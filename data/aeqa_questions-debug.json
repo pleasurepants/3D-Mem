@@ -1,0 +1,42 @@
+[
+    {
+        "question": "Is the bathroom shower curtain open or closed?",
+        "answer": "Open",
+        "category": "object state recognition",
+        "question_id": "15ef0e88-83c5-41dd-9a1f-cf9feb3dafbb",
+        "episode_history": "00878-XB4GS9ShBRE",
+        "position": [
+            -2.8504385948181152,
+            2.7961301803588867,
+            -0.9476851224899292
+        ],
+        "rotation": [
+            -0.9700993895530701,
+            0.0,
+            0.24270813167095184,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+    "question": "Where can I workout?",
+    "answer": "upstairs bedroom",
+    "category": "functional reasoning",
+    "question_id": "f739f880-79fc-4066-9ca1-b04943433974",
+    "episode_history": "00844-q5QZSEeHe5g",
+    "position": [
+        1.1950371265411377,
+        0.15387678146362305,
+        -7.093991279602051
+    ],
+    "rotation": [
+        -0.5859194397926331,
+        0.0,
+        0.8103693127632141,
+        0.0
+    ],
+    "object_id": null,
+    "class": null
+    }
+]

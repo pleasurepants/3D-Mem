@@ -1,0 +1,25 @@
+Mon Mar 24 01:50:52 PM CET 2025
+worker-5
+/home/wiss/zhang/.pyenv/versions/3.10.12/bin/python
+/home/wiss/zhang/code/video-blip-icl/eilev:
+Running on MASTER_NODE=worker-5, MASTER_PORT=8969, RDZV_ID=20050
+2.3.0
+/home/wiss/zhang/anaconda3/envs/3dmem/lib/python3.9/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+00:00:00 - ***** Running exp_eval_aeqa *****
+00:00:00 - Total number of questions: 41
+00:00:00 - number of questions after splitting: 41
+00:00:00 - question path: data/aeqa_questions-41.json
+00:00:00 - Load YOLO model yolov8x-world.pt successful!
+00:00:03 - Load SAM model sam_l.pt successful!
+00:00:03 - Loaded ViT-B-32 model config.
+00:00:04 - Loading pretrained ViT-B-32 weights (laion2b_s34b_b79k).
+00:00:05 - Load CLIP model successful!
+Traceback (most recent call last):
+  File "/home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation.py", line 428, in <module>
+    main(cfg, args.start_ratio, args.end_ratio)
+  File "/home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation.py", line 77, in main
+    logger = Logger(
+  File "/home/wiss/zhang/code/openeqa/3D-Mem/src/logger_aeqa.py", line 126, in __init__
+    assert n_success == len(
+AssertionError: 40 != 41
