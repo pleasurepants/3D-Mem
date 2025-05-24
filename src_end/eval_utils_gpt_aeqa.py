@@ -23,11 +23,12 @@ vlm = VLM(cfg)
 print("Model loaded.")
 
 
-
-
+from dotenv import load_dotenv
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(
     base_url=END_POINT,
-    api_key=OPENAI_KEY,
+    api_key=api_key,
 )
 
 
