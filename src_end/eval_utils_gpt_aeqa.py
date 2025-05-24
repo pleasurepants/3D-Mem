@@ -24,11 +24,10 @@ print("Model loaded.")
 
 
 from dotenv import load_dotenv
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+load_dotenv(dotenv_path="/home/wiss/zhang/code/openeqa/3D-Mem/.env", override=True)
 client = OpenAI(
     base_url=END_POINT,
-    api_key=api_key,
+    api_key=OPENAI_KEY,
 )
 
 
@@ -62,8 +61,12 @@ def evaluate_snapshot_relevance_with_full_prompt(
 
     # 调用 VLM 模型
     probs = vlm.get_loss(image=snapshot_img, prompt=sys_prompt + prompt, tokens=tokens, get_smx=True, T=T)
+    if probs[1]>probs[0]:
+        turn_snapshot=True
+    else:
+        turn_snapshot=False
 
-    return probs
+    return probs, turn_snapshot
 
 
 def format_content(contents):
@@ -379,61 +382,79 @@ def explore_step(step, cfg, verbose=False):
     snapshot_probs = []
     for snapshot_img_base64, classes in zip(snapshot_imgs, snapshot_classes):
         # vlm.model.llm_backbone.half_precision_dtype = torch.float16
-        prob = evaluate_snapshot_relevance_with_full_prompt(vlm, snapshot_img_base64, classes, question)
+        prob, turn_snapshot = evaluate_snapshot_relevance_with_full_prompt(vlm, snapshot_img_base64, classes, question)
         snapshot_probs.append(prob)
 
-    if verbose:
-        logging.info(f"Input prompt:")
-        message = sys_prompt
-        for c in content:
-            message += c[0]
-            if len(c) == 2:
-                message += f"[{c[1][:10]}...]"
-        logging.info(message)
+    # check turn_snapshot True or False
+    turn_snapshot_flags = []
+    snapshot_deltas = []
 
-    retry_bound = 3
-    final_response = None
-    final_reason = None
-    for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
+    for probs in snapshot_probs:
+        delta = probs[0] - probs[1]  # Yes - No
+        snapshot_deltas.append(delta)
+        turn_snapshot_flags.append(probs[0] > probs[1])  # Yes 概率高则为 True
 
-        if full_response is None:
-            print("call_openai_api returns None, retrying")
-            continue
+    if any(turn_snapshot_flags):
+        best_index = int(np.argmax(snapshot_deltas))  # 在保留列表中 index
+        final_response = f"Snapshot {best_index}"  # query_vlm_for_response 会转换
+        final_reason = "Selected based on highest confidence from evaluate_snapshot_relevance_with_full_prompt"
+        return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+    else:
 
-        full_response = full_response.strip()
-        if "\n" in full_response:
-            full_response = full_response.split("\n")
-            response, reason = full_response[0], full_response[-1]
-            response, reason = response.strip(), reason.strip()
-        else:
-            response = full_response
-            reason = ""
-        response = response.lower()
-        try:
-            choice_type, choice_id = response.split(" ")
-        except Exception as e:
-            print(f"Error in splitting response: {response}")
-            print(e)
-            continue
 
-        response_valid = False
-        if (
-            choice_type == "snapshot"
-            and choice_id.isdigit()
-            and 0 <= int(choice_id) < len(snapshot_imgs)
-        ):
-            response_valid = True
-        elif (
-            choice_type == "frontier"
-            and choice_id.isdigit()
-            and 0 <= int(choice_id) < len(frontier_imgs)
-        ):
-            response_valid = True
 
-        if response_valid:
-            final_response = response
-            final_reason = reason
-            break
+        if verbose:
+            logging.info(f"Input prompt:")
+            message = sys_prompt
+            for c in content:
+                message += c[0]
+                if len(c) == 2:
+                    message += f"[{c[1][:10]}...]"
+            logging.info(message)
 
-    return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+        retry_bound = 3
+        final_response = None
+        final_reason = None
+        for _ in range(retry_bound):
+            full_response = call_openai_api(sys_prompt, content)
+
+            if full_response is None:
+                print("call_openai_api returns None, retrying")
+                continue
+
+            full_response = full_response.strip()
+            if "\n" in full_response:
+                full_response = full_response.split("\n")
+                response, reason = full_response[0], full_response[-1]
+                response, reason = response.strip(), reason.strip()
+            else:
+                response = full_response
+                reason = ""
+            response = response.lower()
+            try:
+                choice_type, choice_id = response.split(" ")
+            except Exception as e:
+                print(f"Error in splitting response: {response}")
+                print(e)
+                continue
+
+            response_valid = False
+            if (
+                choice_type == "snapshot"
+                and choice_id.isdigit()
+                and 0 <= int(choice_id) < len(snapshot_imgs)
+            ):
+                response_valid = True
+            elif (
+                choice_type == "frontier"
+                and choice_id.isdigit()
+                and 0 <= int(choice_id) < len(frontier_imgs)
+            ):
+                response_valid = True
+
+            if response_valid:
+                final_response = response
+                final_reason = reason
+                break
+
+        return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)

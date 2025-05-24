@@ -13,6 +13,7 @@
 
 
 source /home/wiss/zhang/anaconda3/bin/activate 3dmem
+source .env
 
 date
 hostname

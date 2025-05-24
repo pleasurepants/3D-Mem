@@ -11,7 +11,6 @@ os.environ["MAGNUM_LOG"] = "quiet"
 
 
 
-
 import argparse
 from omegaconf import OmegaConf
 import random
@@ -233,6 +232,9 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
             logging.info(
                 f"Step {cnt_step}, update snapshots, {len(scene.objects)} objects, {len(scene.snapshots)} snapshots"
             )
+
+
+
 
             # (3) Update the Frontier Snapshots
             update_success = tsdf_planner.update_frontier_map(
