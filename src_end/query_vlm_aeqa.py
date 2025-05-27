@@ -7,6 +7,7 @@ from src_end.scene_aeqa import Scene
 
 
 def query_vlm_for_response(
+    threshold: float,
     vlm, 
     question: str,
     scene: Scene,
@@ -45,7 +46,7 @@ def query_vlm_for_response(
 
     # query vlm
     outputs, snapshot_id_mapping, reason, n_filtered_snapshots = explore_step(
-        vlm, step_dict, cfg, verbose=verbose
+        threshold, vlm, step_dict, cfg, verbose=verbose
     )
     if outputs is None:
         logging.error(f"explore_step failed and returned None")

@@ -392,7 +392,7 @@ def prefiltering(
     return snapshot_classes, keep_index
 
 
-def explore_step(vlm, step, cfg, verbose=False):
+def explore_step(threshold, vlm, step, cfg, verbose=False):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
     (
@@ -422,7 +422,6 @@ def explore_step(vlm, step, cfg, verbose=False):
         prob = evaluate_snapshot_relevance_with_full_prompt(vlm, snapshot_img_base64, classes, question)
         snapshot_probs.append(prob)
 
-    threshold = 0.7  # set a threshold for snapshot selection
 
     # only select snapshots with a probability of yes above the threshold
     qualified_indices = [i for i, probs in enumerate(snapshot_probs) if probs[0] > threshold]

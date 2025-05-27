@@ -274,6 +274,7 @@ def main(vlm_pred, cfg, start_ratio=0.0, end_ratio=1.0):
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                 # query the VLM for the next navigation point, and the reason for the choice
                 vlm_response = query_vlm_for_response(
+                    threshold=cfg.threshold,
                     vlm=vlm_pred,
                     question=question,
                     scene=scene,
@@ -396,6 +397,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
+
+
+    for key in ["output_parent_dir", "questions_list_path"]:
+        if isinstance(cfg[key], str):
+            cfg[key] = cfg[key].format(**cfg)
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
