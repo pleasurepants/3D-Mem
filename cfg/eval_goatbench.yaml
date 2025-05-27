@@ -1,7 +1,7 @@
 # General
-seed: 77
+seed: 88
 exp_name: "exp_eval_goatbench"
-output_parent_dir: "/home/wiss/zhang/projects/openeqa/aeqa/results"
+output_parent_dir: "/home/wiss/zhang/projects/openeqa/aeqa/results_41"
 scene_dataset_config_path: "/home/wiss/zhang/code/openeqa/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/nfs/data2/zhang/openeqa/hm3d/data/3dmem"
 test_data_dir: "data/goat_bench/val_unseen/content/"

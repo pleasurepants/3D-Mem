@@ -811,6 +811,12 @@ class TSDFPlanner(TSDFPlannerBase):
 
             if type(self.max_point) == SnapShot:
                 for obj_id in self.max_point.cluster:
+
+                    if obj_id not in objects:
+                        logging.warning(f"[agent_step] MaxPoint Snapshot object_id {obj_id} not in objects, skipping.")
+                        continue
+
+                    
                     obj_vox = self.habitat2voxel(objects[obj_id]["bbox"].center)
                     ax1.scatter(obj_vox[1], obj_vox[0], color="r", s=30)
 

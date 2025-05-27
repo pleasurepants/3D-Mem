@@ -9,18 +9,16 @@ from typing import Optional
 import logging
 from src_end.const import *
 import torch
-
-import numpy as np
-from PIL import Image
+import argparse
 from omegaconf import OmegaConf
-from src_end.vlm import VLM  
-cfg_path = "/home/wiss/zhang/code/openeqa/explore-eqa/cfg/vlm_exp.yaml"
-cfg = OmegaConf.load(cfg_path)
-cfg = cfg.vlm
+import random
+import numpy as np
+import torch
+import time
+import json
+import logging
+import matplotlib.pyplot as plt
 
-print("Loading model...")
-vlm = VLM(cfg)
-print("Model loaded.")
 
 
 from dotenv import load_dotenv
@@ -62,9 +60,9 @@ def evaluate_snapshot_relevance_with_full_prompt(
     # 调用 VLM 模型
     probs = vlm.get_loss(image=snapshot_img, prompt=sys_prompt + prompt, tokens=tokens, get_smx=True, T=T)
     if probs[1]>probs[0]:
-        turn_snapshot=True
-    else:
         turn_snapshot=False
+    else:
+        turn_snapshot=True
 
     return probs, turn_snapshot
 
@@ -209,10 +207,10 @@ def format_explore_prompt(
     use_snapshot_class=True,
     image_goal=None,
 ):
-    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore.\n"
+    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.\n"
     sys_prompt += "Definitions:\n"
-    sys_prompt += "Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. "
-    sys_prompt += "If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot.\n"
+    sys_prompt += "snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. "
+    sys_prompt += "If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.\n"
     sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
     sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore.\n"
 
@@ -225,7 +223,7 @@ def format_explore_prompt(
     else:
         content.append((text + "\n",))
 
-    text = "Select the Frontier/Snapshot that would help find the answer of the question.\n"
+    text = "Select the Frontier/snapshot that would help find the answer of the question.\n"
     content.append((text,))
 
     # 2 add egocentric view
@@ -242,10 +240,10 @@ def format_explore_prompt(
     text += "So you still need to utilize the images to make decisions.\n"
     content.append((text,))
     if len(snapshot_imgs) == 0:
-        content.append(("No Snapshot is available\n",))
+        content.append(("No snapshot is available\n",))
     else:
         for i in range(len(snapshot_imgs)):
-            content.append((f"Snapshot {i} ", snapshot_imgs[i]))
+            content.append((f"snapshot {i} ", snapshot_imgs[i]))
             if use_snapshot_class:
                 text = ", ".join(snapshot_classes[i])
                 content.append((text,))
@@ -262,12 +260,56 @@ def format_explore_prompt(
             content.append(("\n",))
 
     # 5 here is the format of the answer
-    text = "Please provide your answer in the following format: 'Snapshot i\n[Answer]' or 'Frontier i\n[Reason]', where i is the index of the snapshot or frontier you choose. "
-    text += "For example, if you choose the first snapshot, you can return 'Snapshot 0\nThe fruit bowl is on the kitchen counter.'. "
+    text = "Please provide your answer in the following format: 'snapshot i\n[Answer]' or 'Frontier i\n[Reason]', where i is the index of the snapshot or frontier you choose. "
+    text += "For example, if you choose the first snapshot, you can return 'snapshot 0\nThe fruit bowl is on the kitchen counter.'. "
     text += "If you choose the second frontier, you can return 'Frontier 1\nI see a door that may lead to the living room.'.\n"
     text += "Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; "
     text += "(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.\n"
     content.append((text,))
+
+    return sys_prompt, content
+
+
+
+def format_explore_prompt_end(
+    question,
+    snapshot_img,          
+    snapshot_classes,     
+    image_goal=None,
+):
+    # system prompt: tell the agent to give a final answer based on the snapshot
+    sys_prompt = (
+        "Task: You are an agent in a 3D indoor environment tasked with answering a question.\n"
+        "You have already selected one snapshot image that contains several detected objects.\n"
+        "Now, you should give a final answer to the question **based on this snapshot only**.\n\n"
+        "Instructions:\n"
+        "- Your answer should be a direct, natural sentence that a human can understand.\n"
+        "- DO NOT mention words like 'snapshot', 'in the image', 'on the left', or any reference to image layout.\n"
+        "- Also provide a short reason why this snapshot helps you answer the question."
+    )
+
+    # content to be sent to the model
+    content = []
+
+    if image_goal is not None:
+        content.append((f"Question: {question}", image_goal))
+    else:
+        content.append((f"Question: {question}",))
+
+    # Snapshot 
+    content.append(("Here is the selected snapshot that may help answer the question:", snapshot_img))
+
+    # Object 
+    class_text = ", ".join(snapshot_classes)
+    content.append((f"Objects detected in this snapshot: {class_text}",))
+
+    # final answer format
+    content.append((
+        "Please respond in the following format:\n"
+        "'Answer: <your answer>'\n"
+        "'Reason: <your reason>'\n"
+        "Only return these two lines, nothing else."
+    ,))
 
     return sys_prompt, content
 
@@ -354,7 +396,7 @@ def prefiltering(
     return snapshot_classes, keep_index
 
 
-def explore_step(step, cfg, verbose=False):
+def explore_step(vlm, step, cfg, verbose=False):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
     (
@@ -392,17 +434,35 @@ def explore_step(step, cfg, verbose=False):
     for probs in snapshot_probs:
         delta = probs[0] - probs[1]  # Yes - No
         snapshot_deltas.append(delta)
-        turn_snapshot_flags.append(probs[0] > probs[1])  # Yes 概率高则为 True
+        turn_snapshot_flags.append(probs[0] > probs[1])  # True if Yes is more likely than No
 
     if any(turn_snapshot_flags):
-        best_index = int(np.argmax(snapshot_deltas))  # 在保留列表中 index
-        final_response = f"Snapshot {best_index}"  # query_vlm_for_response 会转换
-        final_reason = "Selected based on highest confidence from evaluate_snapshot_relevance_with_full_prompt"
-        return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
-    else:
+        best_index = int(np.argmax(snapshot_deltas))  
+        final_response = f"snapshot {best_index}"  # query_vlm_for_response will return the index of the best snapshot
+        # final_reason = "Selected based on highest confidence from evaluate_snapshot_relevance_with_full_prompt"
+
+        sys_prompt_explain, content_explain = format_explore_prompt_end(
+            question=question,
+            snapshot_img=snapshot_imgs[best_index],
+            snapshot_classes=snapshot_classes[best_index],
+            image_goal=image_goal,
+        )
+        final_reason = call_openai_api(sys_prompt_explain, content_explain)
+        if final_reason is None:
+            final_reason = "No explanation provided."
 
 
 
+
+
+
+
+
+
+
+
+
+    else:        # No snapshot is selected first, we need to select a frontier
         if verbose:
             logging.info(f"Input prompt:")
             message = sys_prompt
@@ -457,4 +517,4 @@ def explore_step(step, cfg, verbose=False):
                 final_reason = reason
                 break
 
-        return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+    return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)

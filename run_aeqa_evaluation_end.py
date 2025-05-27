@@ -34,9 +34,15 @@ from src_end.utils import resize_image, get_pts_angle_aeqa
 from src_end.query_vlm_aeqa import query_vlm_for_response
 from src_end.logger_aeqa import Logger
 from src_end.const import *
+import numpy as np
+from PIL import Image
+from omegaconf import OmegaConf
+from src_end.vlm import VLM  
 
 
-def main(cfg, start_ratio=0.0, end_ratio=1.0):
+
+
+def main(vlm_pred, cfg, start_ratio=0.0, end_ratio=1.0):
     # load the default concept graph config
     cfg_cg = OmegaConf.load(cfg.concept_graph_config_path)
     OmegaConf.resolve(cfg_cg)
@@ -268,6 +274,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                 # query the VLM for the next navigation point, and the reason for the choice
                 vlm_response = query_vlm_for_response(
+                    vlm=vlm_pred,
                     question=question,
                     scene=scene,
                     tsdf_planner=tsdf_planner,
@@ -426,7 +433,13 @@ if __name__ == "__main__":
     # Set the custom formatter
     for handler in logging.getLogger().handlers:
         handler.setFormatter(formatter)
+    cfg_path = "/home/wiss/zhang/code/openeqa/explore-eqa/cfg/vlm_exp.yaml"
+    cfg_vlm = OmegaConf.load(cfg_path)
+    cfg_vlm = cfg_vlm.vlm
 
+    print("Loading model...123")
+    vlm_pred = VLM(cfg_vlm)
+    print("Model loaded.")
     # run
     logging.info(f"***** Running {cfg.exp_name} *****")
-    main(cfg, args.start_ratio, args.end_ratio)
+    main(vlm_pred, cfg, args.start_ratio, args.end_ratio)

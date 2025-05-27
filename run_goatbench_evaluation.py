@@ -61,9 +61,13 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
     )
     logging.info(f"Total number of scenes: {len(scene_data_list)}")
 
-    all_scene_ids = os.listdir(cfg.scene_data_path + "/train") + os.listdir(
-        cfg.scene_data_path + "/val"
-    )
+    # all_scene_ids = os.listdir(cfg.scene_data_path + "/train") + os.listdir(
+    #     cfg.scene_data_path + "/val"
+    # )
+
+    all_scene_ids = os.listdir(cfg.scene_data_path + "/val")  # only use the val scenes
+
+
 
     # load detection and segmentation models
     detection_model = YOLOWorld(cfg.yolo_model_name)

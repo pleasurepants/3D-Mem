@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=184-eval
+#SBATCH --job-name=pred-eval
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
 #SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6
-#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/184-aeqa-eval-%j.out 
+#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/pred-aeqa-eval-%j.out 
 #SBATCH --partition all
 
 
