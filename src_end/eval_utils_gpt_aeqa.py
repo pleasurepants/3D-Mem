@@ -38,7 +38,6 @@ from torchvision import transforms
 def evaluate_snapshot_relevance_with_full_prompt(
     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
 ):
-    # 将 base64 解码为 PIL 图片
     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
 
     # transform = transforms.Compose([
@@ -47,7 +46,6 @@ def evaluate_snapshot_relevance_with_full_prompt(
     # ])
     # snapshot_tensor = transform(snapshot_img).unsqueeze(0)
 
-    # 构造简洁有效的 prompt（只问：这张图是否足够回答问题）
     class_info = ", ".join(snapshot_classes)
     sys_prompt = (
         "You are an intelligent agent in a 3D indoor environment.\n"
@@ -56,15 +54,13 @@ def evaluate_snapshot_relevance_with_full_prompt(
         "Determine if the snapshot contains enough information to confidently answer the question.\n"
     )
     prompt = f"Question: {question}\nCan you confidently answer the question based on this view? Answer with Yes or No."
-
-    # 调用 VLM 模型
+    # reasoning steps in details
+    # different threshold
+    # 2steps verification
     probs = vlm.get_loss(image=snapshot_img, prompt=sys_prompt + prompt, tokens=tokens, get_smx=True, T=T)
-    if probs[1]>probs[0]:
-        turn_snapshot=False
-    else:
-        turn_snapshot=True
 
-    return probs, turn_snapshot
+
+    return probs
 
 
 def format_content(contents):
@@ -420,26 +416,20 @@ def explore_step(vlm, step, cfg, verbose=False):
     )
 
 
-    # 计算每个snapshot的概率（完整prompt）
     snapshot_probs = []
     for snapshot_img_base64, classes in zip(snapshot_imgs, snapshot_classes):
         # vlm.model.llm_backbone.half_precision_dtype = torch.float16
-        prob, turn_snapshot = evaluate_snapshot_relevance_with_full_prompt(vlm, snapshot_img_base64, classes, question)
+        prob = evaluate_snapshot_relevance_with_full_prompt(vlm, snapshot_img_base64, classes, question)
         snapshot_probs.append(prob)
 
-    # check turn_snapshot True or False
-    turn_snapshot_flags = []
-    snapshot_deltas = []
+    threshold = 0.7  # set a threshold for snapshot selection
 
-    for probs in snapshot_probs:
-        delta = probs[0] - probs[1]  # Yes - No
-        snapshot_deltas.append(delta)
-        turn_snapshot_flags.append(probs[0] > probs[1])  # True if Yes is more likely than No
+    # only select snapshots with a probability of yes above the threshold
+    qualified_indices = [i for i, probs in enumerate(snapshot_probs) if probs[0] > threshold]
 
-    if any(turn_snapshot_flags):
-        best_index = int(np.argmax(snapshot_deltas))  
-        final_response = f"snapshot {best_index}"  # query_vlm_for_response will return the index of the best snapshot
-        # final_reason = "Selected based on highest confidence from evaluate_snapshot_relevance_with_full_prompt"
+    if qualified_indices:
+        best_index = max(qualified_indices, key=lambda i: snapshot_probs[i][0] - snapshot_probs[i][1])
+        final_response = f"snapshot {best_index}"
 
         sys_prompt_explain, content_explain = format_explore_prompt_end(
             question=question,
@@ -450,13 +440,6 @@ def explore_step(vlm, step, cfg, verbose=False):
         final_reason = call_openai_api(sys_prompt_explain, content_explain)
         if final_reason is None:
             final_reason = "No explanation provided."
-
-
-
-
-
-
-
 
 
 
