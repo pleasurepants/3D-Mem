@@ -2282,3 +2282,422 @@ UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, whic
 00:15:01 - Current position: [     1.8268    0.050354      9.8939], 10.118
 00:15:04 - 
 == step: 10
+00:15:04 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.03 seconds
+00:15:06 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:15:07 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:15:08 - Step 10, update snapshots, 28 objects, 13 snapshots
+00:15:10 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:15:10 - Prefiltering selected classes: ['bench', 'coffee table', 'sofa chair']
+00:15:10 - Prefiltering snapshot: 13 -> 3
+00:15:11 - Input prompt:
+00:15:11 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]coffee table
+snapshot 1 [iVBORw0KGg...]bench, sofa chair
+snapshot 2 [iVBORw0KGg...]bench
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+
+00:15:22 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:15:22 - Response: [frontier 7]
+Reason: [The view suggests there may be an outdoor area, which could be ideal for a summer evening dinner party. Exploring further might reveal a suitable space for setting the table.]
+00:15:22 - Prediction: frontier, 7
+00:15:22 - Next choice: Frontier at [143  89]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:15:23 - Current position: [     2.8268    0.050354      9.7939], 11.123
+00:15:26 - 
+== step: 11
+00:15:26 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:15:28 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+00:15:29 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:15:31 - Done! Execution time of denoise_objects function: 1.11 seconds
+00:15:31 - Done! Execution time of merge_objects function: 0.15 seconds
+00:15:31 - Step 11, update snapshots, 28 objects, 12 snapshots
+00:15:35 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:15:35 - Prefiltering selected classes: ['bench', 'coffee table', 'couch', 'sofa chair']
+00:15:35 - Prefiltering snapshot: 12 -> 3
+00:15:35 - Input prompt:
+00:15:35 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]bench, coffee table, couch, sofa chair
+snapshot 1 [iVBORw0KGg...]sofa chair
+snapshot 2 [iVBORw0KGg...]sofa chair
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Frontier 8 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+
+00:15:46 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:15:46 - Response: [frontier 7]
+Reason: [To find a suitable area for setting the table, I'll explore this direction as it seems to lead to a larger space that might include a dining area.]
+00:15:46 - Prediction: frontier, 7
+00:15:46 - Next choice: Frontier at [144 104]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:15:47 - Current position: [     3.5268    0.050354      8.9939], 12.186
+00:15:50 - 
+== step: 12
+00:15:51 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.14 seconds
+00:15:53 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:15:54 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.15 seconds
+00:15:55 - Step 12, update snapshots, 38 objects, 15 snapshots
+00:15:58 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:15:58 - Prefiltering selected classes: ['bench', 'chair', 'coffee table', 'couch', 'sofa chair']
+00:15:58 - Prefiltering snapshot: 15 -> 4
+00:15:59 - Input prompt:
+00:15:59 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]chair, coffee table, couch, sofa chair
+snapshot 1 [iVBORw0KGg...]bench
+snapshot 2 [iVBORw0KGg...]sofa chair
+snapshot 3 [iVBORw0KGg...]sofa chair
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+
+00:16:07 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:16:07 - Response: [frontier 7]
+Reason: [There is a view outside through the windows that may lead to a suitable outdoor space for a summer dinner party.]
+00:16:07 - Prediction: frontier, 7
+00:16:07 - Next choice: Frontier at [161  96]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:16:07 - Current position: [     4.4268    0.050354      9.1939], 13.108
+00:16:10 - 
+== step: 13
+00:16:11 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.03 seconds
+00:16:12 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.14 seconds
+00:16:14 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.12 seconds
+00:16:15 - Step 13, update snapshots, 41 objects, 16 snapshots
+00:16:18 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:16:18 - Prefiltering selected classes: ['bench', 'chair', 'coffee table', 'couch', 'sofa chair']
+00:16:18 - Prefiltering snapshot: 16 -> 4
+00:16:19 - Input prompt:
+00:16:19 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]chair, coffee table, couch, sofa chair
+snapshot 1 [iVBORw0KGg...]bench
+snapshot 2 [iVBORw0KGg...]sofa chair
+snapshot 3 [iVBORw0KGg...]sofa chair
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Frontier 8 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+
+00:16:29 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:16:29 - Response: [frontier 7]
+Reason: [The sliding doors lead to an outdoor area where setting a table for a summer evening dinner party would be ideal.]
+00:16:29 - Prediction: frontier, 7
+00:16:29 - Next choice: Frontier at [163 109]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:16:29 - Current position: [     5.2268    0.050354      8.5939], 14.108
+00:16:32 - 
+== step: 14
+00:16:33 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:16:34 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.15 seconds
+00:16:36 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.15 seconds
+00:16:37 - Step 14, update snapshots, 42 objects, 18 snapshots
+00:16:40 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:16:40 - Prefiltering selected classes: ['coffee table', 'couch', 'bench', 'sofa chair', 'armchair']
+00:16:40 - Prefiltering snapshot: 18 -> 5
+00:16:41 - Input prompt:
+00:16:41 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]armchair
+snapshot 1 [iVBORw0KGg...]armchair, coffee table, couch
+snapshot 2 [iVBORw0KGg...]bench
+snapshot 3 [iVBORw0KGg...]sofa chair
+snapshot 4 [iVBORw0KGg...]sofa chair
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Frontier 8 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+
+00:16:51 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:16:51 - Response: [frontier 8]
+Reason: [I want to explore the outdoor area visible through the glass doors, as it seems like a suitable place for a summer evening dinner party.]
+00:16:51 - Prediction: frontier, 8
+00:16:51 - Next choice: Frontier at [170 115]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:16:51 - Current position: [     5.5268    0.050354      7.6939], 15.057
+00:16:55 - 
+== step: 15
+00:16:55 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.03 seconds
+00:16:56 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.17 seconds
+00:16:58 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+00:17:00 - Done! Execution time of denoise_objects function: 1.73 seconds
+00:17:01 - Done! Execution time of merge_objects function: 0.25 seconds
+00:17:01 - Step 15, update snapshots, 38 objects, 16 snapshots
+00:17:04 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:17:04 - Prefiltering selected classes: ['coffee table', 'bench', 'couch', 'sofa chair', 'armchair']
+00:17:04 - Prefiltering snapshot: 16 -> 5
+00:17:05 - Input prompt:
+00:17:05 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]coffee table
+snapshot 1 [iVBORw0KGg...]armchair, coffee table, couch
+snapshot 2 [iVBORw0KGg...]bench
+snapshot 3 [iVBORw0KGg...]sofa chair
+snapshot 4 [iVBORw0KGg...]sofa chair
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Frontier 8 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+
+00:17:16 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:17:16 - Response: [frontier 8]
+Reason: [The outdoor area visible through the glass doors seems like a suitable place for a summer evening dinner party. Exploring it may provide more details on the setting.]
+00:17:16 - Prediction: frontier, 8
+00:17:16 - Next choice: Frontier at [177 122]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:17:16 - Current position: [     6.4268    0.050354      7.0939], 16.138
+00:17:20 - 
+== step: 16
+00:17:20 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.01 seconds
+00:17:21 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.04 seconds
+00:17:22 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.02 seconds
+00:17:23 - Step 16, update snapshots, 40 objects, 16 snapshots
+00:17:25 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:17:25 - Prefiltering selected classes: ['dining table', 'chair', 'bench', 'couch', 'sofa chair']
+00:17:25 - Prefiltering snapshot: 16 -> 5
+00:17:27 - Input prompt:
+00:17:27 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]bench
+snapshot 1 [iVBORw0KGg...]sofa chair
+snapshot 2 [iVBORw0KGg...]couch
+snapshot 3 [iVBORw0KGg...]chair, dining table
+snapshot 4 [iVBORw0KGg...]sofa chair
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Frontier 8 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+
+00:17:36 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:17:36 - Response: [frontier 8]
+Reason: [The outdoor area visible through the glass doors looks ideal for a summer evening dinner party. I would like to explore this area further to see if it's suitable for setting the table.]
+00:17:36 - Prediction: frontier, 8
+00:17:36 - Next choice: Frontier at [172 133]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:17:37 - Current position: [     6.5268    0.050354      6.0939], 17.143
+00:17:40 - 
+== step: 17
+00:17:42 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+00:17:43 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:17:44 - Step 17, update snapshots, 44 objects, 17 snapshots
+00:17:47 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:17:47 - Prefiltering selected classes: ['dining table', 'chair', 'folded chair', 'bench', 'sofa chair']
+00:17:47 - Prefiltering snapshot: 17 -> 5
+00:17:49 - Input prompt:
+00:17:49 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]bench
+snapshot 1 [iVBORw0KGg...]sofa chair
+snapshot 2 [iVBORw0KGg...]sofa chair
+snapshot 3 [iVBORw0KGg...]chair, dining table, folded chair
+snapshot 4 [iVBORw0KGg...]sofa chair
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Frontier 8 [iVBORw0KGg...]
+Frontier 9 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+
+00:17:56 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:17:56 - Response: [frontier 7]
+Reason: [The outdoor area beyond the glass doors might be suitable for a summer evening dinner party.]
+00:17:56 - Prediction: frontier, 7
+00:17:56 - Next choice: Frontier at [180 100]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:17:57 - Current position: [     6.8268    0.050354      7.0939], 18.187
+00:18:00 - 
+== step: 18
+00:18:01 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.15 seconds
+00:18:02 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.03 seconds
+00:18:03 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:18:04 - Step 18, update snapshots, 45 objects, 18 snapshots
+00:18:07 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:18:07 - Prefiltering selected classes: ['dining table', 'chair', 'folded chair', 'bench', 'fan']
+00:18:07 - Prefiltering snapshot: 18 -> 4
+00:18:08 - Input prompt:
+00:18:08 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]bench
+snapshot 1 [iVBORw0KGg...]fan
+snapshot 2 [iVBORw0KGg...]chair, dining table, folded chair
+snapshot 3 [iVBORw0KGg...]chair
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Frontier 8 [iVBORw0KGg...]
+Frontier 9 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+

@@ -179,8 +179,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-slurm/*.out
-.env
-*.out
-*.err
-*.log
+slurm/pred/*.out
