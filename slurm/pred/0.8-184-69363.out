@@ -2701,3 +2701,10 @@ The fruit bowl is on the kitchen counter.'. If you choose the second frontier, y
 I see a door that may lead to the living room.'.
 Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
 
+00:18:17 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:18:17 - Response: [frontier 9]
+Reason: [Exploring the outdoor area might reveal an ideal spot for a summer evening dinner party.]
+00:18:17 - Prediction: frontier, 9
+00:18:17 - Next choice: Frontier at [180  98]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:18:17 - Current position: [     7.1268    0.050354      8.0939], 19.231

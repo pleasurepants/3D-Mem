@@ -2367,3 +2367,46 @@ The fruit bowl is on the kitchen counter.'. If you choose the second frontier, y
 I see a door that may lead to the living room.'.
 Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
 
+00:17:58 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:17:58 - Response: [frontier 6]
+Reason: [The area ahead seems to lead to a larger, possibly open space where a dinner table could be set up for a summer evening. Exploring this direction might reveal more suitable areas.]
+00:17:58 - Prediction: frontier, 6
+00:17:58 - Next choice: Frontier at [126  86]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:17:58 - Current position: [     1.1268    0.050354      10.094], 10.103
+00:18:01 - 
+== step: 10
+00:18:02 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.03 seconds
+00:18:03 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:18:05 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:18:06 - Step 10, update snapshots, 23 objects, 12 snapshots
+00:18:08 - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+00:18:08 - Prefiltering selected classes: ['couch']
+00:18:08 - Prefiltering snapshot: 12 -> 1
+00:18:09 - Input prompt:
+00:18:09 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.
+Definitions:
+snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.
+Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore.
+Question: I want to host a dinner party on a summer evening, where should I set the table?
+Select the Frontier/snapshot that would help find the answer of the question.
+The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...]
+The followings are all the snapshots that you can choose (followed with contained object classes)
+Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions.
+snapshot 0 [iVBORw0KGg...]couch
+The followings are all the Frontiers that you can explore: 
+Frontier 0 [iVBORw0KGg...]
+Frontier 1 [iVBORw0KGg...]
+Frontier 2 [iVBORw0KGg...]
+Frontier 3 [iVBORw0KGg...]
+Frontier 4 [iVBORw0KGg...]
+Frontier 5 [iVBORw0KGg...]
+Frontier 6 [iVBORw0KGg...]
+Frontier 7 [iVBORw0KGg...]
+Please provide your answer in the following format: 'snapshot i
+[Answer]' or 'Frontier i
+[Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'snapshot 0
+The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1
+I see a door that may lead to the living room.'.
+Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.
+
