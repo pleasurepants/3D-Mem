@@ -35,32 +35,87 @@ import base64
 import torch
 from torchvision import transforms
 
+
+# before 
+# def evaluate_snapshot_relevance_with_full_prompt(
+#     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
+# ):
+#     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
+
+#     # transform = transforms.Compose([
+#     #     transforms.Resize((224, 224)),  # 依据你模型默认输入尺寸调整
+#     #     transforms.ToTensor()
+#     # ])
+#     # snapshot_tensor = transform(snapshot_img).unsqueeze(0)
+
+#     class_info = ", ".join(snapshot_classes)
+#     sys_prompt = (
+#         "You are an intelligent agent in a 3D indoor environment.\n"
+#         "You are given a question and a snapshot image that contains the following detected objects:\n"
+#         f"{class_info}\n\n"
+#         "Determine if the snapshot contains enough information to confidently answer the question.\n"
+#     )
+#     prompt = f"Question: {question}\nCan you confidently answer the question based on this view? Answer with Yes or No."
+#     # reasoning steps in details
+#     # different threshold
+#     # 2steps verification
+#     probs = vlm.get_loss(image=snapshot_img, prompt=sys_prompt + prompt, tokens=tokens, get_smx=True, T=T)
+
+
+#     return probs
+
+
+
+
+
 def evaluate_snapshot_relevance_with_full_prompt(
     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
 ):
+    from PIL import Image
+    from io import BytesIO
+    import base64
+
     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
-
-    # transform = transforms.Compose([
-    #     transforms.Resize((224, 224)),  # 依据你模型默认输入尺寸调整
-    #     transforms.ToTensor()
-    # ])
-    # snapshot_tensor = transform(snapshot_img).unsqueeze(0)
-
     class_info = ", ".join(snapshot_classes)
-    sys_prompt = (
-        "You are an intelligent agent in a 3D indoor environment.\n"
-        "You are given a question and a snapshot image that contains the following detected objects:\n"
-        f"{class_info}\n\n"
-        "Determine if the snapshot contains enough information to confidently answer the question.\n"
-    )
-    prompt = f"Question: {question}\nCan you confidently answer the question based on this view? Answer with Yes or No."
-    # reasoning steps in details
-    # different threshold
-    # 2steps verification
-    probs = vlm.get_loss(image=snapshot_img, prompt=sys_prompt + prompt, tokens=tokens, get_smx=True, T=T)
 
+    # System Prompt —— adding refusal and reasoning steps
+    sys_prompt = (
+        "You are a visual agent operating in a 3D indoor environment.\n"
+        "You are given a natural language question and a snapshot image with the following detected objects:\n"
+        f"{class_info}\n\n"
+        "Your task is to decide whether this snapshot contains enough visual information to confidently answer the question.\n"
+        "If the snapshot is sufficient and you are confident, respond with 'Yes'.\n"
+        "If the snapshot is insufficient or uncertain, respond with 'No'. Do not guess.\n"
+        "Only answer based on the visual evidence in the snapshot. Do not infer from prior knowledge.\n"
+    )
+
+    prompt = (
+        f"Question: {question}\n"
+        "Step 1: Check the listed objects.\n"
+        "Step 2: Consider whether they provide enough evidence to answer the question.\n"
+        "Step 3: Respond only with one word: Yes or No."
+    )
+
+    # Call VLM for loss-based softmax scoring
+    probs = vlm.get_loss(
+        image=snapshot_img,
+        prompt=sys_prompt + prompt,
+        tokens=tokens,
+        get_smx=True,
+        T=T,
+    )
 
     return probs
+
+
+
+
+
+
+
+
+
+
 
 
 def format_content(contents):
