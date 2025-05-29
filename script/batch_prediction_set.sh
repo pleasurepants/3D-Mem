@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=vf-0.6-184
+#SBATCH --job-name=fs-0.6-184
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
 #SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-1,worker-3,worker-4,worker-5,worker-7,worker-9
-#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/ver/0.6-184-verf-%j.out 
+#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/fewshot/0.6-184-fewshot-%j.out 
 #SBATCH --partition all
 
 # srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:1 --time=4:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6 --partition all bash
