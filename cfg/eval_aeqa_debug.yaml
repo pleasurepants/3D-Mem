@@ -1,12 +1,12 @@
 # General
 seed: 88
 exp_name: "exp_eval_aeqa"
-threshold: 0.6  # the threshold for the predicted answers, only answers with confidence larger than this will be considered
-hm3d_num: 184  # the number of scenes in HM3D to evaluate on, this is the number of scenes in the original HM3D dataset
-output_parent_dir: "/home/wiss/zhang/projects/openeqa/aeqa/gpt-4o-mini/pred_{threshold}/results_{hm3d_num}_verf"
+threshold: 0.5  # the threshold for the predicted answers, only answers with confidence larger than this will be considered
+hm3d_num: 41  # the number of scenes in HM3D to evaluate on, this is the number of scenes in the original HM3D dataset
+output_parent_dir: "/home/wiss/zhang/projects/openeqa/aeqa/results_debug_end/pred_{threshold}/results_{hm3d_num}_fewshot"
 scene_dataset_config_path: "/home/wiss/zhang/code/openeqa/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/nfs/data2/zhang/openeqa/hm3d/data/3dmem"
-questions_list_path: 'data/aeqa_questions-{hm3d_num}.json'
+questions_list_path: 'data/aeqa_questions-debug.json'
 
 
 concept_graph_config_path: "/home/wiss/zhang/code/openeqa/3D-Mem/cfg/concept_graph_default.yaml"
