@@ -68,114 +68,114 @@ from torchvision import transforms
 
 
 # version_2
-# def evaluate_snapshot_relevance_with_full_prompt(
-#     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
-# ):
-
-
-#     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
-#     class_info = ", ".join(snapshot_classes)
-
-#     # System Prompt —— adding refusal and reasoning steps
-#     sys_prompt = (
-#         "You are a visual agent operating in a 3D indoor environment.\n"
-#         "You are given a natural language question and a snapshot image with the following detected objects:\n"
-#         f"{class_info}\n\n"
-#         "Your task is to decide whether this snapshot contains enough visual information to confidently answer the question.\n"
-#         "If the snapshot is sufficient and you are confident, respond with 'Yes'.\n"
-#         "If the snapshot is insufficient or uncertain, respond with 'No'. Do not guess.\n"
-#         "Only answer based on the visual evidence in the snapshot. Do not infer from prior knowledge.\n"
-#     )
-
-#     prompt = (
-#         f"Question: {question}\n"
-#         "Step 1: Check the listed objects.\n"
-#         "Step 2: Consider whether they provide enough evidence to answer the question.\n"
-#         "Step 3: Respond only with one word: Yes or No."
-#     )
-
-#     # Call VLM for loss-based softmax scoring
-#     probs = vlm.get_loss(
-#         image=snapshot_img,
-#         prompt=sys_prompt + prompt,
-#         tokens=tokens,
-#         get_smx=True,
-#         T=T,
-#     )
-
-#     return probs
-
-
-
-
-
-#version_3 fewshot
 def evaluate_snapshot_relevance_with_full_prompt(
     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
 ):
 
 
-    few_shot_examples = """
-        [Examples]
-
-        Question: Is there a laptop on the desk?
-        Detected objects: desk, chair, lamp, laptop
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: Yes
-
-        ---
-
-        Question: Is there a red mug on the dining table?
-        Detected objects: dining table, chair, mug
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: No
-
-        ---
-
-        Question: Is there enough space to walk between the sofa and the TV stand?
-        Detected objects: sofa, TV stand, coffee table, rug
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: Yes
-
-        ---
-
-        Question: What is written on the whiteboard?
-        Detected objects: whiteboard, marker, eraser
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: No
-
-        ---
-
-        Question: Can you see the microwave in the kitchen area?
-        Detected objects: countertop, sink, oven
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: No
-
-        ---
-        """
-
     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
     class_info = ", ".join(snapshot_classes)
 
-    prompt = (
-        "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
-        "Your task is to answer only this: \"Are you confident you can answer the question based solely on this snapshot?\"\n"
-        "Answer with \"Yes\" if you are confident that the snapshot contains enough visual evidence. Otherwise, answer \"No\".\n"
-        "Do not guess. Only answer \"Yes\" if you are truly confident.\n"
-        + few_shot_examples +
-        f"\nQuestion: {question}\nDetected objects: {class_info}\nAre you confident you can answer the question based solely on this snapshot?\nAnswer:"
+    # System Prompt —— adding refusal and reasoning steps
+    sys_prompt = (
+        "You are a visual agent operating in a 3D indoor environment.\n"
+        "You are given a natural language question and a snapshot image with the following detected objects:\n"
+        f"{class_info}\n\n"
+        "Your task is to decide whether this snapshot contains enough visual information to confidently answer the question.\n"
+        "If the snapshot is sufficient and you are confident, respond with 'Yes'.\n"
+        "If the snapshot is insufficient or uncertain, respond with 'No'. Do not guess.\n"
+        "Only answer based on the visual evidence in the snapshot. Do not infer from prior knowledge.\n"
     )
 
-    # 3. 调用VLM
+    prompt = (
+        f"Question: {question}\n"
+        "Step 1: Check the listed objects.\n"
+        "Step 2: Consider whether they provide enough evidence to answer the question.\n"
+        "Step 3: Respond only with one word: Yes or No."
+    )
+
+    # Call VLM for loss-based softmax scoring
     probs = vlm.get_loss(
         image=snapshot_img,
-        prompt=prompt,
+        prompt=sys_prompt + prompt,
         tokens=tokens,
         get_smx=True,
         T=T,
     )
 
     return probs
+
+
+
+
+
+#version_3 fewshot
+# def evaluate_snapshot_relevance_with_full_prompt(
+#     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
+# ):
+
+
+#     few_shot_examples = """
+#         [Examples]
+
+#         Question: Is there a laptop on the desk?
+#         Detected objects: desk, chair, lamp, laptop
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: Yes
+
+#         ---
+
+#         Question: Is there a red mug on the dining table?
+#         Detected objects: dining table, chair, mug
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: No
+
+#         ---
+
+#         Question: Is there enough space to walk between the sofa and the TV stand?
+#         Detected objects: sofa, TV stand, coffee table, rug
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: Yes
+
+#         ---
+
+#         Question: What is written on the whiteboard?
+#         Detected objects: whiteboard, marker, eraser
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: No
+
+#         ---
+
+#         Question: Can you see the microwave in the kitchen area?
+#         Detected objects: countertop, sink, oven
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: No
+
+#         ---
+#         """
+
+#     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
+#     class_info = ", ".join(snapshot_classes)
+
+#     prompt = (
+#         "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
+#         "Your task is to answer only this: \"Are you confident you can answer the question based solely on this snapshot?\"\n"
+#         "Answer with \"Yes\" if you are confident that the snapshot contains enough visual evidence. Otherwise, answer \"No\".\n"
+#         "Do not guess. Only answer \"Yes\" if you are truly confident.\n"
+#         + few_shot_examples +
+#         f"\nQuestion: {question}\nDetected objects: {class_info}\nAre you confident you can answer the question based solely on this snapshot?\nAnswer:"
+#     )
+
+#     # 3. 调用VLM
+#     probs = vlm.get_loss(
+#         image=snapshot_img,
+#         prompt=prompt,
+#         tokens=tokens,
+#         get_smx=True,
+#         T=T,
+#     )
+
+#     return probs
 
 
 
@@ -394,7 +394,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="gpt-4o-mini",  # model = "deployment_name"
+                model="gpt-4o",  # model = "deployment_name"
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096,
