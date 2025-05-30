@@ -110,162 +110,162 @@ from torchvision import transforms
 
 
 #version_3
-def evaluate_snapshot_relevance_with_full_prompt(
-    vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
-):
+# def evaluate_snapshot_relevance_with_full_prompt(
+#     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
+# ):
 
 
-    few_shot_examples = """
-        [Examples]
+#     few_shot_examples = """
+#         [Examples]
 
-        Question: Is there a laptop on the desk?
-        Detected objects: desk, chair, lamp, laptop
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: Yes
+#         Question: Is there a laptop on the desk?
+#         Detected objects: desk, chair, lamp, laptop
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: Yes
 
-        ---
+#         ---
 
-        Question: Is there a red mug on the dining table?
-        Detected objects: dining table, chair, mug
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: No
+#         Question: Is there a red mug on the dining table?
+#         Detected objects: dining table, chair, mug
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: No
 
-        ---
+#         ---
 
-        Question: Is there enough space to walk between the sofa and the TV stand?
-        Detected objects: sofa, TV stand, coffee table, rug
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: Yes
+#         Question: Is there enough space to walk between the sofa and the TV stand?
+#         Detected objects: sofa, TV stand, coffee table, rug
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: Yes
 
-        ---
+#         ---
 
-        Question: What is written on the whiteboard?
-        Detected objects: whiteboard, marker, eraser
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: No
+#         Question: What is written on the whiteboard?
+#         Detected objects: whiteboard, marker, eraser
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: No
 
-        ---
+#         ---
 
-        Question: Can you see the microwave in the kitchen area?
-        Detected objects: countertop, sink, oven
-        Are you confident you can answer the question based solely on this snapshot?
-        Answer: No
+#         Question: Can you see the microwave in the kitchen area?
+#         Detected objects: countertop, sink, oven
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: No
 
-        ---
-        """
+#         ---
+#         """
 
-    snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
-    class_info = ", ".join(snapshot_classes)
+#     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
+#     class_info = ", ".join(snapshot_classes)
 
-    prompt = (
-        "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
-        "Your task is to answer only this: \"Are you confident you can answer the question based solely on this snapshot?\"\n"
-        "Answer with \"Yes\" if you are confident that the snapshot contains enough visual evidence. Otherwise, answer \"No\".\n"
-        "Do not guess. Only answer \"Yes\" if you are truly confident.\n"
-        + few_shot_examples +
-        f"\nQuestion: {question}\nDetected objects: {class_info}\nAre you confident you can answer the question based solely on this snapshot?\nAnswer:"
-    )
+#     prompt = (
+#         "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
+#         "Your task is to answer only this: \"Are you confident you can answer the question based solely on this snapshot?\"\n"
+#         "Answer with \"Yes\" if you are confident that the snapshot contains enough visual evidence. Otherwise, answer \"No\".\n"
+#         "Do not guess. Only answer \"Yes\" if you are truly confident.\n"
+#         + few_shot_examples +
+#         f"\nQuestion: {question}\nDetected objects: {class_info}\nAre you confident you can answer the question based solely on this snapshot?\nAnswer:"
+#     )
 
-    # 3. 调用VLM
-    probs = vlm.get_loss(
-        image=snapshot_img,
-        prompt=prompt,
-        tokens=tokens,
-        get_smx=True,
-        T=T,
-    )
-
-
-    few_shot_anwer = """
-    [Examples]
-
-    Question: What is the white object on the wall above the TV?
-    Detected objects: desk, chair, lamp, laptop, Air conditioning unit, Air conditioner
-    Reasoning: The detected objects include an air conditioning unit and the question asks about a white object above the TV, which matches the position of an air conditioner in typical rooms.
-    Answer: Air conditioning unit
-
-    ---
-
-    Question: Is there a red mug on the dining table?
-    Detected objects: dining table, chair, mug
-    Reasoning: There is a mug detected, but no color information can be clearly seen from the snapshot, so I cannot be confident about its color.
-    Answer: No
-    """
-
-    prompt_answer = (
-        "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
-        "Your task is to think step by step: first provide a brief reasoning process based solely on the visual information in the snapshot, then give the final answer.\n"
-        + few_shot_anwer +
-        f"\nQuestion: {question}\nDetected objects: {class_info}\nReasoning: <your reasoning>\nAnswer: <your answer>\n"
-    )
-
-    # 调用生成接口
-    reasoning_and_answer = vlm.generate(
-        image=snapshot_img,
-        prompt=prompt_answer,
-        T=T,
-    )
+#     # 3. 调用VLM
+#     probs = vlm.get_loss(
+#         image=snapshot_img,
+#         prompt=prompt,
+#         tokens=tokens,
+#         get_smx=True,
+#         T=T,
+#     )
 
 
-    few_shot_verification = """
-        [Examples]
+#     few_shot_anwer = """
+#     [Examples]
 
-        Question: What is the white object on the wall above the TV?
-        Detected objects: desk, chair, lamp, laptop, Air conditioning unit, Air conditioner
-        Answer: Air conditioning unit
-        Does this answer confidently and correctly answer the question based on the snapshot?
-        Yes
+#     Question: What is the white object on the wall above the TV?
+#     Detected objects: desk, chair, lamp, laptop, Air conditioning unit, Air conditioner
+#     Reasoning: The detected objects include an air conditioning unit and the question asks about a white object above the TV, which matches the position of an air conditioner in typical rooms.
+#     Answer: Air conditioning unit
 
-        ---
+#     ---
 
-        Question: Is there a red mug on the dining table?
-        Detected objects: dining table, chair, mug
-        Answer: No
-        Does this answer confidently and correctly answer the question based on the snapshot?
-        Yes
+#     Question: Is there a red mug on the dining table?
+#     Detected objects: dining table, chair, mug
+#     Reasoning: There is a mug detected, but no color information can be clearly seen from the snapshot, so I cannot be confident about its color.
+#     Answer: No
+#     """
 
-        ---
+#     prompt_answer = (
+#         "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
+#         "Your task is to think step by step: first provide a brief reasoning process based solely on the visual information in the snapshot, then give the final answer.\n"
+#         + few_shot_anwer +
+#         f"\nQuestion: {question}\nDetected objects: {class_info}\nReasoning: <your reasoning>\nAnswer: <your answer>\n"
+#     )
 
-        Question: What is written on the whiteboard?
-        Detected objects: whiteboard, marker, eraser
-        Answer: Meeting agenda
-        Does this answer confidently and correctly answer the question based on the snapshot?
-        No
-
-        ---
-
-        Question: Is there enough space to walk between the sofa and the TV stand?
-        Detected objects: sofa, TV stand, coffee table, rug
-        Answer: Yes
-        Does this answer confidently and correctly answer the question based on the snapshot?
-        Yes
-        """
+#     # 调用生成接口
+#     reasoning_and_answer = vlm.generate(
+#         image=snapshot_img,
+#         prompt=prompt_answer,
+#         T=T,
+#     )
 
 
-    prompt_verification = (
-    "You are a visual agent in a 3D environment. For each question, you are given a snapshot image, a list of detected objects, and an answer.\n"
-    "Please decide: Does this answer confidently and correctly answer the question based on the visual evidence in the snapshot?\n"
-    + few_shot_verification +
-    f"\nQuestion: {question}\nDetected objects: {class_info}\nAnswer: {reasoning_and_answer}\nDoes this answer confidently and correctly answer the question based on the snapshot?")
+#     few_shot_verification = """
+#         [Examples]
 
-    probs_verify = vlm.get_loss(
-        image=snapshot_img,
-        prompt=prompt_verification,
-        tokens=tokens,
-        get_smx=True,
-        T=T,
-    )
+#         Question: What is the white object on the wall above the TV?
+#         Detected objects: desk, chair, lamp, laptop, Air conditioning unit, Air conditioner
+#         Answer: Air conditioning unit
+#         Does this answer confidently and correctly answer the question based on the snapshot?
+#         Yes
 
-    turn_snapshot = False
-    if probs_verify[0] > 0.8:
-        turn_snapshot = True
-        print(f"Snapshot is selected with probability: {probs_verify[0]}")
+#         ---
+
+#         Question: Is there a red mug on the dining table?
+#         Detected objects: dining table, chair, mug
+#         Answer: No
+#         Does this answer confidently and correctly answer the question based on the snapshot?
+#         Yes
+
+#         ---
+
+#         Question: What is written on the whiteboard?
+#         Detected objects: whiteboard, marker, eraser
+#         Answer: Meeting agenda
+#         Does this answer confidently and correctly answer the question based on the snapshot?
+#         No
+
+#         ---
+
+#         Question: Is there enough space to walk between the sofa and the TV stand?
+#         Detected objects: sofa, TV stand, coffee table, rug
+#         Answer: Yes
+#         Does this answer confidently and correctly answer the question based on the snapshot?
+#         Yes
+#         """
+
+
+#     prompt_verification = (
+#     "You are a visual agent in a 3D environment. For each question, you are given a snapshot image, a list of detected objects, and an answer.\n"
+#     "Please decide: Does this answer confidently and correctly answer the question based on the visual evidence in the snapshot?\n"
+#     + few_shot_verification +
+#     f"\nQuestion: {question}\nDetected objects: {class_info}\nAnswer: {reasoning_and_answer}\nDoes this answer confidently and correctly answer the question based on the snapshot?")
+
+#     probs_verify = vlm.get_loss(
+#         image=snapshot_img,
+#         prompt=prompt_verification,
+#         tokens=tokens,
+#         get_smx=True,
+#         T=T,
+#     )
+
+#     turn_snapshot = False
+#     if probs_verify[0] > 0.8:
+#         turn_snapshot = True
+#         print(f"Snapshot is selected with probability: {probs_verify[0]}")
 
 
 
     
 
-    return probs, turn_snapshot
+#     return probs, turn_snapshot
 
 
 
@@ -439,22 +439,6 @@ def evaluate_snapshot_relevance_with_full_prompt(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def format_content(contents):
     formated_content = []
     for c in contents:
@@ -484,7 +468,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="gpt-4o-mini",  # model = "deployment_name"
+                model="gpt-4o",  # model = "deployment_name"
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096,
@@ -669,11 +653,10 @@ def format_explore_prompt_end(
     sys_prompt = (
         "Task: You are an agent in a 3D indoor environment tasked with answering a question.\n"
         "You have already selected one snapshot image that contains several detected objects.\n"
-        "Now, you should give a final answer to the question **based on this snapshot only**.\n\n"
+        "Now, you should give a final answer to the question **based on this snapshot only**.\n"
         "Instructions:\n"
         "- Your answer should be a direct, natural sentence that a human can understand.\n"
         "- DO NOT mention words like 'snapshot', 'in the image', 'on the left', or any reference to image layout.\n"
-        "- Also provide a short reason why this snapshot helps you answer the question."
     )
 
     # content to be sent to the model
@@ -695,9 +678,7 @@ def format_explore_prompt_end(
     content.append((
         "Please respond in the following format:\n"
         "'Answer: <your answer>'\n"
-        "'Reason: <your reason>'\n"
-        "Only return these two lines, nothing else."
-    ,))
+        "Only return the answer you generated, nothing else."))
 
     return sys_prompt, content
 
