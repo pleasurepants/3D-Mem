@@ -579,11 +579,10 @@ def format_explore_prompt_end(
     sys_prompt = (
         "Task: You are an agent in a 3D indoor environment tasked with answering a question.\n"
         "You have already selected one snapshot image that contains several detected objects.\n"
-        "Now, you should give a final answer to the question **based on this snapshot only**.\n\n"
+        "Now, you should give a final answer to the question **based on this snapshot only**.\n"
         "Instructions:\n"
         "- Your answer should be a direct, natural sentence that a human can understand.\n"
         "- DO NOT mention words like 'snapshot', 'in the image', 'on the left', or any reference to image layout.\n"
-        "- Also provide a short reason why this snapshot helps you answer the question."
     )
 
     # content to be sent to the model
@@ -605,12 +604,9 @@ def format_explore_prompt_end(
     content.append((
         "Please respond in the following format:\n"
         "'Answer: <your answer>'\n"
-        "'Reason: <your reason>'\n"
-        "Only return these two lines, nothing else."
-    ,))
+        "Only return the answer you generated, nothing else."))
 
     return sys_prompt, content
-
 
 def format_prefiltering_prompt(question, class_list, top_k=10, image_goal=None):
     content = []
