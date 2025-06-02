@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=pred-eval
+#SBATCH --job-name=bs_184
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
-#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6
-#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/pred-aeqa-eval-%j.out 
+#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-9
+#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/4o/baseline_184-%j.out 
 #SBATCH --partition all
 
 
@@ -38,4 +38,4 @@ echo "Running on MASTER_NODE=$MASTER_NODE, MASTER_PORT=$MASTER_PORT, RDZV_ID=$RD
 
 python -c "import omegaconf; print(omegaconf.__version__)"
 
-python /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation.py -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa.yaml
+python /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation.py -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_baseline.yaml

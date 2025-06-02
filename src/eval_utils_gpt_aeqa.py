@@ -10,10 +10,13 @@ import logging
 from src.const import *
 
 
+from dotenv import load_dotenv
+load_dotenv(dotenv_path="/home/wiss/zhang/code/openeqa/3D-Mem/.env", override=True)
 client = OpenAI(
     base_url=END_POINT,
     api_key=OPENAI_KEY,
 )
+
 
 
 def format_content(contents):
