@@ -1,0 +1,2 @@
+kt means knockout tournament(pairwise)
+end means end of a exploration, means chooce snapshot earlier than before, add some judgment method
