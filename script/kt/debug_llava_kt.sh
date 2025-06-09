@@ -35,5 +35,7 @@ echo "Running on MASTER_NODE=$MASTER_NODE, MASTER_PORT=$MASTER_PORT, RDZV_ID=$RD
 
 python -c "import omegaconf; print(omegaconf.__version__)"
 
-python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
- /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_kt.py -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_debug.yaml
+# python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
+#  /home/wiss/zhang/code/openeqa/3D-Mem/script/kt/kt_llava.py
+
+python /home/wiss/zhang/code/openeqa/3D-Mem/script/kt/kt_llava.py
