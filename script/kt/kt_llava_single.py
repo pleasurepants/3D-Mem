@@ -22,7 +22,7 @@ class LLaVAFrontierSelector:
         pil_img1 = Image.fromarray(img1)
         pil_img2 = Image.fromarray(img2)
         prompt = (
-            "You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose a direction to further explore."
+            "You are an intelligent agent exploring an indoor environment. "
             "Given two possible frontiers (A and B)—each representing an observation of an unexplored region that could potentially provide new information for answering the question—choose the frontier you would prefer to explore further, and explain why you selected that direction."
             "Always use the following response format:\n"
             "Answer: [A or B]\nReason: <your explanation>\n"
@@ -93,8 +93,6 @@ def pairwise_voting_frontier(frontier_dict, question, selector):
     """
     All-pair (round robin) voting with both A/B and B/A.
     3 points if one frontier wins both orders, 1-1 if split win, 0 for both lose.
-    Returns: final_winner (int), score_dict, log_trace
-        - final_winner: index of the winner, or -1 if tie.
     """
     indexes = sorted(list(frontier_dict.keys()))
     score = defaultdict(int)
@@ -131,12 +129,15 @@ def pairwise_voting_frontier(frontier_dict, question, selector):
             log_trace.append((idx_j, idx_i, 'A', win_2, ans_2, reason_2))
 
             # Scoring
+            # idx_i wins both directions
             if win_1 == 0 and win_2 == 1:
                 score[idx_i] += 3
                 print(f"--> {idx_i} wins both rounds: +3")
+            # idx_j wins both directions
             elif win_1 == 1 and win_2 == 0:
                 score[idx_j] += 3
                 print(f"--> {idx_j} wins both rounds: +3")
+            # tie: each wins one (or any unclear result)
             else:
                 score[idx_i] += 1
                 score[idx_j] += 1
@@ -150,20 +151,14 @@ def pairwise_voting_frontier(frontier_dict, question, selector):
         print(f"Frontier {idx}: score = {score[idx]}")
     print(f"Best index(s): {best_idxs}")
 
-    # Return single winner or -1 if tie
-    if len(best_idxs) == 1:
-        final_winner = best_idxs[0]
-    else:
-        final_winner = -1
-    return final_winner, score, log_trace
+    return best_idxs, score, log_trace
 
 if __name__ == "__main__":
     img_paths = {
-        0: "/home/wiss/zhang/projects/openeqa/aeqa/baseline/result_184/exp_eval_aeqa/f776a834-1e21-4442-8834-18b6f9d6cfad/frontier/0_1.png",
-        1: "/home/wiss/zhang/projects/openeqa/aeqa/baseline/result_184/exp_eval_aeqa/f776a834-1e21-4442-8834-18b6f9d6cfad/frontier/0_2.png",
-        2: "/home/wiss/zhang/projects/openeqa/aeqa/baseline/result_184/exp_eval_aeqa/f776a834-1e21-4442-8834-18b6f9d6cfad/frontier/0_0.png",
-        3: "/home/wiss/zhang/projects/openeqa/aeqa/baseline/result_184/exp_eval_aeqa/f776a834-1e21-4442-8834-18b6f9d6cfad/frontier/0_3.png",}
-    question = "Where is the orange painting?"
+        0: "/home/wiss/zhang/projects/openeqa/aeqa/baseline/4o/results_41_4o/exp_eval_aeqa/4dbd213e-56cd-481a-8ff5-ed9a8d636dbc/frontier/8_4.png",
+        1: "/home/wiss/zhang/projects/openeqa/aeqa/baseline/4o/results_41_4o/exp_eval_aeqa/4dbd213e-56cd-481a-8ff5-ed9a8d636dbc/frontier/8_5.png",
+        2: "/home/wiss/zhang/projects/openeqa/aeqa/baseline/4o/results_41_4o/exp_eval_aeqa/4dbd213e-56cd-481a-8ff5-ed9a8d636dbc/frontier/8_6.png"}
+    question = "Is the light above the sink turned on?"
 
     frontier_dict = {idx: np.array(Image.open(path).convert("RGB")) for idx, path in img_paths.items()}
 
@@ -172,5 +167,3 @@ if __name__ == "__main__":
 
     print("\n==== Final selected winner(s): ====")
     print(best_idxs)
-    print("log_trace:", log_trace)
-    print("score_dict:", score_dict)

@@ -7,6 +7,9 @@ from src_kt.scene_aeqa import Scene
 
 
 def query_vlm_for_response(
+    threshold: float,
+    llava_pairwise_selector,
+    vlm, 
     question: str,
     scene: Scene,
     tsdf_planner: TSDFPlanner,
@@ -44,7 +47,7 @@ def query_vlm_for_response(
 
     # query vlm
     outputs, snapshot_id_mapping, reason, n_filtered_snapshots = explore_step(
-        step_dict, cfg, verbose=verbose
+        threshold, llava_pairwise_selector, vlm, step_dict, cfg, verbose=verbose
     )
     if outputs is None:
         logging.error(f"explore_step failed and returned None")

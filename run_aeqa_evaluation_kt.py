@@ -11,7 +11,6 @@ os.environ["MAGNUM_LOG"] = "quiet"
 
 
 
-
 import argparse
 from omegaconf import OmegaConf
 import random
@@ -21,6 +20,8 @@ import time
 import json
 import logging
 import matplotlib.pyplot as plt
+
+
 
 import open_clip
 from ultralytics import SAM, YOLOWorld
@@ -33,9 +34,15 @@ from src_kt.utils import resize_image, get_pts_angle_aeqa
 from src_kt.query_vlm_aeqa import query_vlm_for_response
 from src_kt.logger_aeqa import Logger
 from src_kt.const import *
+import numpy as np
+from PIL import Image
+from omegaconf import OmegaConf
+from src_kt.vlm import VLM  
+from src_kt.pairwise_voting import LLaVAFrontierSelector
 
 
-def main(cfg, start_ratio=0.0, end_ratio=1.0):
+
+def main(llava_pair_selector, vlm_pred, cfg, start_ratio=0.0, end_ratio=1.0):
     # load the default concept graph config
     cfg_cg = OmegaConf.load(cfg.concept_graph_config_path)
     OmegaConf.resolve(cfg_cg)
@@ -232,6 +239,9 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                 f"Step {cnt_step}, update snapshots, {len(scene.objects)} objects, {len(scene.snapshots)} snapshots"
             )
 
+
+
+
             # (3) Update the Frontier Snapshots
             update_success = tsdf_planner.update_frontier_map(
                 pts=pts,
@@ -264,6 +274,9 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                 # query the VLM for the next navigation point, and the reason for the choice
                 vlm_response = query_vlm_for_response(
+                    threshold=cfg.threshold,
+                    llava_pair_selector=llava_pair_selector,
+                    vlm=vlm_pred,
                     question=question,
                     scene=scene,
                     tsdf_planner=tsdf_planner,
@@ -386,6 +399,11 @@ if __name__ == "__main__":
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
 
+
+    for key in ["output_parent_dir", "questions_list_path"]:
+        if isinstance(cfg[key], str):
+            cfg[key] = cfg[key].format(**cfg)
+
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
     if not os.path.exists(cfg.output_dir):
@@ -422,7 +440,17 @@ if __name__ == "__main__":
     # Set the custom formatter
     for handler in logging.getLogger().handlers:
         handler.setFormatter(formatter)
+    cfg_path = "/home/wiss/zhang/code/openeqa/explore-eqa/cfg/vlm_exp.yaml"
+    cfg_vlm = OmegaConf.load(cfg_path)
+    cfg_vlm = cfg_vlm.vlm
 
+    print("Loading snapshot prismatic model")
+    vlm_pred = VLM(cfg_vlm)
+    print("prismatic loaded.")
     # run
     logging.info(f"***** Running {cfg.exp_name} *****")
-    main(cfg, args.start_ratio, args.end_ratio)
+
+    llava_pair_selector = LLaVAFrontierSelector(device="cuda")
+
+
+    main(llava_pair_selector, vlm_pred, cfg, args.start_ratio, args.end_ratio)

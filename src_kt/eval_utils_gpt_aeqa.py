@@ -8,6 +8,17 @@ import time
 from typing import Optional
 import logging
 from src_kt.const import *
+import torch
+import argparse
+from omegaconf import OmegaConf
+import random
+import numpy as np
+import torch
+import time
+import json
+import logging
+import matplotlib.pyplot as plt
+
 
 
 from dotenv import load_dotenv
@@ -16,6 +27,502 @@ client = OpenAI(
     base_url=END_POINT,
     api_key=OPENAI_KEY,
 )
+
+
+from PIL import Image
+from io import BytesIO
+import base64
+import torch
+from torchvision import transforms
+
+
+# version_1 
+# def evaluate_snapshot_relevance_with_full_prompt(
+#     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
+# ):
+#     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
+
+#     # transform = transforms.Compose([
+#     #     transforms.Resize((224, 224)),  # 依据你模型默认输入尺寸调整
+#     #     transforms.ToTensor()
+#     # ])
+#     # snapshot_tensor = transform(snapshot_img).unsqueeze(0)
+
+#     class_info = ", ".join(snapshot_classes)
+#     sys_prompt = (
+#         "You are an intelligent agent in a 3D indoor environment.\n"
+#         "You are given a question and a snapshot image that contains the following detected objects:\n"
+#         f"{class_info}\n\n"
+#         "Determine if the snapshot contains enough information to confidently answer the question.\n"
+#     )
+#     prompt = f"Question: {question}\nCan you confidently answer the question based on this view? Answer with Yes or No."
+#     # reasoning steps in details
+#     # different threshold
+#     # 2steps verification
+#     probs = vlm.get_loss(image=snapshot_img, prompt=sys_prompt + prompt, tokens=tokens, get_smx=True, T=T)
+
+
+#     return probs
+
+
+
+
+# version_2
+# def evaluate_snapshot_relevance_with_full_prompt(
+#     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
+# ):
+
+
+#     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
+#     class_info = ", ".join(snapshot_classes)
+
+#     # System Prompt —— adding refusal and reasoning steps
+#     sys_prompt = (
+#         "You are a visual agent operating in a 3D indoor environment.\n"
+#         "You are given a natural language question and a snapshot image with the following detected objects:\n"
+#         f"{class_info}\n\n"
+#         "Your task is to decide whether this snapshot contains enough visual information to confidently answer the question.\n"
+#         "If the snapshot is sufficient and you are confident, respond with 'Yes'.\n"
+#         "If the snapshot is insufficient or uncertain, respond with 'No'. Do not guess.\n"
+#         "Only answer based on the visual evidence in the snapshot. Do not infer from prior knowledge.\n"
+#     )
+
+#     prompt = (
+#         f"Question: {question}\n"
+#         "Step 1: Check the listed objects.\n"
+#         "Step 2: Consider whether they provide enough evidence to answer the question.\n"
+#         "Step 3: Respond only with one word: Yes or No."
+#     )
+
+#     # Call VLM for loss-based softmax scoring
+#     probs = vlm.get_loss(
+#         image=snapshot_img,
+#         prompt=sys_prompt + prompt,
+#         tokens=tokens,
+#         get_smx=True,
+#         T=T,
+#     )
+
+#     return probs
+
+
+
+
+
+#version_3
+# def evaluate_snapshot_relevance_with_full_prompt(
+#     vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
+# ):
+
+
+#     few_shot_examples = """
+#         [Examples]
+
+#         Question: Is there a laptop on the desk?
+#         Detected objects: desk, chair, lamp, laptop
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: Yes
+
+#         ---
+
+#         Question: Is there a red mug on the dining table?
+#         Detected objects: dining table, chair, mug
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: No
+
+#         ---
+
+#         Question: Is there enough space to walk between the sofa and the TV stand?
+#         Detected objects: sofa, TV stand, coffee table, rug
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: Yes
+
+#         ---
+
+#         Question: What is written on the whiteboard?
+#         Detected objects: whiteboard, marker, eraser
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: No
+
+#         ---
+
+#         Question: Can you see the microwave in the kitchen area?
+#         Detected objects: countertop, sink, oven
+#         Are you confident you can answer the question based solely on this snapshot?
+#         Answer: No
+
+#         ---
+#         """
+
+#     snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
+#     class_info = ", ".join(snapshot_classes)
+
+#     prompt = (
+#         "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
+#         "Your task is to answer only this: \"Are you confident you can answer the question based solely on this snapshot?\"\n"
+#         "Answer with \"Yes\" if you are confident that the snapshot contains enough visual evidence. Otherwise, answer \"No\".\n"
+#         "Do not guess. Only answer \"Yes\" if you are truly confident.\n"
+#         + few_shot_examples +
+#         f"\nQuestion: {question}\nDetected objects: {class_info}\nAre you confident you can answer the question based solely on this snapshot?\nAnswer:"
+#     )
+
+#     # 3. 调用VLM
+#     probs = vlm.get_loss(
+#         image=snapshot_img,
+#         prompt=prompt,
+#         tokens=tokens,
+#         get_smx=True,
+#         T=T,
+#     )
+
+
+#     few_shot_anwer = """
+#     [Examples]
+
+#     Question: What is the white object on the wall above the TV?
+#     Detected objects: desk, chair, lamp, laptop, Air conditioning unit, Air conditioner
+#     Reasoning: The detected objects include an air conditioning unit and the question asks about a white object above the TV, which matches the position of an air conditioner in typical rooms.
+#     Answer: Air conditioning unit
+
+#     ---
+
+#     Question: Is there a red mug on the dining table?
+#     Detected objects: dining table, chair, mug
+#     Reasoning: There is a mug detected, but no color information can be clearly seen from the snapshot, so I cannot be confident about its color.
+#     Answer: No
+#     """
+
+#     prompt_answer = (
+#         "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
+#         "Your task is to think step by step: first provide a brief reasoning process based solely on the visual information in the snapshot, then give the final answer.\n"
+#         + few_shot_anwer +
+#         f"\nQuestion: {question}\nDetected objects: {class_info}\nReasoning: <your reasoning>\nAnswer: <your answer>\n"
+#     )
+
+#     # 调用生成接口
+#     reasoning_and_answer = vlm.generate(
+#         image=snapshot_img,
+#         prompt=prompt_answer,
+#         T=T,
+#     )
+
+
+#     few_shot_verification = """
+#         [Examples]
+
+#         Question: What is the white object on the wall above the TV?
+#         Detected objects: desk, chair, lamp, laptop, Air conditioning unit, Air conditioner
+#         Answer: Air conditioning unit
+#         Does this answer confidently and correctly answer the question based on the snapshot?
+#         Yes
+
+#         ---
+
+#         Question: Is there a red mug on the dining table?
+#         Detected objects: dining table, chair, mug
+#         Answer: No
+#         Does this answer confidently and correctly answer the question based on the snapshot?
+#         Yes
+
+#         ---
+
+#         Question: What is written on the whiteboard?
+#         Detected objects: whiteboard, marker, eraser
+#         Answer: Meeting agenda
+#         Does this answer confidently and correctly answer the question based on the snapshot?
+#         No
+
+#         ---
+
+#         Question: Is there enough space to walk between the sofa and the TV stand?
+#         Detected objects: sofa, TV stand, coffee table, rug
+#         Answer: Yes
+#         Does this answer confidently and correctly answer the question based on the snapshot?
+#         Yes
+#         """
+
+
+#     prompt_verification = (
+#     "You are a visual agent in a 3D environment. For each question, you are given a snapshot image, a list of detected objects, and an answer.\n"
+#     "Please decide: Does this answer confidently and correctly answer the question based on the visual evidence in the snapshot?\n"
+#     + few_shot_verification +
+#     f"\nQuestion: {question}\nDetected objects: {class_info}\nAnswer: {reasoning_and_answer}\nDoes this answer confidently and correctly answer the question based on the snapshot?")
+
+#     probs_verify = vlm.get_loss(
+#         image=snapshot_img,
+#         prompt=prompt_verification,
+#         tokens=tokens,
+#         get_smx=True,
+#         T=T,
+#     )
+
+#     turn_snapshot = False
+#     if probs_verify[0] > 0.8:
+#         turn_snapshot = True
+#         print(f"Snapshot is selected with probability: {probs_verify[0]}")
+
+
+
+    
+
+#     return probs, turn_snapshot
+
+
+
+
+
+
+
+# version_4
+def evaluate_snapshot_relevance_with_full_prompt(
+    vlm, snapshot_img_base64, snapshot_classes, question, tokens=["Yes", "No"], T=1.0
+):
+
+
+    few_shot_examples = """
+        [Examples]
+
+        Question: Is there a laptop on the desk?
+        Detected objects: desk, chair, lamp, laptop
+        Are you confident you can answer the question based solely on this snapshot?
+        Answer: Yes
+
+        ---
+
+        Question: Is there a red mug on the dining table?
+        Detected objects: dining table, chair, mug
+        Are you confident you can answer the question based solely on this snapshot?
+        Answer: No
+
+        ---
+
+        Question: Is there enough space to walk between the sofa and the TV stand?
+        Detected objects: sofa, TV stand, coffee table, rug
+        Are you confident you can answer the question based solely on this snapshot?
+        Answer: Yes
+
+        ---
+
+        Question: What is written on the whiteboard?
+        Detected objects: whiteboard, marker, eraser
+        Are you confident you can answer the question based solely on this snapshot?
+        Answer: No
+
+        ---
+
+        Question: Can you see the microwave in the kitchen area?
+        Detected objects: countertop, sink, oven
+        Are you confident you can answer the question based solely on this snapshot?
+        Answer: No
+
+        ---
+        """
+
+    snapshot_img = Image.open(BytesIO(base64.b64decode(snapshot_img_base64))).convert("RGB")
+    class_info = ", ".join(snapshot_classes)
+
+    prompt = (
+        "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
+        "Your task is to answer only this: \"Are you confident you can answer the question based solely on this snapshot?\"\n"
+        "Answer with \"Yes\" if you are confident that the snapshot contains enough visual evidence. Otherwise, answer \"No\".\n"
+        "Do not guess. Only answer \"Yes\" if you are truly confident.\n"
+        + few_shot_examples +
+        f"\nQuestion: {question}\nDetected objects: {class_info}\nAre you confident you can answer the question based solely on this snapshot?\nAnswer:"
+    )
+
+    # 3. 调用VLM
+    probs = vlm.get_loss(
+        image=snapshot_img,
+        prompt=prompt,
+        tokens=tokens,
+        get_smx=True,
+        T=T,
+    )
+
+
+    few_shot_anwer = """
+    [Examples]
+
+    Question: What is the white object on the wall above the TV?
+    Detected objects: desk, chair, lamp, laptop, Air conditioning unit, Air conditioner
+    Reasoning: The detected objects include an air conditioning unit and the question asks about a white object above the TV, which matches the position of an air conditioner in typical rooms.
+    Answer: Air conditioning unit
+
+    ---
+
+    Question: Is there a red mug on the dining table?
+    Detected objects: dining table, chair, mug
+    Reasoning: There is a mug detected, but no color information can be clearly seen from the snapshot, so I cannot be confident about its color.
+    Answer: No
+    """
+
+    prompt_answer = (
+        "You are a visual agent in a 3D environment. For each question, you are given a snapshot image and a list of detected objects in that image.\n"
+        "Your task is to think step by step: first provide a brief reasoning process based solely on the visual information in the snapshot, then give the final answer.\n"
+        + few_shot_anwer +
+        f"\nQuestion: {question}\nDetected objects: {class_info}\nReasoning: <your reasoning>\nAnswer: <your answer>\n"
+    )
+
+    # 调用生成接口
+    reasoning_and_answer = vlm.generate(
+        image=snapshot_img,
+        prompt=prompt_answer,
+        T=T,
+    )
+
+
+    few_shot_verification = """
+        [Examples]
+
+        Question: What is the white object on the wall above the TV?
+        Detected objects: desk, chair, lamp, laptop, Air conditioning unit, Air conditioner
+        Answer: Air conditioning unit
+        Does this answer confidently and correctly answer the question based on the snapshot?
+        Yes
+
+        ---
+
+        Question: Is there a red mug on the dining table?
+        Detected objects: dining table, chair, mug
+        Answer: No
+        Does this answer confidently and correctly answer the question based on the snapshot?
+        Yes
+
+        ---
+
+        Question: What is written on the whiteboard?
+        Detected objects: whiteboard, marker, eraser
+        Answer: Meeting agenda
+        Does this answer confidently and correctly answer the question based on the snapshot?
+        No
+
+        ---
+
+        Question: Is there enough space to walk between the sofa and the TV stand?
+        Detected objects: sofa, TV stand, coffee table, rug
+        Answer: Yes
+        Does this answer confidently and correctly answer the question based on the snapshot?
+        Yes
+        """
+
+
+    prompt_verification = (
+    "You are a visual agent in a 3D environment. For each question, you are given a snapshot image, a list of detected objects, and an answer.\n"
+    "Please decide: Does this answer confidently and correctly answer the question based on the visual evidence in the snapshot?\n"
+    + few_shot_verification +
+    f"\nQuestion: {question}\nDetected objects: {class_info}\nAnswer: {reasoning_and_answer}\nDoes this answer confidently and correctly answer the question based on the snapshot?")
+
+    probs_verify = vlm.get_loss(
+        image=snapshot_img,
+        prompt=prompt_verification,
+        tokens=tokens,
+        get_smx=True,
+        T=T,
+    )
+
+    turn_snapshot = False
+    if probs_verify[0] > 0.8:
+        turn_snapshot = True
+        print(f"Snapshot is selected with probability: {probs_verify[0]}")
+
+
+
+    
+
+    return probs, turn_snapshot
+
+
+
+
+
+
+
+
+from collections import defaultdict
+def pairwise_voting_frontier(frontier_dict, question, selector):
+    """
+    All-pair (round robin) voting with both A/B and B/A.
+    3 points if one frontier wins both orders, 1-1 if split win, 0 for both lose.
+    Returns: final_winner (int), score_dict, log_trace
+        - final_winner: index of the winner, or -1 if tie.
+    """
+    indexes = sorted(list(frontier_dict.keys()))
+    score = defaultdict(int)
+    log_trace = []
+
+    n = len(indexes)
+    for i in range(n):
+        for j in range(i+1, n):
+            idx_i = indexes[i]
+            idx_j = indexes[j]
+            img_i = frontier_dict[idx_i]
+            img_j = frontier_dict[idx_j]
+
+            # idx_i as A, idx_j as B
+            print(f"\n[Compare] {idx_i} (A) vs {idx_j} (B)")
+            win_1, ans_1, reason_1, _ = selector.select(img_i, img_j, question)
+            if win_1 == 0:
+                print(f"Winner: {idx_i} (A), Reason: {reason_1}")
+            elif win_1 == 1:
+                print(f"Winner: {idx_j} (B), Reason: {reason_1}")
+            else:
+                print("Unclear winner.")
+            log_trace.append((idx_i, idx_j, 'A', win_1, ans_1, reason_1))
+
+            # idx_j as A, idx_i as B
+            print(f"[Compare] {idx_j} (A) vs {idx_i} (B)")
+            win_2, ans_2, reason_2, _ = selector.select(img_j, img_i, question)
+            if win_2 == 0:
+                print(f"Winner: {idx_j} (A), Reason: {reason_2}")
+            elif win_2 == 1:
+                print(f"Winner: {idx_i} (B), Reason: {reason_2}")
+            else:
+                print("Unclear winner.")
+            log_trace.append((idx_j, idx_i, 'A', win_2, ans_2, reason_2))
+
+            # Scoring
+            if win_1 == 0 and win_2 == 1:
+                score[idx_i] += 3
+                print(f"--> {idx_i} wins both rounds: +3")
+            elif win_1 == 1 and win_2 == 0:
+                score[idx_j] += 3
+                print(f"--> {idx_j} wins both rounds: +3")
+            else:
+                score[idx_i] += 1
+                score[idx_j] += 1
+                print(f"--> Tie: both {idx_i} and {idx_j} +1")
+
+    max_score = max(score.values())
+    best_idxs = [idx for idx, s in score.items() if s == max_score]
+
+    print(f"\n=== Final voting result ===")
+    for idx in indexes:
+        print(f"Frontier {idx}: score = {score[idx]}")
+    print(f"Best index(s): {best_idxs}")
+
+    # Return single winner or -1 if tie
+    if len(best_idxs) == 1:
+        final_winner = best_idxs[0]
+    else:
+        final_winner = -1
+    return final_winner, score, log_trace
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -159,10 +666,10 @@ def format_explore_prompt(
     use_snapshot_class=True,
     image_goal=None,
 ):
-    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore.\n"
+    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a snapshot as the answer or a Frontier to further explore.\n"
     sys_prompt += "Definitions:\n"
-    sys_prompt += "Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. "
-    sys_prompt += "If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot.\n"
+    sys_prompt += "snapshot: A focused observation of several objects. Choosing a snapshot means that this snapshot image contains enough information for you to answer the question. "
+    sys_prompt += "If you choose a snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a snapshot.\n"
     sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
     sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore.\n"
 
@@ -175,7 +682,7 @@ def format_explore_prompt(
     else:
         content.append((text + "\n",))
 
-    text = "Select the Frontier/Snapshot that would help find the answer of the question.\n"
+    text = "Select the Frontier/snapshot that would help find the answer of the question.\n"
     content.append((text,))
 
     # 2 add egocentric view
@@ -192,10 +699,10 @@ def format_explore_prompt(
     text += "So you still need to utilize the images to make decisions.\n"
     content.append((text,))
     if len(snapshot_imgs) == 0:
-        content.append(("No Snapshot is available\n",))
+        content.append(("No snapshot is available\n",))
     else:
         for i in range(len(snapshot_imgs)):
-            content.append((f"Snapshot {i} ", snapshot_imgs[i]))
+            content.append((f"snapshot {i} ", snapshot_imgs[i]))
             if use_snapshot_class:
                 text = ", ".join(snapshot_classes[i])
                 content.append((text,))
@@ -212,12 +719,53 @@ def format_explore_prompt(
             content.append(("\n",))
 
     # 5 here is the format of the answer
-    text = "Please provide your answer in the following format: 'Snapshot i\n[Answer]' or 'Frontier i\n[Reason]', where i is the index of the snapshot or frontier you choose. "
-    text += "For example, if you choose the first snapshot, you can return 'Snapshot 0\nThe fruit bowl is on the kitchen counter.'. "
+    text = "Please provide your answer in the following format: 'snapshot i\n[Answer]' or 'Frontier i\n[Reason]', where i is the index of the snapshot or frontier you choose. "
+    text += "For example, if you choose the first snapshot, you can return 'snapshot 0\nThe fruit bowl is on the kitchen counter.'. "
     text += "If you choose the second frontier, you can return 'Frontier 1\nI see a door that may lead to the living room.'.\n"
     text += "Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; "
     text += "(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question.\n"
     content.append((text,))
+
+    return sys_prompt, content
+
+
+
+def format_explore_prompt_end(
+    question,
+    snapshot_img,          
+    snapshot_classes,     
+    image_goal=None,
+):
+    # system prompt: tell the agent to give a final answer based on the snapshot
+    sys_prompt = (
+        "Task: You are an agent in a 3D indoor environment tasked with answering a question.\n"
+        "You have already selected one snapshot image that contains several detected objects.\n"
+        "Now, you should give a final answer to the question **based on this snapshot only**.\n"
+        "Instructions:\n"
+        "- Your answer should be a direct, natural sentence that a human can understand.\n"
+        "- DO NOT mention words like 'snapshot', 'in the image', 'on the left', or any reference to image layout.\n"
+    )
+
+    # content to be sent to the model
+    content = []
+
+    if image_goal is not None:
+        content.append((f"Question: {question}", image_goal))
+    else:
+        content.append((f"Question: {question}",))
+
+    # Snapshot 
+    content.append(("Here is the selected snapshot that may help answer the question:", snapshot_img))
+
+    # Object 
+    class_text = ", ".join(snapshot_classes)
+    content.append((f"Objects detected in this snapshot: {class_text}",))
+
+    # final answer format
+    content.append((
+        "Please respond in the following format:\n"
+        "'Answer: <your answer>'\n"
+        "Only return the answer you generated, nothing else."))
 
     return sys_prompt, content
 
@@ -304,7 +852,7 @@ def prefiltering(
     return snapshot_classes, keep_index
 
 
-def explore_step(step, cfg, verbose=False):
+def explore_step(threshold, llava_pairwise_selector, vlm, step, cfg, verbose=False):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
     (
@@ -327,58 +875,92 @@ def explore_step(step, cfg, verbose=False):
         image_goal=image_goal,
     )
 
-    if verbose:
-        logging.info(f"Input prompt:")
-        message = sys_prompt
-        for c in content:
-            message += c[0]
-            if len(c) == 2:
-                message += f"[{c[1][:10]}...]"
-        logging.info(message)
 
-    retry_bound = 3
-    final_response = None
-    final_reason = None
-    for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
+    snapshot_probs = []
+    turn_snapshot_list = []
+    for snapshot_img_base64, classes in zip(snapshot_imgs, snapshot_classes):
+        # vlm.model.llm_backbone.half_precision_dtype = torch.float16
+        prob, turn_snapshot = evaluate_snapshot_relevance_with_full_prompt(vlm, snapshot_img_base64, classes, question)
+        snapshot_probs.append(prob)
+        turn_snapshot_list.append(turn_snapshot)
 
-        if full_response is None:
-            print("call_openai_api returns None, retrying")
-            continue
+    # only select snapshots with a probability of yes above the threshold
+    qualified_indices = [i for i, probs in enumerate(snapshot_probs) if probs[0] > threshold and turn_snapshot_list[i]]
 
-        full_response = full_response.strip()
-        if "\n" in full_response:
-            full_response = full_response.split("\n")
-            response, reason = full_response[0], full_response[-1]
-            response, reason = response.strip(), reason.strip()
-        else:
-            response = full_response
-            reason = ""
-        response = response.lower()
-        try:
-            choice_type, choice_id = response.split(" ")
-        except Exception as e:
-            print(f"Error in splitting response: {response}")
-            print(e)
-            continue
+    if qualified_indices:
+        best_index = max(qualified_indices, key=lambda i: snapshot_probs[i][0] - snapshot_probs[i][1])
+        final_response = f"snapshot {best_index}"
 
-        response_valid = False
-        if (
-            choice_type == "snapshot"
-            and choice_id.isdigit()
-            and 0 <= int(choice_id) < len(snapshot_imgs)
-        ):
-            response_valid = True
-        elif (
-            choice_type == "frontier"
-            and choice_id.isdigit()
-            and 0 <= int(choice_id) < len(frontier_imgs)
-        ):
-            response_valid = True
+        sys_prompt_explain, content_explain = format_explore_prompt_end(
+            question=question,
+            snapshot_img=snapshot_imgs[best_index],
+            snapshot_classes=snapshot_classes[best_index],
+            image_goal=image_goal,
+        )
+        final_reason = call_openai_api(sys_prompt_explain, content_explain)
+        if final_reason is None:
+            final_reason = "No explanation provided."
 
-        if response_valid:
-            final_response = response
-            final_reason = reason
-            break
+
+
+
+
+    else:
+
+        
+
+        if verbose:
+            logging.info(f"Input prompt:")
+            message = sys_prompt
+            for c in content:
+                message += c[0]
+                if len(c) == 2:
+                    message += f"[{c[1][:10]}...]"
+            logging.info(message)
+
+        retry_bound = 3
+        final_response = None
+        final_reason = None
+        for _ in range(retry_bound):
+            full_response = call_openai_api(sys_prompt, content)
+
+            if full_response is None:
+                print("call_openai_api returns None, retrying")
+                continue
+
+            full_response = full_response.strip()
+            if "\n" in full_response:
+                full_response = full_response.split("\n")
+                response, reason = full_response[0], full_response[-1]
+                response, reason = response.strip(), reason.strip()
+            else:
+                response = full_response
+                reason = ""
+            response = response.lower()
+            try:
+                choice_type, choice_id = response.split(" ")
+            except Exception as e:
+                print(f"Error in splitting response: {response}")
+                print(e)
+                continue
+
+            response_valid = False
+            if (
+                choice_type == "snapshot"
+                and choice_id.isdigit()
+                and 0 <= int(choice_id) < len(snapshot_imgs)
+            ):
+                response_valid = True
+            elif (
+                choice_type == "frontier"
+                and choice_id.isdigit()
+                and 0 <= int(choice_id) < len(frontier_imgs)
+            ):
+                response_valid = True
+
+            if response_valid:
+                final_response = response
+                final_reason = reason
+                break
 
     return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)

@@ -1,4 +1,30 @@
-[
+[   
+    {
+        "question": "Where is the orange painting?",
+        "answer": "Above the bed",
+        "category": "object localization",
+        "question_id": "f776a834-1e21-4442-8834-18b6f9d6cfad",
+        "episode_history": "00855-c5eTyR3Rxyh",
+        "extra_answers": [
+            "in the bedroom",
+            "on the wall next to the bed",
+            "above the bed",
+            "on the wall across the french doors"
+        ],
+        "position": [
+            3.398106098175049,
+            0.14745813608169556,
+            0.0978868380188942
+        ],
+        "rotation": [
+            0.5577243566513062,
+            0.0,
+            0.8300262093544006,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
     {
         "question": "What is the white object on the wall above the TV?",
         "answer": "Air conditioning unit",
