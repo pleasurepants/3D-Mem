@@ -543,6 +543,98 @@ def pairwise_voting_frontier_list(frontier_b64_list, question, selector):
 
 
 
+from PIL import Image
+import base64
+from io import BytesIO
+
+def evaluate_frontier_relevance_with_caption(
+    vlm, frontier_list, question, selector,
+    tokens=["Yes", "No"], T=1.0, threshold=0.6
+):
+    """
+    Args:
+        vlm: VLM模型
+        frontier_list: list，每个元素包含图片（base64或PIL），classes
+        question: str
+        selector: 提供 generate_caption(image) 方法
+        tokens: list, 默认["Yes", "No"]
+        T: float
+        threshold: float
+    Returns:
+        over_threshold_indices, reasons, probs_list, captions
+    """
+    print("[INFO] Generating captions for all frontiers ...", flush=True)
+    captions = {}
+    decoded_imgs = []
+    for idx, frontier in enumerate(frontier_list):
+        # decode image
+        if isinstance(frontier["image"], str):
+            img = Image.open(BytesIO(base64.b64decode(frontier["image"]))).convert("RGB")
+        else:
+            img = frontier["image"]
+        decoded_imgs.append(img)
+        # generate caption
+        captions[idx] = selector.generate_caption(img)
+        print(f"Frontier {idx}: {captions[idx]}", flush=True)
+    print("[INFO] Caption generation completed.\n", flush=True)
+
+    prompt_template = (
+        "You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. "
+        "To answer the question, you are required to choose a direction to further explore. "
+        "Given possible frontiers —each representing an observation of an unexplored region that could potentially provide new information for answering the question—"
+        "choose the frontier you would prefer to explore further, and explain why you selected that direction. "
+        "When making your decision, carefully consider both the provided caption and the corresponding image for each direction.\n"
+        "For the given frontier, answer ONLY: 'Would you choose to further explore this frontier for the current question?' "
+        "Answer with 'Yes' ONLY if you are truly confident it will help, otherwise 'No'. Do not guess.\n"
+    )
+
+    over_threshold_indices = []
+    reasons = []
+    probs_list = []
+
+    for idx, (img, frontier) in enumerate(zip(decoded_imgs, frontier_list)):
+        class_info = ", ".join(frontier.get("classes", []))
+        caption = captions[idx]
+        prompt = (
+            prompt_template +
+            f"Question: {question}\n"
+            f"Frontier {idx}: Detected objects: {class_info}\n"
+            f"Frontier {idx} Caption: {caption}\n"
+            "Would you choose to further explore this frontier for the current question? Answer with Yes or No.\n"
+        )
+        # VLM判断
+        probs = vlm.get_loss(
+            image=img,
+            prompt=prompt,
+            tokens=tokens,
+            get_smx=True,
+            T=T,
+        )
+        probs_list.append(probs)
+        if probs[0] > threshold:  # Yes概率
+            over_threshold_indices.append(idx)
+            # 获取reason
+            explain_prompt = (
+                "Explain briefly why you would or would not choose to further explore this frontier for the current question.\n"
+                f"Question: {question}\nFrontier {idx}: Detected objects: {class_info}\n"
+                f"Frontier {idx} Caption: {caption}\n"
+            )
+            reasoning = vlm.generate(
+                image=img,
+                prompt=explain_prompt,
+                T=T,
+            )
+            reasons.append(reasoning)
+        else:
+            reasons.append(None)
+
+    # 返回方式和上面一样
+    if len(over_threshold_indices) == 1:
+        return [-1], [reasons[over_threshold_indices[0]]], probs_list, captions
+    elif len(over_threshold_indices) == 0:
+        return [], [], probs_list, captions
+    else:
+        return over_threshold_indices, [reasons[i] for i in over_threshold_indices], probs_list, captions
 
 
 
@@ -949,7 +1041,7 @@ def explore_step(threshold, llava_pairwise_selector, vlm, step, cfg, verbose=Fal
                     message += f"[{c[1][:10]}...]"
             logging.info(message)
         
-        frontier_index, reason, top_indices = pairwise_voting_frontier_list(frontier_imgs, question, llava_pairwise_selector)
+        frontier_index, reason, top_indices = evaluate_frontier_relevance_with_caption(vlm, frontier_imgs, question, llava_pairwise_selector)
         print(f"Frontier voting result: {frontier_index}, reason: {reason}, top_indices: {top_indices}", flush=True)
         if frontier_index == -1:
             filtered_frontier_imgs = [frontier_imgs[i] for i in top_indices]
