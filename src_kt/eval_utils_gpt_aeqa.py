@@ -547,7 +547,11 @@ from PIL import Image
 import base64
 from io import BytesIO
 
-def evaluate_frontier_relevance_with_caption(
+from PIL import Image
+import base64
+from io import BytesIO
+
+def evaluate_frontier_select_best_with_reason(
     vlm, frontier_list, question, selector,
     tokens=["Yes", "No"], T=1.0, threshold=0.6
 ):
@@ -556,12 +560,15 @@ def evaluate_frontier_relevance_with_caption(
         vlm: VLM模型
         frontier_list: list，每个元素包含图片（base64或PIL），classes
         question: str
-        selector: 提供 generate_caption(image) 方法
+        selector: 有generate_caption(image)方法
         tokens: list, 默认["Yes", "No"]
         T: float
         threshold: float
     Returns:
-        over_threshold_indices, reasons, probs_list, captions
+        selected_index: int，如果没有合格则为-1，否则为最大概率的index
+        reason: str
+        all_probs: dict, 每个frontier的["Yes", "No"]概率
+        captions: dict, 每个frontier的caption
     """
     print("[INFO] Generating captions for all frontiers ...", flush=True)
     captions = {}
@@ -578,31 +585,53 @@ def evaluate_frontier_relevance_with_caption(
         print(f"Frontier {idx}: {captions[idx]}", flush=True)
     print("[INFO] Caption generation completed.\n", flush=True)
 
+    fewshot = """
+        [Examples]
+        Question: How many stories does this house have?
+        Frontier Caption: A staircase leading upward to a second floor. There is a handrail on the right, and the steps are carpeted.
+        Answer: Yes
+
+        ---
+
+        Question: Where is the full body mirror?
+        Frontier Caption: A bedroom with a bed, a bedside table, and no visible mirror. The walls are painted light gray. <example image>\n"
+        Answer: No
+
+        ---
+
+        Question: What color pattern is on the pillow on the black couch?
+        Frontier Caption: A black couch with a pillow that has a floral pattern. A glass coffee table sits in front of the couch. The living room has a large window with curtains on the right.
+        Answer: No
+
+        ---
+
+        """
     prompt_template = (
-        "You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. "
-        "To answer the question, you are required to choose a direction to further explore. "
-        "Given possible frontiers —each representing an observation of an unexplored region that could potentially provide new information for answering the question—"
-        "choose the frontier you would prefer to explore further, and explain why you selected that direction. "
-        "When making your decision, carefully consider both the provided caption and the corresponding image for each direction.\n"
-        "For the given frontier, answer ONLY: 'Would you choose to further explore this frontier for the current question?' "
-        "Answer with 'Yes' ONLY if you are truly confident it will help, otherwise 'No'. Do not guess.\n"
+        "You are an agent in an indoor scene tasked with answering questions by observing your surroundings and exploring the environment. "
+        "For each question, you are presented with one possible frontier—an observation of an unexplored region that could potentially provide new information for answering the question. "
+        "The frontier comes with an image and a caption. "
+        "Decide whether you would choose to further explore this frontier in order to answer the question. "
+        "Respond with 'Yes' if the frontier is promising; otherwise, respond with 'No'. Do not guess—answer 'Yes' only if you are truly confident. "
+        "Always use the following response format:\n"
+        "Answer: [Yes or No]\n"
+        + fewshot +
+        "Now answer for the following:\n"
     )
 
-    over_threshold_indices = []
-    reasons = []
-    probs_list = []
+    max_index = -1
+    max_prob = -1
+    all_probs = {}
+    captions_out = {}
 
+    # 统计所有超过阈值的
     for idx, (img, frontier) in enumerate(zip(decoded_imgs, frontier_list)):
-        class_info = ", ".join(frontier.get("classes", []))
         caption = captions[idx]
         prompt = (
             prompt_template +
             f"Question: {question}\n"
-            f"Frontier {idx}: Detected objects: {class_info}\n"
-            f"Frontier {idx} Caption: {caption}\n"
-            "Would you choose to further explore this frontier for the current question? Answer with Yes or No.\n"
+            f"Frontier Caption: {caption}\n"
+            "Answer:"
         )
-        # VLM判断
         probs = vlm.get_loss(
             image=img,
             prompt=prompt,
@@ -610,32 +639,52 @@ def evaluate_frontier_relevance_with_caption(
             get_smx=True,
             T=T,
         )
-        probs_list.append(probs)
-        if probs[0] > threshold:  # Yes概率
-            over_threshold_indices.append(idx)
-            # 获取reason
-            explain_prompt = (
-                "Explain briefly why you would or would not choose to further explore this frontier for the current question.\n"
-                f"Question: {question}\nFrontier {idx}: Detected objects: {class_info}\n"
-                f"Frontier {idx} Caption: {caption}\n"
-            )
-            reasoning = vlm.generate(
-                image=img,
-                prompt=explain_prompt,
-                T=T,
-            )
-            reasons.append(reasoning)
-        else:
-            reasons.append(None)
+        all_probs[idx] = probs
+        captions_out[idx] = caption
+        if probs[0] > threshold and probs[0] > max_prob:
+            max_prob = probs[0]
+            max_index = idx
 
-    # 返回方式和上面一样
-    if len(over_threshold_indices) == 1:
-        return [-1], [reasons[over_threshold_indices[0]]], probs_list, captions
-    elif len(over_threshold_indices) == 0:
-        return [], [], probs_list, captions
+    # Reason prompt设计（单独生成，简短、自然、直给理由）
+    if max_index == -1:
+        return -1, "No promising frontier to explore for this question.", all_probs, captions_out
     else:
-        return over_threshold_indices, [reasons[i] for i in over_threshold_indices], probs_list, captions
+        reason_prompt = (
+            
+            "You are an intelligent agent in an indoor environment. "
+            "For the given question and the frontier's caption, explain in 1-2 sentences why exploring this direction is most promising for answering the question. "
+            "Be specific and refer to the frontier's visual content. Do not repeat the question.\n"
+            """[Examples]
+            Question: Where might I find more kitchen appliances?
+            Frontier Caption: The corridor appears to lead to another kitchen area with cabinets visible in the distance.
+            Reason: This frontier shows cabinets and a countertop, suggesting the presence of more kitchen appliances.
 
+            ---
+
+            Question: Is there likely a bedroom in that direction?
+            Frontier Caption: A hallway with a closed door and a painting on the wall.
+            Reason: Hallways with closed doors often lead to bedrooms, making this direction promising.
+
+            ---
+
+            Question: Can I see the living room if I go that way?
+            Frontier Caption: The path leads to a window and a small table, but no visible sofas or living area.
+            Reason: There is no sign of living room furniture, so this direction is unlikely to reveal the living room.
+
+            ---
+
+            """
+            f"Question: {question}\n"
+            f"Frontier Caption: {captions_out[max_index]}\n"
+            "Reason:"
+        )
+        best_img = decoded_imgs[max_index]
+        reason = vlm.generate(
+            image=best_img,
+            prompt=reason_prompt,
+            T=T,
+        )
+        return max_index, reason.strip(), all_probs, captions_out
 
 
 
@@ -1041,25 +1090,15 @@ def explore_step(threshold, llava_pairwise_selector, vlm, step, cfg, verbose=Fal
                     message += f"[{c[1][:10]}...]"
             logging.info(message)
         
-        frontier_index, reason, top_indices = evaluate_frontier_relevance_with_caption(vlm, frontier_imgs, question, llava_pairwise_selector)
-        print(f"Frontier voting result: {frontier_index}, reason: {reason}, top_indices: {top_indices}", flush=True)
+        frontier_index, reason, all_probs, captions_out= evaluate_frontier_select_best_with_reason(vlm, frontier_imgs, question, llava_pairwise_selector)
+        print(f"Frontier voting result: {frontier_index} with the caption:{captions_out}\nreason: {reason}, all_probs: {all_probs}", flush=True)
         if frontier_index == -1:
-            filtered_frontier_imgs = [frontier_imgs[i] for i in top_indices]
-            sys_prompt_filtered, content_filtered = format_explore_prompt(
-                question,
-                egocentric_imgs,
-                filtered_frontier_imgs,
-                snapshot_imgs,
-                snapshot_classes,
-                egocentric_view=step.get("use_egocentric_views", False),
-                use_snapshot_class=True,
-                image_goal=image_goal,
-            )
+            
             retry_bound = 3
             final_response = None
             final_reason = None
             for _ in range(retry_bound):
-                full_response = call_openai_api(sys_prompt_filtered, content_filtered)
+                full_response = call_openai_api(sys_prompt, content)
 
                 if full_response is None:
                     print("call_openai_api returns None, retrying")
@@ -1091,18 +1130,13 @@ def explore_step(threshold, llava_pairwise_selector, vlm, step, cfg, verbose=Fal
                 elif (
                     choice_type == "frontier"
                     and choice_id.isdigit()
-                    and 0 <= int(choice_id) < len(filtered_frontier_imgs)
+                    and 0 <= int(choice_id) < len(frontier_imgs)
                 ):
                     response_valid = True
 
                 if response_valid:
-                    if choice_type == "frontier":
-                        mapped_idx = top_indices[int(choice_id)]
-                        final_response = f"frontier {mapped_idx}"
-                        print("choice id:", int(choice_id), flush=True)
-                        print("mapping to original frontier index:", mapped_idx, flush=True)
-                    else:
-                        final_response = response
+                    
+                    final_response = response
                     final_reason = reason
                     break
         else:
