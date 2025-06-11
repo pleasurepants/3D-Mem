@@ -460,7 +460,7 @@ def pairwise_voting_frontier_list(frontier_b64_list, question, selector):
         return -1, ""
     if n == 1:
         print("Only one frontier provided: automatically selected as winner.", flush=True)
-        return 0, "Only one frontier provided: automatically selected as winner."
+        return 0, "Only one frontier provided: automatically selected as winner.", []
 
     # 1. 先批量解码为numpy array
     decoded_imgs = []
