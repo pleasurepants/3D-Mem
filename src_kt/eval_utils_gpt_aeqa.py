@@ -439,73 +439,104 @@ def evaluate_snapshot_relevance_with_full_prompt(
 
 
 from collections import defaultdict
-def pairwise_voting_frontier(frontier_dict, question, selector):
+def pairwise_voting_frontier_list(frontier_b64_list, question, selector):
     """
-    All-pair (round robin) voting with both A/B and B/A.
-    3 points if one frontier wins both orders, 1-1 if split win, 0 for both lose.
-    Returns: final_winner (int), score_dict, log_trace
-        - final_winner: index of the winner, or -1 if tie.
+    Round-robin voting among base64-encoded frontier images.
+    自动为所有frontier批量生成caption，pairwise对比时直接用，不重复生成。
+    输入：
+      - frontier_b64_list: list of base64-encoded images
+      - question: string
+      - selector: LLaVAFrontierSelector 实例
+    输出：
+      - winner_idx (int), decisive_reason (str)
+      （与你的原版接口完全一致）
     """
-    indexes = sorted(list(frontier_dict.keys()))
-    score = defaultdict(int)
-    log_trace = []
+    import base64
+    from io import BytesIO
 
-    n = len(indexes)
+    n = len(frontier_b64_list)
+    if n == 0:
+        print("No frontiers to compare.", flush=True)
+        return -1, ""
+    if n == 1:
+        print("Only one frontier provided: automatically selected as winner.", flush=True)
+        return 0, "Only one frontier provided: automatically selected as winner."
+
+    # 1. 先批量解码为numpy array
+    decoded_imgs = []
+    for idx, b64 in enumerate(frontier_b64_list):
+        pil = Image.open(BytesIO(base64.b64decode(b64))).convert("RGB")
+        decoded_imgs.append(np.array(pil))
+
+    # 2. 先批量生成所有frontier的caption
+    print("[INFO] Generating captions for all frontiers ...", flush=True)
+    captions = {}
+    for idx, img in enumerate(decoded_imgs):
+        captions[idx] = selector.generate_caption(img)
+        print(f"Frontier {idx}: {captions[idx]}", flush=True)
+    print("[INFO] Caption generation completed.\n", flush=True)
+
+    # 3. 两两比较时直接用caption，不重复生成
+    scores = {i: 0 for i in range(n)}
+    win_reasons = defaultdict(list)
+    log = []
+
     for i in range(n):
-        for j in range(i+1, n):
-            idx_i = indexes[i]
-            idx_j = indexes[j]
-            img_i = frontier_dict[idx_i]
-            img_j = frontier_dict[idx_j]
+        for j in range(i + 1, n):
+            img_i, img_j = decoded_imgs[i], decoded_imgs[j]
+            cap_i, cap_j = captions[i], captions[j]
 
-            # idx_i as A, idx_j as B
-            print(f"\n[Compare] {idx_i} (A) vs {idx_j} (B)")
-            win_1, ans_1, reason_1, _ = selector.select(img_i, img_j, question)
-            if win_1 == 0:
-                print(f"Winner: {idx_i} (A), Reason: {reason_1}")
-            elif win_1 == 1:
-                print(f"Winner: {idx_j} (B), Reason: {reason_1}")
+            print(f"[Compare] Frontier {i} (A) vs Frontier {j} (B)", flush=True)
+            win1, ans1, reason1, _ = selector.select(cap_i, img_i, cap_j, img_j, question)
+            log.append((i, j, 'A', win1, ans1, reason1))
+            if win1 == 0:
+                print(f" - Round 1 winner: Frontier {i}. Reason: {reason1}", flush=True)
+            elif win1 == 1:
+                print(f" - Round 1 winner: Frontier {j}. Reason: {reason1}", flush=True)
             else:
-                print("Unclear winner.")
-            log_trace.append((idx_i, idx_j, 'A', win_1, ans_1, reason_1))
+                print(" - Round 1: No clear winner.", flush=True)
 
-            # idx_j as A, idx_i as B
-            print(f"[Compare] {idx_j} (A) vs {idx_i} (B)")
-            win_2, ans_2, reason_2, _ = selector.select(img_j, img_i, question)
-            if win_2 == 0:
-                print(f"Winner: {idx_j} (A), Reason: {reason_2}")
-            elif win_2 == 1:
-                print(f"Winner: {idx_i} (B), Reason: {reason_2}")
+            print(f"[Compare] Frontier {j} (A) vs Frontier {i} (B)", flush=True)
+            win2, ans2, reason2, _ = selector.select(cap_j, img_j, cap_i, img_i, question)
+            log.append((j, i, 'A', win2, ans2, reason2))
+            if win2 == 0:
+                print(f" - Round 2 winner: Frontier {j}. Reason: {reason2}", flush=True)
+            elif win2 == 1:
+                print(f" - Round 2 winner: Frontier {i}. Reason: {reason2}", flush=True)
             else:
-                print("Unclear winner.")
-            log_trace.append((idx_j, idx_i, 'A', win_2, ans_2, reason_2))
+                print(" - Round 2: No clear winner.", flush=True)
 
             # Scoring
-            if win_1 == 0 and win_2 == 1:
-                score[idx_i] += 3
-                print(f"--> {idx_i} wins both rounds: +3")
-            elif win_1 == 1 and win_2 == 0:
-                score[idx_j] += 3
-                print(f"--> {idx_j} wins both rounds: +3")
+            if win1 == 0 and win2 == 1:
+                scores[i] += 3
+                win_reasons[i].append(reason1)
+                print(f" --> Frontier {i} wins both rounds: +3 points.", flush=True)
+            elif win1 == 1 and win2 == 0:
+                scores[j] += 3
+                win_reasons[j].append(reason1)
+                print(f" --> Frontier {j} wins both rounds: +3 points.", flush=True)
             else:
-                score[idx_i] += 1
-                score[idx_j] += 1
-                print(f"--> Tie: both {idx_i} and {idx_j} +1")
+                scores[i] += 1
+                scores[j] += 1
+                print(f" --> Split result: Frontier {i} +1, Frontier {j} +1.", flush=True)
 
-    max_score = max(score.values())
-    best_idxs = [idx for idx, s in score.items() if s == max_score]
+    print("\n=== Final voting results ===", flush=True)
+    for idx in range(n):
+        print(f"Frontier {idx}: score = {scores[idx]}", flush=True)
 
-    print(f"\n=== Final voting result ===")
-    for idx in indexes:
-        print(f"Frontier {idx}: score = {score[idx]}")
-    print(f"Best index(s): {best_idxs}")
+    # Determine winner
+    max_score = max(scores.values())
+    top_indices = [idx for idx, s in scores.items() if s == max_score]
 
-    # Return single winner or -1 if tie
-    if len(best_idxs) == 1:
-        final_winner = best_idxs[0]
+    if len(top_indices) == 1:
+        winner = top_indices[0]
+        reason = win_reasons[winner][0] if win_reasons[winner] else ""
+        print(f"Winner: Frontier {winner}. Decisive reason: {reason}", flush=True)
+        return winner, reason, top_indices
     else:
-        final_winner = -1
-    return final_winner, score, log_trace
+        print("Tie or no clear winner. Top candidates:", top_indices, flush=True)
+        reason = "no clear winner, only do some selection"
+        return -1, reason, top_indices
 
 
 
@@ -917,50 +948,73 @@ def explore_step(threshold, llava_pairwise_selector, vlm, step, cfg, verbose=Fal
                 if len(c) == 2:
                     message += f"[{c[1][:10]}...]"
             logging.info(message)
+        
+        frontier_index, reason, top_indices = pairwise_voting_frontier_list(frontier_imgs, question, llava_pairwise_selector)
+        print(f"Frontier voting result: {frontier_index}, reason: {reason}, top_indices: {top_indices}", flush=True)
+        if frontier_index == -1:
+            filtered_frontier_imgs = [frontier_imgs[i] for i in top_indices]
+            sys_prompt_filtered, content_filtered = format_explore_prompt(
+                question,
+                egocentric_imgs,
+                filtered_frontier_imgs,
+                snapshot_imgs,
+                snapshot_classes,
+                egocentric_view=step.get("use_egocentric_views", False),
+                use_snapshot_class=True,
+                image_goal=image_goal,
+            )
+            retry_bound = 3
+            final_response = None
+            final_reason = None
+            for _ in range(retry_bound):
+                full_response = call_openai_api(sys_prompt_filtered, content_filtered)
 
-        retry_bound = 3
-        final_response = None
-        final_reason = None
-        for _ in range(retry_bound):
-            full_response = call_openai_api(sys_prompt, content)
+                if full_response is None:
+                    print("call_openai_api returns None, retrying")
+                    continue
 
-            if full_response is None:
-                print("call_openai_api returns None, retrying")
-                continue
+                full_response = full_response.strip()
+                if "\n" in full_response:
+                    full_response = full_response.split("\n")
+                    response, reason = full_response[0], full_response[-1]
+                    response, reason = response.strip(), reason.strip()
+                else:
+                    response = full_response
+                    reason = ""
+                response = response.lower()
+                try:
+                    choice_type, choice_id = response.split(" ")
+                except Exception as e:
+                    print(f"Error in splitting response: {response}")
+                    print(e)
+                    continue
 
-            full_response = full_response.strip()
-            if "\n" in full_response:
-                full_response = full_response.split("\n")
-                response, reason = full_response[0], full_response[-1]
-                response, reason = response.strip(), reason.strip()
-            else:
-                response = full_response
-                reason = ""
-            response = response.lower()
-            try:
-                choice_type, choice_id = response.split(" ")
-            except Exception as e:
-                print(f"Error in splitting response: {response}")
-                print(e)
-                continue
+                response_valid = False
+                if (
+                    choice_type == "snapshot"
+                    and choice_id.isdigit()
+                    and 0 <= int(choice_id) < len(snapshot_imgs)
+                ):
+                    response_valid = True
+                elif (
+                    choice_type == "frontier"
+                    and choice_id.isdigit()
+                    and 0 <= int(choice_id) < len(filtered_frontier_imgs)
+                ):
+                    response_valid = True
 
-            response_valid = False
-            if (
-                choice_type == "snapshot"
-                and choice_id.isdigit()
-                and 0 <= int(choice_id) < len(snapshot_imgs)
-            ):
-                response_valid = True
-            elif (
-                choice_type == "frontier"
-                and choice_id.isdigit()
-                and 0 <= int(choice_id) < len(frontier_imgs)
-            ):
-                response_valid = True
-
-            if response_valid:
-                final_response = response
-                final_reason = reason
-                break
+                if response_valid:
+                    if choice_type == "frontier":
+                        mapped_idx = top_indices[int(choice_id)]
+                        final_response = f"frontier {mapped_idx}"
+                        print("choice id:", int(choice_id), flush=True)
+                        print("mapping to original frontier index:", mapped_idx, flush=True)
+                    else:
+                        final_response = response
+                    final_reason = reason
+                    break
+        else:
+            final_response = f"frontier {frontier_index}"
+            final_reason = reason
 
     return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)

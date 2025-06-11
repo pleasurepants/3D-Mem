@@ -275,7 +275,7 @@ def main(llava_pair_selector, vlm_pred, cfg, start_ratio=0.0, end_ratio=1.0):
                 # query the VLM for the next navigation point, and the reason for the choice
                 vlm_response = query_vlm_for_response(
                     threshold=cfg.threshold,
-                    llava_pair_selector=llava_pair_selector,
+                    llava_pairwise_selector=llava_pair_selector,
                     vlm=vlm_pred,
                     question=question,
                     scene=scene,

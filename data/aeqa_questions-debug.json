@@ -26,80 +26,40 @@
         "class": null
     },
     {
-        "question": "What is the white object on the wall above the TV?",
-        "answer": "Air conditioning unit",
-        "category": "object recognition",
-        "question_id": "f2e82760-5c3c-41b1-88b6-85921b9e7b32",
-        "episode_history": "00826-BFRyYbPCCPE",
-        "position": [
-            -3.2461330890655518,
-            0.17934048175811768,
-            -2.557859182357788
-        ],
-        "rotation": [
-            0.9077942371368408,
-            0.0,
-            0.4194158613681793,
-            0.0
-        ],
-        "object_id": null,
-        "class": null
-    },
-    {
-        "question": "Is there room on the dining table to eat?",
-        "answer": "Yes",
+        "question": "What is hanging from the oven handle?",
+        "answer": "A towel",
         "category": "spatial understanding",
-        "question_id": "79344680-6b45-4531-8789-ad0f5ef85b3b",
-        "episode_history": "00826-BFRyYbPCCPE",
+        "question_id": "00c2be2a-1377-4fae-a889-30936b7890c3",
+        "episode_history": "00824-Dd4bFSTQ8gi",
         "position": [
-            -3.2461330890655518,
-            0.17934048175811768,
-            -2.557859182357788
+            6.892691135406494,
+            0.06882420182228088,
+            1.4872137308120728
         ],
         "rotation": [
-            0.9077942371368408,
+            0.37141478061676025,
             0.0,
-            0.4194158613681793,
+            0.9284670948982239,
             0.0
         ],
         "object_id": null,
         "class": null
     },
     {
-        "question": "Is the front door open?",
-        "answer": "No",
+        "question": "Is the light above the sink turned on?",
+        "answer": "Yes",
         "category": "object state recognition",
-        "question_id": "ecad68d2-a16f-4a3e-b8a1-a70ec1c5cf00",
-        "episode_history": "00826-BFRyYbPCCPE",
+        "question_id": "4dbd213e-56cd-481a-8ff5-ed9a8d636dbc",
+        "episode_history": "00824-Dd4bFSTQ8gi",
         "position": [
-            -3.2461330890655518,
-            0.17934048175811768,
-            -2.557859182357788
+            6.892691135406494,
+            0.06882420182228088,
+            1.4872137308120728
         ],
         "rotation": [
-            0.9077942371368408,
+            0.37141478061676025,
             0.0,
-            0.4194158613681793,
-            0.0
-        ],
-        "object_id": null,
-        "class": null
-    },
-    {
-        "question": "What shape are the door knobs?",
-        "answer": "Round or spherical",
-        "category": "attribute recognition",
-        "question_id": "e816a1f9-af6c-4901-8d54-4ddaa2a60dc3",
-        "episode_history": "00886-TPhiubUHKcP",
-        "position": [
-            -4.679103851318359,
-            0.16253697872161865,
-            -4.211667060852051
-        ],
-        "rotation": [
-            -0.07081564515829086,
-            0.0,
-            0.9974894523620605,
+            0.9284670948982239,
             0.0
         ],
         "object_id": null,
