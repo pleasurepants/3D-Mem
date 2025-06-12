@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=pc-novf-41
+#SBATCH --job-name=pc-vf-0.5-41
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
 #SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-1,worker-3,worker-4,worker-8,worker-9
-#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/point_confidence/pc-novf-41-%j.out 
+#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/point_confidence/pc-vf-0.5-41-%j.out 
 #SBATCH --partition all
 
 # srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:1 --time=4:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6 --partition all bash
@@ -35,4 +35,4 @@ echo "Running on MASTER_NODE=$MASTER_NODE, MASTER_PORT=$MASTER_PORT, RDZV_ID=$RD
 
 python -c "import omegaconf; print(omegaconf.__version__)"
 
-python /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_point.py -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa.yaml
+python /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_point.py -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_05.yaml

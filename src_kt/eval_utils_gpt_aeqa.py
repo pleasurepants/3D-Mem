@@ -543,13 +543,7 @@ def pairwise_voting_frontier_list(frontier_b64_list, question, selector):
 
 
 
-from PIL import Image
-import base64
-from io import BytesIO
 
-from PIL import Image
-import base64
-from io import BytesIO
 
 def evaluate_frontier_select_best_with_reason(
     vlm, frontier_list, question, selector,
@@ -574,14 +568,12 @@ def evaluate_frontier_select_best_with_reason(
     captions = {}
     decoded_imgs = []
     for idx, frontier in enumerate(frontier_list):
-        # decode image
-        if isinstance(frontier["image"], str):
-            img = Image.open(BytesIO(base64.b64decode(frontier["image"]))).convert("RGB")
-        else:
-            img = frontier["image"]
+        # 这里frontier就是base64字符串
+        img = Image.open(BytesIO(base64.b64decode(frontier))).convert("RGB")
+        img_np = np.array(img)
         decoded_imgs.append(img)
         # generate caption
-        captions[idx] = selector.generate_caption(img)
+        captions[idx] = selector.generate_caption(img_np)
         print(f"Frontier {idx}: {captions[idx]}", flush=True)
     print("[INFO] Caption generation completed.\n", flush=True)
 
@@ -641,11 +633,15 @@ def evaluate_frontier_select_best_with_reason(
         )
         all_probs[idx] = probs
         captions_out[idx] = caption
-        if probs[0] > threshold and probs[0] > max_prob:
+        # if probs[0] > threshold and probs[0] > max_prob:
+        if probs[0] > max_prob:
             max_prob = probs[0]
             max_index = idx
 
-    # Reason prompt设计（单独生成，简短、自然、直给理由）
+    # # Reason prompt设计（单独生成，简短、自然、直给理由）
+    # if max_index == -1:
+    #     return -1, "No promising frontier to explore for this question.", all_probs, captions_out
+    # else:
     if max_index == -1:
         return -1, "No promising frontier to explore for this question.", all_probs, captions_out
     else:
@@ -1024,7 +1020,7 @@ def prefiltering(
     return snapshot_classes, keep_index
 
 
-def explore_step(threshold, llava_pairwise_selector, vlm, step, cfg, verbose=False):
+def explore_step(threshold, llava_pairwise_selector, vlm, step, cfg, verbose=True):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
     (
@@ -1048,99 +1044,97 @@ def explore_step(threshold, llava_pairwise_selector, vlm, step, cfg, verbose=Fal
     )
 
 
-    snapshot_probs = []
-    turn_snapshot_list = []
-    for snapshot_img_base64, classes in zip(snapshot_imgs, snapshot_classes):
-        # vlm.model.llm_backbone.half_precision_dtype = torch.float16
-        prob, turn_snapshot = evaluate_snapshot_relevance_with_full_prompt(vlm, snapshot_img_base64, classes, question)
-        snapshot_probs.append(prob)
-        turn_snapshot_list.append(turn_snapshot)
+    # snapshot_probs = []
+    # turn_snapshot_list = []
+    # for snapshot_img_base64, classes in zip(snapshot_imgs, snapshot_classes):
+    #     # vlm.model.llm_backbone.half_precision_dtype = torch.float16
+    #     prob, turn_snapshot = evaluate_snapshot_relevance_with_full_prompt(vlm, snapshot_img_base64, classes, question)
+    #     snapshot_probs.append(prob)
+    #     turn_snapshot_list.append(turn_snapshot)
 
-    # only select snapshots with a probability of yes above the threshold
-    qualified_indices = [i for i, probs in enumerate(snapshot_probs) if probs[0] > threshold and turn_snapshot_list[i]]
+    # # only select snapshots with a probability of yes above the threshold
+    # qualified_indices = [i for i, probs in enumerate(snapshot_probs) if probs[0] > threshold and turn_snapshot_list[i]]
 
-    if qualified_indices:
-        best_index = max(qualified_indices, key=lambda i: snapshot_probs[i][0] - snapshot_probs[i][1])
-        final_response = f"snapshot {best_index}"
+    # if qualified_indices:
+    #     best_index = max(qualified_indices, key=lambda i: snapshot_probs[i][0] - snapshot_probs[i][1])
+    #     final_response = f"snapshot {best_index}"
 
-        sys_prompt_explain, content_explain = format_explore_prompt_end(
-            question=question,
-            snapshot_img=snapshot_imgs[best_index],
-            snapshot_classes=snapshot_classes[best_index],
-            image_goal=image_goal,
-        )
-        final_reason = call_openai_api(sys_prompt_explain, content_explain)
-        if final_reason is None:
-            final_reason = "No explanation provided."
+    #     sys_prompt_explain, content_explain = format_explore_prompt_end(
+    #         question=question,
+    #         snapshot_img=snapshot_imgs[best_index],
+    #         snapshot_classes=snapshot_classes[best_index],
+    #         image_goal=image_goal,
+    #     )
+    #     final_reason = call_openai_api(sys_prompt_explain, content_explain)
+    #     if final_reason is None:
+    #         final_reason = "No explanation provided."
 
-
-
-
-
-    else:
+    # else:
 
         
 
-        if verbose:
-            logging.info(f"Input prompt:")
-            message = sys_prompt
-            for c in content:
-                message += c[0]
-                if len(c) == 2:
-                    message += f"[{c[1][:10]}...]"
-            logging.info(message)
-        
-        frontier_index, reason, all_probs, captions_out= evaluate_frontier_select_best_with_reason(vlm, frontier_imgs, question, llava_pairwise_selector)
-        print(f"Frontier voting result: {frontier_index} with the caption:{captions_out}\nreason: {reason}, all_probs: {all_probs}", flush=True)
-        if frontier_index == -1:
-            
-            retry_bound = 3
-            final_response = None
-            final_reason = None
-            for _ in range(retry_bound):
-                full_response = call_openai_api(sys_prompt, content)
+    if verbose:
+        logging.info(f"Input prompt:")
+        message = sys_prompt
+        for c in content:
+            message += c[0]
+            if len(c) == 2:
+                message += f"[{c[1][:10]}...]"
+        logging.info(message)
+    
+    
 
-                if full_response is None:
-                    print("call_openai_api returns None, retrying")
-                    continue
+    retry_bound = 3
+    final_response = None
+    final_reason = None
+    for _ in range(retry_bound):
+        full_response = call_openai_api(sys_prompt, content)
 
-                full_response = full_response.strip()
-                if "\n" in full_response:
-                    full_response = full_response.split("\n")
-                    response, reason = full_response[0], full_response[-1]
-                    response, reason = response.strip(), reason.strip()
-                else:
-                    response = full_response
-                    reason = ""
-                response = response.lower()
-                try:
-                    choice_type, choice_id = response.split(" ")
-                except Exception as e:
-                    print(f"Error in splitting response: {response}")
-                    print(e)
-                    continue
+        if full_response is None:
+            print("call_openai_api returns None, retrying")
+            continue
 
-                response_valid = False
-                if (
-                    choice_type == "snapshot"
-                    and choice_id.isdigit()
-                    and 0 <= int(choice_id) < len(snapshot_imgs)
-                ):
-                    response_valid = True
-                elif (
-                    choice_type == "frontier"
-                    and choice_id.isdigit()
-                    and 0 <= int(choice_id) < len(frontier_imgs)
-                ):
-                    response_valid = True
-
-                if response_valid:
-                    
-                    final_response = response
-                    final_reason = reason
-                    break
+        full_response = full_response.strip()
+        if "\n" in full_response:
+            full_response = full_response.split("\n")
+            response, reason = full_response[0], full_response[-1]
+            response, reason = response.strip(), reason.strip()
         else:
-            final_response = f"frontier {frontier_index}"
+            response = full_response
+            reason = ""
+        response = response.lower()
+        try:
+            choice_type, choice_id = response.split(" ")
+        except Exception as e:
+            print(f"Error in splitting response: {response}")
+            print(e)
+            continue
+
+        response_valid = False
+        if (
+            choice_type == "snapshot"
+            and choice_id.isdigit()
+            and 0 <= int(choice_id) < len(snapshot_imgs)
+        ):
+            response_valid = True
+        elif (
+            choice_type == "frontier"
+            and choice_id.isdigit()
+            and 0 <= int(choice_id) < len(frontier_imgs)
+        ):
+            response_valid = True
+            frontier_index, reason, all_probs, captions_out= evaluate_frontier_select_best_with_reason(vlm, frontier_imgs, question, llava_pairwise_selector)
+            print(f"Frontier voting result: {frontier_index} with the caption:{captions_out}\nreason: {reason}, all_probs: {all_probs}", flush=True)
+            if frontier_index == -1:
+                continue
+            else:
+                response= f"frontier {frontier_index}"
+                reason = reason
+
+        if response_valid:
+            
+            final_response = response
             final_reason = reason
+            break
 
     return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
