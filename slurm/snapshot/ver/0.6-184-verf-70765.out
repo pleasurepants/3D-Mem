@@ -1,0 +1,20 @@
+Fri May 30 07:17:24 PM CEST 2025
+worker-2
+/home/wiss/zhang/anaconda3/envs/3dmem/bin/python
+Running on MASTER_NODE=worker-2, MASTER_PORT=8473, RDZV_ID=32685
+2.3.0
+00:00:00 - Downloading `prism-dinosiglip+7b from HF Hub
+00:00:00 - Found Config =>> Loading & Freezing [bold blue]prism-dinosiglip+7b[/] with:
+             Vision Backbone =>> [bold]dinosiglip-vit-so-384px[/]
+             LLM Backbone    =>> [bold]llama2-7b-pure[/]
+             Arch Specifier  =>> [bold]no-align+fused-gelu-mlp[/]
+             Checkpoint Path =>> [underline]`/home/wiss/zhang/.cache/huggingface/hub/models--TRI-ML--prismatic-vlms/snapshots/a3ba8a19c453a82eaf5a3fb1e699dd9e441f0a12/prism-dinosiglip+7b/checkpoints/latest-checkpoint.pt`[/]
+00:00:00 - Loading Vision Backbone [bold]dinosiglip-vit-so-384px[/]
+00:00:05 - Loading pretrained weights from Hugging Face hub (timm/vit_large_patch14_reg4_dinov2.lvd142m)
+00:00:05 - [timm/vit_large_patch14_reg4_dinov2.lvd142m] Safe alternative available for 'pytorch_model.bin' (as 'model.safetensors'). Loading weights using safetensors.
+00:00:05 - Resized position embedding: (37, 37) to (27, 27).
+00:00:11 - Loading pretrained weights from Hugging Face hub (('timm/ViT-SO400M-14-SigLIP-384', 'open_clip_pytorch_model.bin'))
+00:00:11 - [timm/ViT-SO400M-14-SigLIP-384] Safe alternative available for 'open_clip_pytorch_model.bin' (as 'open_clip_model.safetensors'). Loading weights using safetensors.
+00:00:11 - Loading Pretrained LLM [bold]llama2-7b-pure[/] via HF Transformers
+00:00:11 - Building empty [bold]llama2[/] LLM from [underline]`meta-llama/Llama-2-7b-hf`[/]
+slurmstepd: error: *** JOB 70765 ON worker-2 CANCELLED AT 2025-05-30T19:18:02 ***
