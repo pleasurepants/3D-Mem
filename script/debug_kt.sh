@@ -9,7 +9,7 @@
 #SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/run-aeqa-eval-%j.out 
 #SBATCH --partition all
 
-# srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:1 --time=4:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-1,worker-2,worker-3,worker-4 --partition all bash
+# srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:1 --time=4:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-1,worker-2,worker-3,worker-4,worker-8,worker-9 --partition all bash
 
 
 source /home/wiss/zhang/anaconda3/bin/activate 3dmem
@@ -35,5 +35,7 @@ echo "Running on MASTER_NODE=$MASTER_NODE, MASTER_PORT=$MASTER_PORT, RDZV_ID=$RD
 
 python -c "import omegaconf; print(omegaconf.__version__)"
 
-python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
- /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_kt.py -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_debug.yaml
+# python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
+#  /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_kt.py -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_debug.yaml
+
+python /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_kt.py -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_debug.yaml

@@ -1,7 +1,7 @@
 import logging
 from typing import Tuple, Optional, Union
 
-from src_kt.eval_utils_gpt_aeqa import explore_step
+from src_kt.eval_utils_gpt_aeqa_kt_noverf import explore_step
 from src_kt.tsdf_planner import TSDFPlanner, SnapShot, Frontier
 from src_kt.scene_aeqa import Scene
 
