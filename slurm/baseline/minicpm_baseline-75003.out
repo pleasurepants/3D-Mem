@@ -1,0 +1,726 @@
+=== JOB START ===
+Sat Jun 21 05:16:49 PM CEST 2025
+worker-1
+Sat Jun 21 17:16:50 2025       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 535.247.01             Driver Version: 535.247.01   CUDA Version: 12.2     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  Quadro RTX 8000                Off | 00000000:3E:00.0 Off |                  Off |
+| 33%   31C    P8              12W / 260W |      0MiB / 49152MiB |      0%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+|   1  Quadro RTX 8000                Off | 00000000:B2:00.0 Off |                  Off |
+| 33%   31C    P8              12W / 260W |      0MiB / 49152MiB |      0%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|  No running processes found                                                           |
++---------------------------------------------------------------------------------------+
+SLURM_JOB_ID: 75003
+[INFO] CUDA_VISIBLE_DEVICES=3,5
+[INFO] Starting vLLM (minicpm) server on GPU 0...
+[INFO] Waiting for vLLM (minicpm) server to be ready...
+  ... waiting (2s)
+  ... waiting (4s)
+  ... waiting (6s)
+INFO 06-21 17:16:56 [__init__.py:244] Automatically detected platform cuda.
+  ... waiting (8s)
+  ... waiting (10s)
+  ... waiting (12s)
+  ... waiting (14s)
+INFO 06-21 17:17:03 [api_server.py:1287] vLLM API server version 0.9.1
+INFO 06-21 17:17:04 [cli_args.py:309] non-default args: {'model': 'openbmb/MiniCPM-V-2_6', 'trust_remote_code': True, 'served_model_name': ['minicpm'], 'limit_mm_per_prompt': {'image': 20}}
+  ... waiting (16s)
+  ... waiting (18s)
+  ... waiting (20s)
+  ... waiting (22s)
+  ... waiting (24s)
+  ... waiting (26s)
+INFO 06-21 17:17:15 [config.py:823] This model supports multiple tasks: {'embed', 'generate', 'reward', 'score', 'classify'}. Defaulting to 'generate'.
+WARNING 06-21 17:17:15 [config.py:3220] Your device 'Quadro RTX 8000' (with compute capability 7.5) doesn't support torch.bfloat16. Falling back to torch.float16 for compatibility.
+WARNING 06-21 17:17:15 [config.py:3271] Casting torch.bfloat16 to torch.float16.
+WARNING 06-21 17:17:15 [arg_utils.py:1642] Compute Capability < 8.0 is not supported by the V1 Engine. Falling back to V0. 
+INFO 06-21 17:17:15 [api_server.py:265] Started engine process with PID 2569664
+  ... waiting (28s)
+WARNING 06-21 17:17:17 [env_override.py:17] NCCL_CUMEM_ENABLE is set to 0, skipping override. This may increase memory overhead with cudagraph+allreduce: https://github.com/NVIDIA/nccl/issues/1234
+  ... waiting (30s)
+INFO 06-21 17:17:19 [__init__.py:244] Automatically detected platform cuda.
+  ... waiting (32s)
+  ... waiting (34s)
+INFO 06-21 17:17:23 [llm_engine.py:230] Initializing a V0 LLM engine (v0.9.1) with config: model='openbmb/MiniCPM-V-2_6', speculative_config=None, tokenizer='openbmb/MiniCPM-V-2_6', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config={}, tokenizer_revision=None, trust_remote_code=True, dtype=torch.float16, max_seq_len=32768, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_backend=''), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None), seed=0, served_model_name=minicpm, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=None, chunked_prefill_enabled=False, use_async_output_proc=True, pooler_config=None, compilation_config={"level":0,"debug_dump_path":"","cache_dir":"","backend":"","custom_ops":[],"splitting_ops":[],"use_inductor":true,"compile_sizes":[],"inductor_compile_config":{"enable_auto_functionalized_v2":false},"inductor_passes":{},"use_cudagraph":true,"cudagraph_num_of_warmups":0,"cudagraph_capture_sizes":[256,248,240,232,224,216,208,200,192,184,176,168,160,152,144,136,128,120,112,104,96,88,80,72,64,56,48,40,32,24,16,8,4,2,1],"cudagraph_copy_inputs":false,"full_cuda_graph":false,"max_capture_size":256,"local_cache_dir":null}, use_cached_outputs=True, 
+  ... waiting (36s)
+INFO 06-21 17:17:25 [cuda.py:275] Cannot use FlashAttention-2 backend for Volta and Turing GPUs.
+INFO 06-21 17:17:25 [cuda.py:324] Using XFormers backend.
+INFO 06-21 17:17:26 [parallel_state.py:1065] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0
+INFO 06-21 17:17:26 [model_runner.py:1171] Starting to load model openbmb/MiniCPM-V-2_6...
+INFO 06-21 17:17:26 [cuda.py:275] Cannot use FlashAttention-2 backend for Volta and Turing GPUs.
+INFO 06-21 17:17:26 [cuda.py:324] Using XFormers backend.
+  ... waiting (38s)
+INFO 06-21 17:17:27 [weight_utils.py:292] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+  ... waiting (40s)
+Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:03<00:09,  3.31s/it]
+  ... waiting (42s)
+  ... waiting (44s)
+  ... waiting (46s)
+Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:09<00:10,  5.06s/it]
+  ... waiting (48s)
+  ... waiting (50s)
+  ... waiting (52s)
+  ... waiting (54s)
+Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:16<00:05,  5.91s/it]
+  ... waiting (56s)
+  ... waiting (58s)
+  ... waiting (60s)
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:22<00:00,  6.01s/it]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:22<00:00,  5.67s/it]
+
+INFO 06-21 17:17:50 [default_loader.py:272] Loading weights took 22.82 seconds
+INFO 06-21 17:17:50 [model_runner.py:1203] Model loading took 15.1267 GiB and 24.056929 seconds
+  ... waiting (62s)
+/home/wiss/zhang/anaconda3/envs/vllm/lib/python3.10/site-packages/transformers/models/auto/image_processing_auto.py:609: FutureWarning: The image_processor_class argument is deprecated and will be removed in v4.42. Please use `slow_image_processor_class`, or `fast_image_processor_class` instead
+  warnings.warn(
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+  ... waiting (64s)
+  ... waiting (66s)
+  ... waiting (68s)
+  ... waiting (70s)
+  ... waiting (72s)
+  ... waiting (74s)
+  ... waiting (76s)
+  ... waiting (78s)
+  ... waiting (80s)
+  ... waiting (82s)
+  ... waiting (84s)
+  ... waiting (86s)
+  ... waiting (88s)
+  ... waiting (90s)
+  ... waiting (92s)
+INFO 06-21 17:18:23 [worker.py:294] Memory profiling takes 32.22 seconds
+INFO 06-21 17:18:23 [worker.py:294] the current vLLM instance can use total_gpu_memory (47.45GiB) x gpu_memory_utilization (0.90) = 42.71GiB
+INFO 06-21 17:18:23 [worker.py:294] model weights take 15.13GiB; non_torch_memory takes 0.06GiB; PyTorch activation peak memory takes 20.32GiB; the rest of the memory reserved for KV Cache is 7.20GiB.
+INFO 06-21 17:18:23 [executor_base.py:113] # cuda blocks: 8422, # CPU blocks: 4681
+INFO 06-21 17:18:23 [executor_base.py:118] Maximum concurrency for 32768 tokens per request: 4.11x
+  ... waiting (94s)
+  ... waiting (96s)
+INFO 06-21 17:18:26 [model_runner.py:1513] Capturing cudagraphs for decoding. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI. If out-of-memory error occurs during cudagraph capture, consider decreasing `gpu_memory_utilization` or switching to eager mode. You can also reduce the `max_num_seqs` as needed to decrease memory usage.
+Capturing CUDA graph shapes:   0%|          | 0/35 [00:00<?, ?it/s]Capturing CUDA graph shapes:   3%|▎         | 1/35 [00:00<00:21,  1.58it/s]  ... waiting (98s)
+Capturing CUDA graph shapes:   6%|▌         | 2/35 [00:01<00:19,  1.66it/s]Capturing CUDA graph shapes:   9%|▊         | 3/35 [00:01<00:18,  1.72it/s]Capturing CUDA graph shapes:  11%|█▏        | 4/35 [00:02<00:17,  1.76it/s]  ... waiting (100s)
+Capturing CUDA graph shapes:  14%|█▍        | 5/35 [00:02<00:16,  1.78it/s]Capturing CUDA graph shapes:  17%|█▋        | 6/35 [00:03<00:16,  1.80it/s]Capturing CUDA graph shapes:  20%|██        | 7/35 [00:03<00:15,  1.81it/s]Capturing CUDA graph shapes:  23%|██▎       | 8/35 [00:04<00:14,  1.80it/s]  ... waiting (102s)
+Capturing CUDA graph shapes:  26%|██▌       | 9/35 [00:05<00:14,  1.81it/s]Capturing CUDA graph shapes:  29%|██▊       | 10/35 [00:05<00:13,  1.82it/s]Capturing CUDA graph shapes:  31%|███▏      | 11/35 [00:06<00:13,  1.82it/s]Capturing CUDA graph shapes:  34%|███▍      | 12/35 [00:06<00:12,  1.83it/s]  ... waiting (104s)
+Capturing CUDA graph shapes:  37%|███▋      | 13/35 [00:07<00:12,  1.83it/s]Capturing CUDA graph shapes:  40%|████      | 14/35 [00:07<00:11,  1.83it/s]Capturing CUDA graph shapes:  43%|████▎     | 15/35 [00:08<00:10,  1.83it/s]  ... waiting (106s)
+Capturing CUDA graph shapes:  46%|████▌     | 16/35 [00:08<00:10,  1.84it/s]Capturing CUDA graph shapes:  49%|████▊     | 17/35 [00:09<00:09,  1.83it/s]Capturing CUDA graph shapes:  51%|█████▏    | 18/35 [00:09<00:09,  1.85it/s]Capturing CUDA graph shapes:  54%|█████▍    | 19/35 [00:10<00:08,  1.86it/s]  ... waiting (108s)
+Capturing CUDA graph shapes:  57%|█████▋    | 20/35 [00:11<00:08,  1.87it/s]Capturing CUDA graph shapes:  60%|██████    | 21/35 [00:11<00:07,  1.87it/s]Capturing CUDA graph shapes:  63%|██████▎   | 22/35 [00:12<00:06,  1.88it/s]Capturing CUDA graph shapes:  66%|██████▌   | 23/35 [00:12<00:06,  1.89it/s]  ... waiting (110s)
+Capturing CUDA graph shapes:  69%|██████▊   | 24/35 [00:13<00:05,  1.90it/s]Capturing CUDA graph shapes:  71%|███████▏  | 25/35 [00:13<00:05,  1.91it/s]Capturing CUDA graph shapes:  74%|███████▍  | 26/35 [00:14<00:04,  1.92it/s]Capturing CUDA graph shapes:  77%|███████▋  | 27/35 [00:14<00:04,  1.92it/s]  ... waiting (112s)
+Capturing CUDA graph shapes:  80%|████████  | 28/35 [00:15<00:03,  1.92it/s]Capturing CUDA graph shapes:  83%|████████▎ | 29/35 [00:15<00:03,  1.86it/s]Capturing CUDA graph shapes:  86%|████████▌ | 30/35 [00:16<00:02,  1.85it/s]Capturing CUDA graph shapes:  89%|████████▊ | 31/35 [00:16<00:02,  1.83it/s]  ... waiting (114s)
+Capturing CUDA graph shapes:  91%|█████████▏| 32/35 [00:17<00:01,  1.90it/s]Capturing CUDA graph shapes:  94%|█████████▍| 33/35 [00:17<00:01,  1.96it/s]Capturing CUDA graph shapes:  97%|█████████▋| 34/35 [00:18<00:00,  2.01it/s]Capturing CUDA graph shapes: 100%|██████████| 35/35 [00:18<00:00,  2.02it/s]Capturing CUDA graph shapes: 100%|██████████| 35/35 [00:18<00:00,  1.86it/s]
+INFO 06-21 17:18:45 [model_runner.py:1671] Graph capturing finished in 19 secs, took 0.78 GiB
+INFO 06-21 17:18:45 [llm_engine.py:428] init engine (profile, create kv cache, warmup model) took 54.81 seconds
+  ... waiting (116s)
+INFO 06-21 17:18:47 [api_server.py:1349] Starting vLLM API server 0 on http://0.0.0.0:8000
+INFO 06-21 17:18:47 [launcher.py:29] Available routes are:
+INFO 06-21 17:18:47 [launcher.py:37] Route: /openapi.json, Methods: GET, HEAD
+INFO 06-21 17:18:47 [launcher.py:37] Route: /docs, Methods: GET, HEAD
+INFO 06-21 17:18:47 [launcher.py:37] Route: /docs/oauth2-redirect, Methods: GET, HEAD
+INFO 06-21 17:18:47 [launcher.py:37] Route: /redoc, Methods: GET, HEAD
+INFO 06-21 17:18:47 [launcher.py:37] Route: /health, Methods: GET
+INFO 06-21 17:18:47 [launcher.py:37] Route: /load, Methods: GET
+INFO 06-21 17:18:47 [launcher.py:37] Route: /ping, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /ping, Methods: GET
+INFO 06-21 17:18:47 [launcher.py:37] Route: /tokenize, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /detokenize, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /v1/models, Methods: GET
+INFO 06-21 17:18:47 [launcher.py:37] Route: /version, Methods: GET
+INFO 06-21 17:18:47 [launcher.py:37] Route: /v1/chat/completions, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /v1/completions, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /v1/embeddings, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /pooling, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /classify, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /score, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /v1/score, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /v1/audio/transcriptions, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /rerank, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /v1/rerank, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /v2/rerank, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /invocations, Methods: POST
+INFO 06-21 17:18:47 [launcher.py:37] Route: /metrics, Methods: GET
+INFO:     Started server process [2568566]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:48836 - "GET /v1/models HTTP/1.1" 200 OK
+[INFO] ✅ minicpm API is ready!
+[INFO] Starting AEQA evaluation on GPU 1 (3dmem env)...
+00:00:00 - ***** Running exp_eval_aeqa *****
+00:00:00 - Total number of questions: 41
+00:00:00 - number of questions after splitting: 41
+00:00:00 - question path: data/aeqa_questions-41.json
+00:00:00 - Load YOLO model yolov8x-world.pt successful!
+00:00:03 - Load SAM model sam_l.pt successful!
+00:00:03 - Loaded ViT-B-32 model config.
+00:00:04 - Loading pretrained ViT-B-32 weights (laion2b_s34b_b79k).
+00:00:05 - Load CLIP model successful!
+00:00:05 - 
+========
+Index: 0 Scene: 00824-Dd4bFSTQ8gi
+00:00:10 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:00:10 - Load scene 00824-Dd4bFSTQ8gi successfully with semantic texture
+00:00:15 - 
+
+Question id 00c2be2a-1377-4fae-a889-30936b7890c3 initialization successful!
+00:00:15 - 
+== step: 0
+00:00:17 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:00:20 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+00:00:22 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:00:23 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:00:24 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:00:26 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:00:27 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:00:29 - Step 0, update snapshots, 12 objects, 4 snapshots
+/home/wiss/zhang/anaconda3/envs/vllm/lib/python3.10/site-packages/transformers/models/auto/image_processing_auto.py:609: FutureWarning: The image_processor_class argument is deprecated and will be removed in v4.42. Please use `slow_image_processor_class`, or `fast_image_processor_class` instead
+  warnings.warn(
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+INFO 06-21 17:19:35 [chat_utils.py:420] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+INFO 06-21 17:19:35 [logger.py:43] Received request chatcmpl-0ac71df5901243cf8335d26babb6197d: prompt: '<|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: What is hanging from the oven handle? \nFollowing is a list of objects that you can choose, each object one line bed chair folded chair picture pillow plate potted plant sofa chair table Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:19:35 [engine.py:317] Added request chatcmpl-0ac71df5901243cf8335d26babb6197d.
+INFO 06-21 17:19:35 [metrics.py:417] Avg prompt throughput: 26.9 tokens/s, Avg generation throughput: 0.1 tokens/s, Running: 1 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.2%, CPU KV cache usage: 0.0%.
+INFO:     127.0.0.1:48648 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:00:34 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:00:34 - Prefiltering selected classes: []
+00:00:34 - Prefiltering snapshot: 4 -> 0
+00:00:34 - Input prompt:
+00:00:34 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: What is hanging from the oven handle? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. No Snapshot is available The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. 
+INFO 06-21 17:19:36 [logger.py:43] Received request chatcmpl-c450d08a165543c4bf74b639158224ab: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: What is hanging from the oven handle? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nNo Snapshot is available \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:19:39 [engine.py:317] Added request chatcmpl-c450d08a165543c4bf74b639158224ab.
+INFO 06-21 17:19:40 [metrics.py:417] Avg prompt throughput: 147.7 tokens/s, Avg generation throughput: 2.6 tokens/s, Running: 1 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.6%, CPU KV cache usage: 0.0%.
+INFO:     127.0.0.1:48648 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:00:39 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-21 17:19:40 [logger.py:43] Received request chatcmpl-0434a465c3b64c83aa9872b34ef81077: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: What is hanging from the oven handle? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nNo Snapshot is available \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:19:40 [engine.py:317] Added request chatcmpl-0434a465c3b64c83aa9872b34ef81077.
+INFO:     127.0.0.1:48648 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:00:41 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-21 17:19:42 [logger.py:43] Received request chatcmpl-2097529fb0424c3180da5bffa9f1230e: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: What is hanging from the oven handle? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nNo Snapshot is available \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:19:42 [engine.py:317] Added request chatcmpl-2097529fb0424c3180da5bffa9f1230e.
+INFO:     127.0.0.1:48648 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:00:41 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:00:41 - explore_step failed and returned None
+00:00:41 - Question id 00c2be2a-1377-4fae-a889-30936b7890c3 invalid: query_vlm_for_response failed!
+00:00:41 - Question id 00c2be2a-1377-4fae-a889-30936b7890c3 failed, 0 length
+00:00:41 - 1/41: Success rate: 0/1
+RuntimeWarning: Mean of empty slice.
+RuntimeWarning: invalid value encountered in scalar divide
+00:00:41 - Mean path length for success exploration: nan
+00:00:41 - Filtered snapshots/Total snapshots/Total frames: 0/4/5
+00:00:41 - Scene graph of question 00c2be2a-1377-4fae-a889-30936b7890c3:
+00:00:41 - Question: What is hanging from the oven handle?
+00:00:41 - Answer: A towel
+00:00:41 - Prediction: None
+00:00:41 - 0-view_0.png:
+00:00:41 - 	1: potted plant 2
+00:00:41 - 	2: picture 2
+00:00:41 - 	4: folded chair 1
+00:00:41 - 0-view_5.png:
+00:00:41 - 	3: bed 3
+00:00:41 - 	7: plate 3
+00:00:41 - 	9: folded chair 2
+00:00:41 - 	11: plate 2
+00:00:41 - 	12: table 2
+00:00:41 - 	21: chair 1
+00:00:41 - 0-view_3.png:
+00:00:41 - 	8: sofa chair 1
+00:00:41 - 	10: pillow 1
+00:00:41 - 0-view_4.png:
+00:00:41 - 	14: picture 1
+00:00:42 - 
+========
+Index: 1 Scene: 00876-mv2HUxq3B53
+00:00:48 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:00:48 - Load scene 00876-mv2HUxq3B53 successfully with semantic texture
+00:00:49 - 
+
+Question id 013bb857-f47d-4b50-add4-023cc4ff414c initialization successful!
+00:00:49 - 
+== step: 0
+00:00:51 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.04 seconds
+INFO 06-21 17:19:52 [metrics.py:417] Avg prompt throughput: 117.8 tokens/s, Avg generation throughput: 5.6 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:00:53 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:00:54 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.08 seconds
+00:00:56 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:00:57 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:00:59 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:01:00 - Step 0, update snapshots, 15 objects, 4 snapshots
+INFO 06-21 17:20:02 [logger.py:43] Received request chatcmpl-42a9a31f28f84f289dbb4a971044f019: prompt: '<|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: What material are the stools in the kitchen made out of? \nFollowing is a list of objects that you can choose, each object one line bed blanket cabinet curtain lamp nightstand picture pillow telephone tv Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:20:02 [engine.py:317] Added request chatcmpl-42a9a31f28f84f289dbb4a971044f019.
+INFO 06-21 17:20:02 [metrics.py:417] Avg prompt throughput: 25.6 tokens/s, Avg generation throughput: 0.1 tokens/s, Running: 1 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.2%, CPU KV cache usage: 0.0%.
+INFO:     127.0.0.1:50298 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:01 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:01 - Prefiltering selected classes: []
+00:01:01 - Prefiltering snapshot: 4 -> 0
+00:01:01 - Input prompt:
+00:01:01 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: What material are the stools in the kitchen made out of? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. No Snapshot is available The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. 
+INFO 06-21 17:20:03 [logger.py:43] Received request chatcmpl-1832d18868d244a18221466c4af7c973: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: What material are the stools in the kitchen made out of? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nNo Snapshot is available \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:20:03 [engine.py:317] Added request chatcmpl-1832d18868d244a18221466c4af7c973.
+INFO:     127.0.0.1:50298 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:02 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-21 17:20:03 [logger.py:43] Received request chatcmpl-1a53bdadc6b44298ab8bd1f47f7d995d: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: What material are the stools in the kitchen made out of? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nNo Snapshot is available \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:20:03 [engine.py:317] Added request chatcmpl-1a53bdadc6b44298ab8bd1f47f7d995d.
+INFO:     127.0.0.1:50298 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:03 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-21 17:20:04 [logger.py:43] Received request chatcmpl-d6e1f0ce0fd944d2bb736e0d1af0fc28: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: What material are the stools in the kitchen made out of? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nNo Snapshot is available \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:20:04 [engine.py:317] Added request chatcmpl-d6e1f0ce0fd944d2bb736e0d1af0fc28.
+INFO:     127.0.0.1:50298 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:04 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:04 - explore_step failed and returned None
+00:01:04 - Question id 013bb857-f47d-4b50-add4-023cc4ff414c invalid: query_vlm_for_response failed!
+00:01:04 - Question id 013bb857-f47d-4b50-add4-023cc4ff414c failed, 0 length
+00:01:04 - 2/41: Success rate: 0/2
+RuntimeWarning: Mean of empty slice.
+RuntimeWarning: invalid value encountered in scalar divide
+00:01:04 - Mean path length for success exploration: nan
+00:01:04 - Filtered snapshots/Total snapshots/Total frames: 0/4/6
+00:01:04 - Scene graph of question 013bb857-f47d-4b50-add4-023cc4ff414c:
+00:01:04 - Question: What material are the stools in the kitchen made out of?
+00:01:04 - Answer: Leather
+00:01:04 - Prediction: None
+00:01:04 - 0-view_1.png:
+00:01:04 - 	1: telephone 1
+00:01:04 - 	4: pillow 1
+00:01:04 - 0-view_6.png:
+00:01:04 - 	2: nightstand 3
+00:01:04 - 	3: lamp 3
+00:01:04 - 	27: picture 1
+00:01:04 - 0-view_3.png:
+00:01:04 - 	7: bed 4
+00:01:04 - 	8: pillow 2
+00:01:04 - 	12: pillow 1
+00:01:04 - 	13: pillow 1
+00:01:04 - 	14: blanket 1
+00:01:04 - 0-view_5.png:
+00:01:04 - 	11: cabinet 3
+00:01:04 - 	16: picture 2
+00:01:04 - 	18: curtain 2
+00:01:04 - 	21: picture 1
+00:01:04 - 	23: tv 1
+00:01:04 - 
+========
+Index: 2 Scene: 00848-ziup5kvtCCR
+00:01:08 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:01:08 - Load scene 00848-ziup5kvtCCR successfully with semantic texture
+00:01:08 - 
+
+Question id 01fcc568-f51e-4e12-b976-5dc8d554135a initialization successful!
+00:01:08 - 
+== step: 0
+00:01:09 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.16 seconds
+00:01:11 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:01:13 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+INFO 06-21 17:20:15 [metrics.py:417] Avg prompt throughput: 181.4 tokens/s, Avg generation throughput: 4.3 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:01:15 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:01:16 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:01:18 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:01:19 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+00:01:21 - Step 0, update snapshots, 25 objects, 7 snapshots
+INFO 06-21 17:20:24 [logger.py:43] Received request chatcmpl-3368cdbdd2d34368ab33912ceaaa0f47: prompt: '<|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: Where is the teddy bear? \nFollowing is a list of objects that you can choose, each object one line bottle cabinet candle clock coffee table couch curtain lamp mirror pillow potted plant sofa chair tv Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:20:24 [engine.py:317] Added request chatcmpl-3368cdbdd2d34368ab33912ceaaa0f47.
+INFO 06-21 17:20:24 [metrics.py:417] Avg prompt throughput: 27.7 tokens/s, Avg generation throughput: 0.1 tokens/s, Running: 1 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.2%, CPU KV cache usage: 0.0%.
+INFO:     127.0.0.1:50838 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:23 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:23 - Prefiltering selected classes: ['couch']
+00:01:23 - Prefiltering snapshot: 7 -> 2
+00:01:23 - Input prompt:
+00:01:23 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: Where is the teddy bear? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. Snapshot 0 [iVBORw0KGg...]couch Snapshot 1 [iVBORw0KGg...]couch The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. 
+INFO 06-21 17:20:24 [logger.py:43] Received request chatcmpl-a2178a04d45e4685bd72277e90a42a10: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: Where is the teddy bear? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nSnapshot 0 \ncouch\n \nSnapshot 1 \ncouch\n \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:20:24 [engine.py:317] Added request chatcmpl-a2178a04d45e4685bd72277e90a42a10.
+INFO:     127.0.0.1:50838 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:24 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:24 - Response: [snapshot 0]
+Reason: [The teddy bear is not visible in the provided snapshots.]
+00:01:24 - Prediction: snapshot, 0
+00:01:24 - The index of target snapshot 0
+00:01:24 - Pred_target_class: lamp coffee table potted plant pillow pillow pillow pillow couch
+00:01:24 - Next choice Snapshot of 0-view_0.png
+00:01:24 - Error in get_proper_snapshot_observation_point: cannot find a proper observation point among 1 candidates, return the snapshot center!
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:01:24 - Current position: [    0.21692    0.021223      7.1057], 0.000
+00:01:27 - Question id 01fcc568-f51e-4e12-b976-5dc8d554135a finished after arriving at target!
+00:01:27 - Question id 01fcc568-f51e-4e12-b976-5dc8d554135a finish successfully, 0.0 length
+00:01:27 - 3/41: Success rate: 1/3
+00:01:27 - Mean path length for success exploration: 0.0
+00:01:27 - Filtered snapshots/Total snapshots/Total frames: 2/7/7
+00:01:27 - Scene graph of question 01fcc568-f51e-4e12-b976-5dc8d554135a:
+00:01:27 - Question: Where is the teddy bear?
+00:01:27 - Answer: In the dog bed in the living room.
+00:01:27 - Prediction: The teddy bear is not visible in the provided snapshots.
+00:01:27 - 0-view_0.png:
+00:01:27 - 	1: lamp 1
+00:01:27 - 	2: pillow 3
+00:01:27 - 	4: couch 2
+00:01:27 - 	5: coffee table 1
+00:01:27 - 	6: potted plant 1
+00:01:27 - 	7: pillow 2
+00:01:27 - 	8: pillow 2
+00:01:27 - 	9: pillow 1
+00:01:27 - 0-view_2.png:
+00:01:27 - 	3: pillow 3
+00:01:27 - 	18: couch 2
+00:01:27 - 0-view_1.png:
+00:01:27 - 	10: coffee table 3
+00:01:27 - 	11: sofa chair 3
+00:01:27 - 	14: pillow 1
+00:01:27 - 0-view_6.png:
+00:01:27 - 	21: cabinet 3
+00:01:27 - 	25: tv 2
+00:01:27 - 	26: potted plant 3
+00:01:27 - 0-view_3.png:
+00:01:27 - 	24: mirror 1
+00:01:27 - 0-view_4.png:
+00:01:27 - 	28: clock 2
+00:01:27 - 	29: bottle 2
+00:01:27 - 0-view_5.png:
+00:01:27 - 	30: mirror 2
+00:01:27 - 	32: clock 2
+00:01:27 - 	35: lamp 2
+00:01:27 - 	39: curtain 1
+00:01:27 - 	40: candle 1
+00:01:27 - 	41: potted plant 1
+00:01:27 - 
+========
+Index: 3 Scene: 00848-ziup5kvtCCR
+00:01:31 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:01:31 - Load scene 00848-ziup5kvtCCR successfully with semantic texture
+00:01:31 - 
+
+Question id 0df60236-15ad-4166-a31a-a98d14214fdb initialization successful!
+00:01:31 - 
+== step: 0
+00:01:32 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.16 seconds
+INFO 06-21 17:20:35 [metrics.py:417] Avg prompt throughput: 81.2 tokens/s, Avg generation throughput: 1.7 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:01:34 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:01:37 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:01:38 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:01:40 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:01:42 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:01:44 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+INFO 06-21 17:20:45 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:01:46 - Step 0, update snapshots, 25 objects, 7 snapshots
+INFO 06-21 17:20:49 [logger.py:43] Received request chatcmpl-ea1cd842944a449a96b3fb5bfcab3e34: prompt: '<|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: What type of numbers are on the clock? \nFollowing is a list of objects that you can choose, each object one line bottle cabinet candle clock coffee table couch curtain lamp mirror pillow potted plant sofa chair tv Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:20:49 [engine.py:317] Added request chatcmpl-ea1cd842944a449a96b3fb5bfcab3e34.
+INFO:     127.0.0.1:44598 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:48 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:48 - Prefiltering selected classes: ['clock']
+00:01:48 - Prefiltering snapshot: 7 -> 2
+00:01:48 - Input prompt:
+00:01:48 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: What type of numbers are on the clock? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. Snapshot 0 [iVBORw0KGg...]clock Snapshot 1 [iVBORw0KGg...]clock The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. 
+INFO 06-21 17:20:49 [logger.py:43] Received request chatcmpl-a6dbe1a44f3342f09ccd2f0fdadb194f: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: What type of numbers are on the clock? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nSnapshot 0 \nclock\n \nSnapshot 1 \nclock\n \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:20:49 [engine.py:317] Added request chatcmpl-a6dbe1a44f3342f09ccd2f0fdadb194f.
+INFO:     127.0.0.1:44598 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:49 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:49 - Response: [snapshot 1]
+Reason: [The numbers on the clock are Roman numerals.]
+00:01:49 - Prediction: snapshot, 1
+00:01:49 - The index of target snapshot 2
+00:01:49 - Pred_target_class: clock bottle
+00:01:49 - Next choice Snapshot of 0-view_4.png
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:01:49 - Current position: [   -0.38308    0.021223      6.8057], 0.671
+00:01:52 - Question id 0df60236-15ad-4166-a31a-a98d14214fdb finished after arriving at target!
+00:01:52 - Question id 0df60236-15ad-4166-a31a-a98d14214fdb finish successfully, 0.670820393249937 length
+00:01:52 - 4/41: Success rate: 2/4
+00:01:52 - Mean path length for success exploration: 0.3354101966249685
+00:01:52 - Filtered snapshots/Total snapshots/Total frames: 2/7/7
+00:01:52 - Scene graph of question 0df60236-15ad-4166-a31a-a98d14214fdb:
+00:01:52 - Question: What type of numbers are on the clock?
+00:01:52 - Answer: Roman numerals
+00:01:52 - Prediction: The numbers on the clock are Roman numerals.
+00:01:52 - 0-view_0.png:
+00:01:52 - 	1: lamp 1
+00:01:52 - 	2: pillow 3
+00:01:52 - 	4: couch 2
+00:01:52 - 	5: coffee table 1
+00:01:52 - 	6: potted plant 1
+00:01:52 - 	7: pillow 2
+00:01:52 - 	8: pillow 2
+00:01:52 - 	9: pillow 1
+00:01:52 - 0-view_2.png:
+00:01:52 - 	3: pillow 3
+00:01:52 - 	18: couch 2
+00:01:52 - 0-view_1.png:
+00:01:52 - 	10: coffee table 3
+00:01:52 - 	11: sofa chair 3
+00:01:52 - 	14: pillow 1
+00:01:52 - 0-view_6.png:
+00:01:52 - 	21: cabinet 3
+00:01:52 - 	25: tv 2
+00:01:52 - 	26: potted plant 3
+00:01:52 - 0-view_3.png:
+00:01:52 - 	24: mirror 1
+00:01:52 - 0-view_4.png:
+00:01:52 - 	28: clock 2
+00:01:52 - 	29: bottle 2
+00:01:52 - 0-view_5.png:
+00:01:52 - 	30: mirror 2
+00:01:52 - 	32: clock 2
+00:01:52 - 	35: lamp 2
+00:01:52 - 	39: curtain 1
+00:01:52 - 	40: candle 1
+00:01:52 - 	41: potted plant 1
+00:01:52 - 
+========
+Index: 4 Scene: 00880-Nfvxx8J5NCo
+00:01:56 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:01:56 - Load scene 00880-Nfvxx8J5NCo successfully with semantic texture
+00:01:56 - 
+
+Question id 109eaad4-6e68-4da1-8f98-a0d8589ec26d initialization successful!
+00:01:56 - 
+== step: 0
+00:01:57 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:01:58 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.09 seconds
+INFO 06-21 17:21:00 [metrics.py:417] Avg prompt throughput: 77.3 tokens/s, Avg generation throughput: 1.1 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:02:00 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.13 seconds
+00:02:02 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.12 seconds
+00:02:04 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.12 seconds
+00:02:06 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.08 seconds
+00:02:07 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.13 seconds
+00:02:09 - Step 0, update snapshots, 24 objects, 6 snapshots
+INFO 06-21 17:21:10 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+INFO 06-21 17:21:12 [logger.py:43] Received request chatcmpl-3598f0a51149423585330b621a4cdece: prompt: '<|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: where can I keep a photo frame? \nFollowing is a list of objects that you can choose, each object one line book cabinet coffee table couch counter fan mat microwave paper bag picture refrigerator shelf sink stool stove tissue box trash bin Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:21:12 [engine.py:317] Added request chatcmpl-3598f0a51149423585330b621a4cdece.
+INFO:     127.0.0.1:48890 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:11 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:02:11 - Prefiltering selected classes: ['shelf', 'picture', 'counter', 'shelf']
+00:02:11 - Prefiltering snapshot: 6 -> 4
+00:02:11 - Input prompt:
+00:02:11 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: where can I keep a photo frame? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. Snapshot 0 [iVBORw0KGg...]picture Snapshot 1 [iVBORw0KGg...]picture, shelf Snapshot 2 [iVBORw0KGg...]picture, shelf Snapshot 3 [iVBORw0KGg...]counter The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Frontier 2 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. 
+INFO 06-21 17:21:13 [logger.py:43] Received request chatcmpl-39830392ae0e4af0b6250f29532a14bb: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: where can I keep a photo frame? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nSnapshot 0 \npicture\n \nSnapshot 1 \npicture, shelf\n \nSnapshot 2 \npicture, shelf\n \nSnapshot 3 \ncounter\n \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nFrontier 2 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:21:13 [engine.py:317] Added request chatcmpl-39830392ae0e4af0b6250f29532a14bb.
+INFO:     127.0.0.1:48890 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:13 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:02:13 - Response: [snapshot 1]
+Reason: [Picture, shelf Based on the provided snapshots, the most appropriate place to keep a photo frame is on a shelf, as it is a common spot for displaying personal items and decor.]
+00:02:13 - Prediction: snapshot, 1
+00:02:13 - The index of target snapshot 2
+00:02:13 - Pred_target_class: microwave shelf stove picture stool stool stool
+00:02:13 - Next choice Snapshot of 0-view_3.png
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:02:13 - Current position: [    -9.0166     0.18086     0.35245], 0.860
+00:02:16 - Question id 109eaad4-6e68-4da1-8f98-a0d8589ec26d finished after arriving at target!
+00:02:16 - Question id 109eaad4-6e68-4da1-8f98-a0d8589ec26d finish successfully, 0.8602325267042628 length
+00:02:16 - 5/41: Success rate: 3/5
+00:02:16 - Mean path length for success exploration: 0.5103509733180666
+00:02:16 - Filtered snapshots/Total snapshots/Total frames: 4/6/7
+00:02:16 - Scene graph of question 109eaad4-6e68-4da1-8f98-a0d8589ec26d:
+00:02:16 - Question: where can I keep a photo frame?
+00:02:16 - Answer: on the counter below the television with other frames
+00:02:16 - Prediction: Picture, shelf Based on the provided snapshots, the most appropriate place to keep a photo frame is on a shelf, as it is a common spot for displaying personal items and decor.
+00:02:16 - 0-view_0.png:
+00:02:16 - 	1: couch 4
+00:02:16 - 	2: coffee table 2
+00:02:16 - 	3: book 2
+00:02:16 - 	4: mat 1
+00:02:16 - 0-view_6.png:
+00:02:16 - 	8: fan 2
+00:02:16 - 0-view_2.png:
+00:02:16 - 	10: microwave 1
+00:02:16 - 	11: stool 1
+00:02:16 - 	12: trash bin 1
+00:02:16 - 	13: counter 1
+00:02:16 - 0-view_4.png:
+00:02:16 - 	14: sink 4
+00:02:16 - 	15: refrigerator 3
+00:02:16 - 	25: paper bag 1
+00:02:16 - 	27: tissue box 1
+00:02:16 - 	29: picture 2
+00:02:16 - 	32: cabinet 1
+00:02:16 - 0-view_3.png:
+00:02:16 - 	16: stool 3
+00:02:16 - 	17: stool 2
+00:02:16 - 	18: stool 2
+00:02:16 - 	19: microwave 2
+00:02:16 - 	20: picture 2
+00:02:16 - 	21: shelf 2
+00:02:16 - 	23: stove 2
+00:02:16 - 0-view_5.png:
+00:02:16 - 	37: shelf 1
+00:02:16 - 	38: picture 1
+00:02:16 - 
+========
+Index: 5 Scene: 00876-mv2HUxq3B53
+00:02:22 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:02:22 - Load scene 00876-mv2HUxq3B53 successfully with semantic texture
+00:02:22 - 
+
+Question id 1b36e675-74ff-46ad-8caa-c33da46a5a67 initialization successful!
+00:02:22 - 
+== step: 0
+INFO 06-21 17:21:24 [metrics.py:417] Avg prompt throughput: 97.3 tokens/s, Avg generation throughput: 3.5 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:02:24 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.04 seconds
+00:02:26 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:02:27 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.08 seconds
+00:02:30 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:02:32 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+INFO 06-21 17:21:34 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:02:33 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:02:34 - Step 0, update snapshots, 15 objects, 4 snapshots
+INFO 06-21 17:21:37 [logger.py:43] Received request chatcmpl-6094fdad64d54fdf843ac5f25afa72bc: prompt: '<|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: I want to host a dinner party on a summer evening, where should I set the table? \nFollowing is a list of objects that you can choose, each object one line bed blanket cabinet curtain lamp nightstand picture pillow telephone tv Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:21:37 [engine.py:317] Added request chatcmpl-6094fdad64d54fdf843ac5f25afa72bc.
+INFO:     127.0.0.1:40818 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:36 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:02:36 - Prefiltering selected classes: ['blanket', 'nightstand', 'picture', 'lamp', 'telephone']
+00:02:36 - Prefiltering snapshot: 4 -> 4
+00:02:36 - Input prompt:
+00:02:36 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: I want to host a dinner party on a summer evening, where should I set the table? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. Snapshot 0 [iVBORw0KGg...]picture Snapshot 1 [iVBORw0KGg...]blanket Snapshot 2 [iVBORw0KGg...]lamp, nightstand, picture Snapshot 3 [iVBORw0KGg...]telephone The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. 
+INFO 06-21 17:21:38 [logger.py:43] Received request chatcmpl-741ad05d517e41cf8b7ebd92788e561f: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: I want to host a dinner party on a summer evening, where should I set the table? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nSnapshot 0 \npicture\n \nSnapshot 1 \nblanket\n \nSnapshot 2 \nlamp, nightstand, picture\n \nSnapshot 3 \ntelephone\n \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:21:38 [engine.py:317] Added request chatcmpl-741ad05d517e41cf8b7ebd92788e561f.
+INFO:     127.0.0.1:40818 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:38 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:02:38 - Response: [snapshot 1]
+Reason: [[You should set the table near the window for a summer evening view.] Frontier 1 [You could explore the hallway to find other possible settings for the dinner party.]]
+00:02:38 - Prediction: snapshot, 1
+00:02:38 - The index of target snapshot 1
+00:02:38 - Pred_target_class: pillow blanket bed pillow pillow
+00:02:38 - Next choice Snapshot of 0-view_3.png
+RuntimeWarning: invalid value encountered in divide
+00:02:38 - Error in get_proper_snapshot_observation_point: cannot find a proper observation point among 7 candidates, return the snapshot center!
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:02:38 - Current position: [    -7.9732    0.050354      8.2939], 0.000
+00:02:41 - Question id 1b36e675-74ff-46ad-8caa-c33da46a5a67 finished after arriving at target!
+00:02:41 - Question id 1b36e675-74ff-46ad-8caa-c33da46a5a67 finish successfully, 0.0 length
+00:02:41 - 6/41: Success rate: 4/6
+00:02:41 - Mean path length for success exploration: 0.38276322998854995
+00:02:41 - Filtered snapshots/Total snapshots/Total frames: 4/4/6
+00:02:41 - Scene graph of question 1b36e675-74ff-46ad-8caa-c33da46a5a67:
+00:02:41 - Question: I want to host a dinner party on a summer evening, where should I set the table?
+00:02:41 - Answer: On the table on the porch.
+00:02:41 - Prediction: [You should set the table near the window for a summer evening view.] Frontier 1 [You could explore the hallway to find other possible settings for the dinner party.]
+00:02:41 - 0-view_1.png:
+00:02:41 - 	1: telephone 1
+00:02:41 - 	4: pillow 1
+00:02:41 - 0-view_6.png:
+00:02:41 - 	2: nightstand 3
+00:02:41 - 	3: lamp 3
+00:02:41 - 	27: picture 1
+00:02:41 - 0-view_3.png:
+00:02:41 - 	7: bed 4
+00:02:41 - 	8: pillow 2
+00:02:41 - 	12: pillow 1
+00:02:41 - 	13: pillow 1
+00:02:41 - 	14: blanket 1
+00:02:41 - 0-view_5.png:
+00:02:41 - 	11: cabinet 3
+00:02:41 - 	16: picture 2
+00:02:41 - 	18: curtain 2
+00:02:41 - 	21: picture 1
+00:02:41 - 	23: tv 1
+00:02:41 - 
+========
+Index: 6 Scene: 00880-Nfvxx8J5NCo
+00:02:45 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:02:45 - Load scene 00880-Nfvxx8J5NCo successfully with semantic texture
+00:02:45 - 
+
+Question id 1dcdd225-eba2-4ba1-97b6-c4cdc7ca4e9b initialization successful!
+00:02:45 - 
+== step: 0
+00:02:46 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:02:47 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.09 seconds
+INFO 06-21 17:21:49 [metrics.py:417] Avg prompt throughput: 88.5 tokens/s, Avg generation throughput: 3.3 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:02:50 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.13 seconds
+00:02:51 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.12 seconds
+00:02:54 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:02:56 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.08 seconds
+00:02:57 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.13 seconds
+INFO 06-21 17:21:59 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:02:59 - Step 0, update snapshots, 24 objects, 6 snapshots
+INFO 06-21 17:22:02 [logger.py:43] Received request chatcmpl-f330d987124e4457b34ca2c0ba431c14: prompt: '<|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: where can I keep a new knife I got? \nFollowing is a list of objects that you can choose, each object one line book cabinet coffee table couch counter fan mat microwave paper bag picture refrigerator shelf sink stool stove tissue box trash bin Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:22:02 [engine.py:317] Added request chatcmpl-f330d987124e4457b34ca2c0ba431c14.
+INFO:     127.0.0.1:48174 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:03:01 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:03:01 - Prefiltering selected classes: ['cabinet', 'counter', 'shelf']
+00:03:01 - Prefiltering snapshot: 6 -> 4
+00:03:01 - Input prompt:
+00:03:01 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: where can I keep a new knife I got? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. Snapshot 0 [iVBORw0KGg...]cabinet Snapshot 1 [iVBORw0KGg...]shelf Snapshot 2 [iVBORw0KGg...]shelf Snapshot 3 [iVBORw0KGg...]counter The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Frontier 2 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. 
+INFO 06-21 17:22:03 [logger.py:43] Received request chatcmpl-da02e3c1043f4517b454c5a227bf06e1: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: where can I keep a new knife I got? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nSnapshot 0 \ncabinet\n \nSnapshot 1 \nshelf\n \nSnapshot 2 \nshelf\n \nSnapshot 3 \ncounter\n \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nFrontier 2 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:22:03 [engine.py:317] Added request chatcmpl-da02e3c1043f4517b454c5a227bf06e1.
+INFO:     127.0.0.1:48174 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:03:02 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-21 17:22:04 [logger.py:43] Received request chatcmpl-4207ee7d202e47c4affb05237faf325d: prompt: "<|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\n(<image>./</image>)\nQuestion: where can I keep a new knife I got? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nSnapshot 0 \ncabinet\n \nSnapshot 1 \nshelf\n \nSnapshot 2 \nshelf\n \nSnapshot 3 \ncounter\n \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nFrontier 2 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above.(2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. You must only choose from the provided Snapshot or Frontier indices. Do not make up an index that is not listed above. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-21 17:22:04 [engine.py:317] Added request chatcmpl-4207ee7d202e47c4affb05237faf325d.
+INFO 06-21 17:22:04 [metrics.py:417] Avg prompt throughput: 498.1 tokens/s, Avg generation throughput: 6.6 tokens/s, Running: 1 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.8%, CPU KV cache usage: 0.0%.
+INFO:     127.0.0.1:48174 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:03:03 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:03:03 - Response: [snapshot 3]
+Reason: [The new knife can be kept on the counter.]
+00:03:03 - Prediction: snapshot, 3
+00:03:03 - The index of target snapshot 4
+00:03:03 - Pred_target_class: microwave stool trash bin counter
+00:03:03 - Next choice Snapshot of 0-view_2.png
+RuntimeWarning: invalid value encountered in divide
+00:03:03 - Error in get_proper_snapshot_observation_point: cannot find a proper observation point among 16 candidates, return the snapshot center!
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:03:03 - Current position: [    -9.5166     0.18086    -0.34755], 0.000
+00:03:06 - Question id 1dcdd225-eba2-4ba1-97b6-c4cdc7ca4e9b finished after arriving at target!
+00:03:06 - Question id 1dcdd225-eba2-4ba1-97b6-c4cdc7ca4e9b finish successfully, 0.0 length
+00:03:06 - 7/41: Success rate: 5/7
+00:03:06 - Mean path length for success exploration: 0.30621058399083995
+00:03:06 - Filtered snapshots/Total snapshots/Total frames: 4/6/7
+00:03:06 - Scene graph of question 1dcdd225-eba2-4ba1-97b6-c4cdc7ca4e9b:
+00:03:06 - Question: where can I keep a new knife I got?
+00:03:06 - Answer: there is a knife holder in the kitchen counter next to the gas stove.
+00:03:06 - Prediction: The new knife can be kept on the counter.
+00:03:06 - 0-view_0.png:
+00:03:06 - 	1: couch 4
+00:03:06 - 	2: coffee table 2
+00:03:06 - 	3: book 2
+00:03:06 - 	4: mat 1
+00:03:06 - 0-view_6.png:
+00:03:06 - 	8: fan 2
+00:03:06 - 0-view_2.png:
+00:03:06 - 	10: microwave 1
+00:03:06 - 	11: stool 1
+00:03:06 - 	12: trash bin 1
+00:03:06 - 	13: counter 1
+00:03:06 - 0-view_4.png:
+00:03:06 - 	14: sink 4
+00:03:06 - 	15: refrigerator 3
+00:03:06 - 	25: paper bag 1
+00:03:06 - 	27: tissue box 1
+00:03:06 - 	29: picture 2
+00:03:06 - 	32: cabinet 1
+00:03:06 - 0-view_3.png:
+00:03:06 - 	16: stool 3
+00:03:06 - 	17: stool 2
+00:03:06 - 	18: stool 2
+00:03:06 - 	19: microwave 2
+00:03:06 - 	20: picture 2
+00:03:06 - 	21: shelf 2
+00:03:06 - 	23: stove 2
+00:03:06 - 0-view_5.png:
+00:03:06 - 	37: shelf 1
+00:03:06 - 	38: picture 1
+00:03:06 - 
+========
+Index: 7 Scene: 00824-Dd4bFSTQ8gi
+00:03:09 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:03:09 - Load scene 00824-Dd4bFSTQ8gi successfully with semantic texture
+00:03:10 - 
+
+Question id 30dc765d-80c3-4901-9c69-65e6b48e254a initialization successful!
+00:03:10 - 
+== step: 0
+00:03:10 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:03:12 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+INFO 06-21 17:22:14 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.5 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:03:14 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:03:16 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:03:17 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+slurmstepd: error: *** JOB 75003 ON worker-1 CANCELLED AT 2025-06-21T17:22:19 ***
