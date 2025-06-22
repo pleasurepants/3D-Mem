@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
-#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6
+#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-3,worker-4,worker-8,worker-9,worker-7
 #SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/minicpm/baseline-%j.out
 #SBATCH --partition all
 
@@ -24,6 +24,7 @@ else
     echo "[INFO] CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 fi
 
+export LD_LIBRARY_PATH=/home/wiss/zhang/local_cuda118/cuda_cudart/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
 
 echo "[INFO] Starting vLLM (minicpm) server on GPU 0..."
 source /home/wiss/zhang/anaconda3/bin/activate vllm
