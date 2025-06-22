@@ -1,0 +1,781 @@
+=== JOB START ===
+Sun Jun 22 10:45:20 PM CEST 2025
+worker-2
+Sun Jun 22 22:45:20 2025       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 550.127.05             Driver Version: 550.127.05     CUDA Version: 12.4     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  Quadro RTX 8000                Off |   00000000:1B:00.0 Off |                  Off |
+| 33%   41C    P8             13W /  260W |       1MiB /  49152MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  Quadro RTX 8000                Off |   00000000:3D:00.0 Off |                  Off |
+| 33%   35C    P8             11W /  260W |       1MiB /  49152MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+SLURM_JOB_ID: 75212
+[INFO] CUDA_VISIBLE_DEVICES=1,2
+[INFO] Starting vLLM (internvl) server on GPU 0...
+[INFO] Waiting for vLLM (internvl) server to be ready...
+  ... waiting (2s)
+  ... waiting (4s)
+  ... waiting (6s)
+  ... waiting (8s)
+INFO 06-22 22:45:27 [__init__.py:244] Automatically detected platform cuda.
+  ... waiting (10s)
+  ... waiting (12s)
+  ... waiting (14s)
+  ... waiting (16s)
+INFO 06-22 22:45:35 [api_server.py:1287] vLLM API server version 0.9.1
+INFO 06-22 22:45:36 [cli_args.py:309] non-default args: {'model': 'OpenGVLab/InternVL3-9B', 'trust_remote_code': True, 'served_model_name': ['internvl'], 'limit_mm_per_prompt': {'image': 20}}
+INFO 06-22 22:45:36 [config.py:224] Replacing legacy 'type' key with 'rope_type'
+  ... waiting (18s)
+  ... waiting (20s)
+  ... waiting (22s)
+  ... waiting (24s)
+  ... waiting (26s)
+  ... waiting (28s)
+INFO 06-22 22:45:48 [config.py:823] This model supports multiple tasks: {'reward', 'generate', 'score', 'classify', 'embed'}. Defaulting to 'generate'.
+WARNING 06-22 22:45:48 [config.py:3220] Your device 'Quadro RTX 8000' (with compute capability 7.5) doesn't support torch.bfloat16. Falling back to torch.float16 for compatibility.
+WARNING 06-22 22:45:48 [config.py:3271] Casting torch.bfloat16 to torch.float16.
+WARNING 06-22 22:45:48 [arg_utils.py:1642] Compute Capability < 8.0 is not supported by the V1 Engine. Falling back to V0. 
+INFO 06-22 22:45:48 [api_server.py:265] Started engine process with PID 3215679
+WARNING 06-22 22:45:49 [tokenizer.py:262] Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+WARNING 06-22 22:45:49 [env_override.py:17] NCCL_CUMEM_ENABLE is set to 0, skipping override. This may increase memory overhead with cudagraph+allreduce: https://github.com/NVIDIA/nccl/issues/1234
+  ... waiting (30s)
+  ... waiting (32s)
+INFO 06-22 22:45:52 [__init__.py:244] Automatically detected platform cuda.
+  ... waiting (34s)
+  ... waiting (36s)
+INFO 06-22 22:45:56 [llm_engine.py:230] Initializing a V0 LLM engine (v0.9.1) with config: model='OpenGVLab/InternVL3-9B', speculative_config=None, tokenizer='OpenGVLab/InternVL3-9B', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config={}, tokenizer_revision=None, trust_remote_code=True, dtype=torch.float16, max_seq_len=8192, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_backend=''), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None), seed=0, served_model_name=internvl, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=None, chunked_prefill_enabled=False, use_async_output_proc=True, pooler_config=None, compilation_config={"level":0,"debug_dump_path":"","cache_dir":"","backend":"","custom_ops":[],"splitting_ops":[],"use_inductor":true,"compile_sizes":[],"inductor_compile_config":{"enable_auto_functionalized_v2":false},"inductor_passes":{},"use_cudagraph":true,"cudagraph_num_of_warmups":0,"cudagraph_capture_sizes":[256,248,240,232,224,216,208,200,192,184,176,168,160,152,144,136,128,120,112,104,96,88,80,72,64,56,48,40,32,24,16,8,4,2,1],"cudagraph_copy_inputs":false,"full_cuda_graph":false,"max_capture_size":256,"local_cache_dir":null}, use_cached_outputs=True, 
+WARNING 06-22 22:45:57 [tokenizer.py:262] Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  ... waiting (38s)
+INFO 06-22 22:45:58 [cuda.py:275] Cannot use FlashAttention-2 backend for Volta and Turing GPUs.
+INFO 06-22 22:45:58 [cuda.py:324] Using XFormers backend.
+INFO 06-22 22:45:59 [parallel_state.py:1065] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0
+INFO 06-22 22:45:59 [model_runner.py:1171] Starting to load model OpenGVLab/InternVL3-9B...
+INFO 06-22 22:45:59 [cuda.py:275] Cannot use FlashAttention-2 backend for Volta and Turing GPUs.
+INFO 06-22 22:45:59 [cuda.py:324] Using XFormers backend.
+  ... waiting (40s)
+INFO 06-22 22:46:00 [weight_utils.py:292] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:01<00:04,  1.43s/it]
+  ... waiting (42s)
+  ... waiting (44s)
+Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:03<00:03,  1.88s/it]
+  ... waiting (46s)
+Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:05<00:02,  2.02s/it]
+  ... waiting (48s)
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:08<00:00,  2.11s/it]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:08<00:00,  2.02s/it]
+
+INFO 06-22 22:46:08 [default_loader.py:272] Loading weights took 8.18 seconds
+INFO 06-22 22:46:09 [model_runner.py:1203] Model loading took 17.0389 GiB and 9.177764 seconds
+  ... waiting (50s)
+WARNING 06-22 22:46:10 [tokenizer.py:262] Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+WARNING 06-22 22:46:10 [registry.py:175] InternVLProcessor did not return `BatchFeature`. Make sure to match the behaviour of `ProcessorMixin` when implementing custom processors.
+WARNING 06-22 22:46:11 [model_runner.py:1368] Computed max_num_seqs (min(256, 8192 // 66560)) to be less than 1. Setting it to the minimum value of 1.
+Token indices sequence length is longer than the specified maximum sequence length for this model (66601 > 8192). Running this sequence through the model will result in indexing errors
+WARNING 06-22 22:46:11 [profiling.py:232] The sequence length used for profiling (max_num_batched_tokens / max_num_seqs = 8192) is too short to hold the multi-modal embeddings in the worst case (66601 tokens in total, out of which {'image': 66560} are reserved for multi-modal embeddings). This may cause certain multi-modal inputs to fail during inference, even when the input text is short. To avoid this, you should increase `max_model_len`, reduce `max_num_seqs`, and/or reduce `mm_counts`.
+  ... waiting (52s)
+  ... waiting (54s)
+  ... waiting (56s)
+  ... waiting (58s)
+  ... waiting (60s)
+  ... waiting (62s)
+  ... waiting (64s)
+  ... waiting (66s)
+  ... waiting (68s)
+  ... waiting (70s)
+  ... waiting (72s)
+  ... waiting (74s)
+  ... waiting (76s)
+  ... waiting (78s)
+  ... waiting (80s)
+  ... waiting (82s)
+  ... waiting (84s)
+  ... waiting (86s)
+  ... waiting (88s)
+  ... waiting (90s)
+  ... waiting (92s)
+  ... waiting (94s)
+  ... waiting (96s)
+  ... waiting (98s)
+  ... waiting (100s)
+  ... waiting (102s)
+  ... waiting (104s)
+  ... waiting (106s)
+  ... waiting (108s)
+  ... waiting (110s)
+  ... waiting (112s)
+  ... waiting (114s)
+  ... waiting (116s)
+  ... waiting (118s)
+  ... waiting (120s)
+  ... waiting (122s)
+  ... waiting (124s)
+  ... waiting (126s)
+  ... waiting (128s)
+  ... waiting (130s)
+  ... waiting (132s)
+  ... waiting (134s)
+  ... waiting (136s)
+INFO 06-22 22:47:37 [worker.py:294] Memory profiling takes 88.31 seconds
+INFO 06-22 22:47:37 [worker.py:294] the current vLLM instance can use total_gpu_memory (47.45GiB) x gpu_memory_utilization (0.90) = 42.70GiB
+INFO 06-22 22:47:37 [worker.py:294] model weights take 17.04GiB; non_torch_memory takes 0.06GiB; PyTorch activation peak memory takes 6.65GiB; the rest of the memory reserved for KV Cache is 18.95GiB.
+INFO 06-22 22:47:38 [executor_base.py:113] # cuda blocks: 25877, # CPU blocks: 5461
+INFO 06-22 22:47:38 [executor_base.py:118] Maximum concurrency for 8192 tokens per request: 50.54x
+  ... waiting (138s)
+  ... waiting (140s)
+INFO 06-22 22:47:41 [model_runner.py:1513] Capturing cudagraphs for decoding. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI. If out-of-memory error occurs during cudagraph capture, consider decreasing `gpu_memory_utilization` or switching to eager mode. You can also reduce the `max_num_seqs` as needed to decrease memory usage.
+Capturing CUDA graph shapes:   0%|          | 0/35 [00:00<?, ?it/s]Capturing CUDA graph shapes:   3%|▎         | 1/35 [00:00<00:23,  1.46it/s]Capturing CUDA graph shapes:   6%|▌         | 2/35 [00:01<00:20,  1.58it/s]  ... waiting (142s)
+Capturing CUDA graph shapes:   9%|▊         | 3/35 [00:01<00:19,  1.62it/s]Capturing CUDA graph shapes:  11%|█▏        | 4/35 [00:02<00:18,  1.65it/s]Capturing CUDA graph shapes:  14%|█▍        | 5/35 [00:03<00:18,  1.66it/s]  ... waiting (144s)
+Capturing CUDA graph shapes:  17%|█▋        | 6/35 [00:03<00:17,  1.66it/s]Capturing CUDA graph shapes:  20%|██        | 7/35 [00:04<00:16,  1.67it/s]Capturing CUDA graph shapes:  23%|██▎       | 8/35 [00:04<00:16,  1.67it/s]Capturing CUDA graph shapes:  26%|██▌       | 9/35 [00:05<00:15,  1.68it/s]  ... waiting (146s)
+Capturing CUDA graph shapes:  29%|██▊       | 10/35 [00:06<00:14,  1.70it/s]Capturing CUDA graph shapes:  31%|███▏      | 11/35 [00:06<00:14,  1.71it/s]Capturing CUDA graph shapes:  34%|███▍      | 12/35 [00:07<00:13,  1.71it/s]  ... waiting (148s)
+Capturing CUDA graph shapes:  37%|███▋      | 13/35 [00:07<00:12,  1.72it/s]Capturing CUDA graph shapes:  40%|████      | 14/35 [00:08<00:12,  1.73it/s]Capturing CUDA graph shapes:  43%|████▎     | 15/35 [00:08<00:11,  1.74it/s]Capturing CUDA graph shapes:  46%|████▌     | 16/35 [00:09<00:10,  1.74it/s]  ... waiting (150s)
+Capturing CUDA graph shapes:  49%|████▊     | 17/35 [00:10<00:10,  1.76it/s]Capturing CUDA graph shapes:  51%|█████▏    | 18/35 [00:10<00:09,  1.79it/s]Capturing CUDA graph shapes:  54%|█████▍    | 19/35 [00:11<00:08,  1.79it/s]Capturing CUDA graph shapes:  57%|█████▋    | 20/35 [00:11<00:08,  1.81it/s]  ... waiting (152s)
+Capturing CUDA graph shapes:  60%|██████    | 21/35 [00:12<00:07,  1.80it/s]Capturing CUDA graph shapes:  63%|██████▎   | 22/35 [00:12<00:07,  1.82it/s]Capturing CUDA graph shapes:  66%|██████▌   | 23/35 [00:13<00:06,  1.84it/s]  ... waiting (154s)
+Capturing CUDA graph shapes:  69%|██████▊   | 24/35 [00:13<00:05,  1.84it/s]Capturing CUDA graph shapes:  71%|███████▏  | 25/35 [00:14<00:05,  1.85it/s]Capturing CUDA graph shapes:  74%|███████▍  | 26/35 [00:14<00:04,  1.86it/s]Capturing CUDA graph shapes:  77%|███████▋  | 27/35 [00:15<00:04,  1.87it/s]  ... waiting (156s)
+Capturing CUDA graph shapes:  80%|████████  | 28/35 [00:15<00:03,  1.88it/s]Capturing CUDA graph shapes:  83%|████████▎ | 29/35 [00:16<00:03,  1.87it/s]Capturing CUDA graph shapes:  86%|████████▌ | 30/35 [00:17<00:02,  1.88it/s]Capturing CUDA graph shapes:  89%|████████▊ | 31/35 [00:17<00:02,  1.84it/s]  ... waiting (158s)
+Capturing CUDA graph shapes:  91%|█████████▏| 32/35 [00:18<00:01,  1.85it/s]Capturing CUDA graph shapes:  94%|█████████▍| 33/35 [00:18<00:01,  1.86it/s]Capturing CUDA graph shapes:  97%|█████████▋| 34/35 [00:19<00:00,  1.89it/s]Capturing CUDA graph shapes: 100%|██████████| 35/35 [00:19<00:00,  1.90it/s]Capturing CUDA graph shapes: 100%|██████████| 35/35 [00:19<00:00,  1.78it/s]
+INFO 06-22 22:48:00 [model_runner.py:1671] Graph capturing finished in 20 secs, took 0.32 GiB
+INFO 06-22 22:48:00 [llm_engine.py:428] init engine (profile, create kv cache, warmup model) took 111.57 seconds
+  ... waiting (160s)
+INFO 06-22 22:48:01 [api_server.py:1349] Starting vLLM API server 0 on http://0.0.0.0:8000
+INFO 06-22 22:48:01 [launcher.py:29] Available routes are:
+INFO 06-22 22:48:01 [launcher.py:37] Route: /openapi.json, Methods: HEAD, GET
+INFO 06-22 22:48:01 [launcher.py:37] Route: /docs, Methods: HEAD, GET
+INFO 06-22 22:48:01 [launcher.py:37] Route: /docs/oauth2-redirect, Methods: HEAD, GET
+INFO 06-22 22:48:01 [launcher.py:37] Route: /redoc, Methods: HEAD, GET
+INFO 06-22 22:48:01 [launcher.py:37] Route: /health, Methods: GET
+INFO 06-22 22:48:01 [launcher.py:37] Route: /load, Methods: GET
+INFO 06-22 22:48:01 [launcher.py:37] Route: /ping, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /ping, Methods: GET
+INFO 06-22 22:48:01 [launcher.py:37] Route: /tokenize, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /detokenize, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /v1/models, Methods: GET
+INFO 06-22 22:48:01 [launcher.py:37] Route: /version, Methods: GET
+INFO 06-22 22:48:01 [launcher.py:37] Route: /v1/chat/completions, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /v1/completions, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /v1/embeddings, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /pooling, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /classify, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /score, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /v1/score, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /v1/audio/transcriptions, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /rerank, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /v1/rerank, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /v2/rerank, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /invocations, Methods: POST
+INFO 06-22 22:48:01 [launcher.py:37] Route: /metrics, Methods: GET
+INFO:     Started server process [3202594]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:55338 - "GET /v1/models HTTP/1.1" 200 OK
+[INFO] ✅ internvl API is ready!
+[INFO] Starting AEQA evaluation on GPU 1 (3dmem env)...
+00:00:00 - ***** Running exp_eval_aeqa *****
+00:00:00 - Total number of questions: 41
+00:00:00 - number of questions after splitting: 41
+00:00:00 - question path: data/aeqa_questions-41.json
+00:00:00 - Load YOLO model yolov8x-world.pt successful!
+00:00:03 - Load SAM model sam_l.pt successful!
+00:00:03 - Loaded ViT-B-32 model config.
+00:00:05 - Loading pretrained ViT-B-32 weights (laion2b_s34b_b79k).
+00:00:05 - Load CLIP model successful!
+00:00:05 - Question 00c2be2a-1377-4fae-a889-30936b7890c3 already processed
+00:00:05 - Question 013bb857-f47d-4b50-add4-023cc4ff414c already processed
+00:00:05 - 
+========
+Index: 2 Scene: 00848-ziup5kvtCCR
+00:00:09 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:00:09 - Load scene 00848-ziup5kvtCCR successfully with semantic texture
+00:00:14 - 
+
+Question id 01fcc568-f51e-4e12-b976-5dc8d554135a initialization successful!
+00:00:14 - 
+== step: 0
+00:00:17 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.16 seconds
+00:00:20 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.12 seconds
+00:00:22 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:00:24 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:00:25 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:00:27 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:00:29 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+00:00:30 - Step 0, update snapshots, 25 objects, 7 snapshots
+INFO 06-22 22:48:54 [chat_utils.py:420] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+INFO 06-22 22:48:54 [logger.py:43] Received request chatcmpl-e0b3611cc73d44ada8b234b646ff0f5f: prompt: '<s><|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: Where is the teddy bear? \nFollowing is a list of objects that you can choose, each object one line bottle cabinet candle clock coffee table couch curtain lamp mirror pillow potted plant sofa chair tv Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:48:54 [engine.py:317] Added request chatcmpl-e0b3611cc73d44ada8b234b646ff0f5f.
+INFO:     127.0.0.1:33208 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:00:39 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:00:39 - Prefiltering selected classes: ['couch', 'pillow']
+00:00:39 - Prefiltering snapshot: 7 -> 3
+WARNING 06-22 22:48:56 [tokenizer.py:262] Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+INFO 06-22 22:48:56 [logger.py:43] Received request chatcmpl-9a3d5b5567d2441d93a691c1c7fb09e6: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: couch, pillow\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: Where is the teddy bear?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:48:56 [engine.py:317] Added request chatcmpl-9a3d5b5567d2441d93a691c1c7fb09e6.
+INFO 06-22 22:48:56 [metrics.py:417] Avg prompt throughput: 129.0 tokens/s, Avg generation throughput: 1.2 tokens/s, Running: 1 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.1%, CPU KV cache usage: 0.0%.
+INFO:     127.0.0.1:33208 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:00:41 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:48:56 [logger.py:43] Received request chatcmpl-f5a2aaa9140a48a19cc783bb722941d4: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: pillow\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: Where is the teddy bear?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:48:56 [engine.py:317] Added request chatcmpl-f5a2aaa9140a48a19cc783bb722941d4.
+INFO:     127.0.0.1:33208 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:00:41 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:48:56 [logger.py:43] Received request chatcmpl-441a223b6c7040afa248d373dfc5e945: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: couch, pillow\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: Where is the teddy bear?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:48:56 [engine.py:317] Added request chatcmpl-441a223b6c7040afa248d373dfc5e945.
+INFO:     127.0.0.1:33208 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:00:41 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+是否有满足阈值的snapshot: False
+最大概率index: -1
+00:00:41 - Input prompt:
+00:00:41 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: Where is the teddy bear? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. Snapshot 0 [iVBORw0KGg...]couch, pillow Snapshot 1 [iVBORw0KGg...]pillow Snapshot 2 [iVBORw0KGg...]couch, pillow The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. 
+INFO 06-22 22:48:57 [logger.py:43] Received request chatcmpl-0e789fc685d7471eabaf78c47f804803: prompt: "<s><|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n<image>\n<image>\n<image>\n<image>\n<image>\n<image>\nQuestion: Where is the teddy bear? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nSnapshot 0 \ncouch, pillow\n \nSnapshot 1 \npillow\n \nSnapshot 2 \ncouch, pillow\n \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:48:57 [engine.py:317] Added request chatcmpl-0e789fc685d7471eabaf78c47f804803.
+INFO:     127.0.0.1:33208 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:00:43 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:00:43 - Response: [snapshot 0]
+Reason: [The teddy bear is on the couch.]
+00:00:43 - Prediction: snapshot, 0
+00:00:43 - The index of target snapshot 0
+00:00:43 - Pred_target_class: lamp coffee table potted plant pillow pillow pillow pillow couch
+00:00:43 - Next choice Snapshot of 0-view_0.png
+00:00:43 - Error in get_proper_snapshot_observation_point: cannot find a proper observation point among 1 candidates, return the snapshot center!
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:00:43 - Current position: [    0.21692    0.021223      7.1057], 0.000
+00:00:46 - Question id 01fcc568-f51e-4e12-b976-5dc8d554135a finished after arriving at target!
+00:00:46 - Question id 01fcc568-f51e-4e12-b976-5dc8d554135a finish successfully, 0.0 length
+00:00:46 - 3/41: Success rate: 3/3
+00:00:46 - Mean path length for success exploration: 7.307007334730062
+00:00:46 - Filtered snapshots/Total snapshots/Total frames: 3/7/7
+00:00:46 - Scene graph of question 01fcc568-f51e-4e12-b976-5dc8d554135a:
+00:00:46 - Question: Where is the teddy bear?
+00:00:46 - Answer: In the dog bed in the living room.
+00:00:46 - Prediction: The teddy bear is on the couch.
+00:00:46 - 0-view_0.png:
+00:00:46 - 	1: lamp 1
+00:00:46 - 	2: pillow 3
+00:00:46 - 	4: couch 2
+00:00:46 - 	5: coffee table 1
+00:00:46 - 	6: potted plant 1
+00:00:46 - 	7: pillow 2
+00:00:46 - 	8: pillow 2
+00:00:46 - 	9: pillow 1
+00:00:46 - 0-view_2.png:
+00:00:46 - 	3: pillow 3
+00:00:46 - 	18: couch 2
+00:00:46 - 0-view_1.png:
+00:00:46 - 	10: coffee table 3
+00:00:46 - 	11: sofa chair 3
+00:00:46 - 	14: pillow 1
+00:00:46 - 0-view_6.png:
+00:00:46 - 	21: cabinet 3
+00:00:46 - 	25: tv 2
+00:00:46 - 	26: potted plant 3
+00:00:46 - 0-view_3.png:
+00:00:46 - 	24: mirror 1
+00:00:46 - 0-view_4.png:
+00:00:46 - 	28: clock 2
+00:00:46 - 	29: bottle 2
+00:00:46 - 0-view_5.png:
+00:00:46 - 	30: mirror 2
+00:00:46 - 	32: clock 2
+00:00:46 - 	35: lamp 2
+00:00:46 - 	39: curtain 1
+00:00:46 - 	40: candle 1
+00:00:46 - 	41: potted plant 1
+00:00:46 - 
+========
+Index: 3 Scene: 00848-ziup5kvtCCR
+00:00:49 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:00:49 - Load scene 00848-ziup5kvtCCR successfully with semantic texture
+00:00:49 - 
+
+Question id 0df60236-15ad-4166-a31a-a98d14214fdb initialization successful!
+00:00:49 - 
+== step: 0
+00:00:50 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.16 seconds
+INFO 06-22 22:49:08 [metrics.py:417] Avg prompt throughput: 245.3 tokens/s, Avg generation throughput: 1.7 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:00:53 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.12 seconds
+00:00:55 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:00:56 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:00:58 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:00:59 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:01:00 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+00:01:01 - Step 0, update snapshots, 25 objects, 7 snapshots
+INFO 06-22 22:49:18 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+INFO 06-22 22:49:19 [logger.py:43] Received request chatcmpl-284c70f1c32749098e320ff9467b2d98: prompt: '<s><|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: What type of numbers are on the clock? \nFollowing is a list of objects that you can choose, each object one line bottle cabinet candle clock coffee table couch curtain lamp mirror pillow potted plant sofa chair tv Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:49:19 [engine.py:317] Added request chatcmpl-284c70f1c32749098e320ff9467b2d98.
+INFO:     127.0.0.1:36976 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:04 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:04 - Prefiltering selected classes: ['clock']
+00:01:04 - Prefiltering snapshot: 7 -> 2
+INFO 06-22 22:49:19 [logger.py:43] Received request chatcmpl-6f8ef57d7b50496db33de371fd939f3a: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: clock\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: What type of numbers are on the clock?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:49:19 [engine.py:317] Added request chatcmpl-6f8ef57d7b50496db33de371fd939f3a.
+INFO:     127.0.0.1:36976 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:04 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:49:19 [logger.py:43] Received request chatcmpl-38b980409c3e42cab85418691398b282: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: clock\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: What type of numbers are on the clock?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:49:19 [engine.py:317] Added request chatcmpl-38b980409c3e42cab85418691398b282.
+INFO:     127.0.0.1:36976 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:05 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+len(success_list) 3
+len(fail_list) 0
+len(gpt_answer_list) 3
+len(n_filtered_snapshots_list) 3
+len(n_total_snapshots_list) 3
+len(n_total_frames_list) 3
+是否有满足阈值的snapshot: True
+最大概率index: 1
+INFO 06-22 22:49:20 [logger.py:43] Received request chatcmpl-013a5bc959134f59aa87c14d2f73ba9d: prompt: "<s><|im_start|>system\nTask: You are an agent in a 3D indoor environment tasked with answering a question.\nYou have already selected one snapshot image that contains several detected objects.\nNow, you should give a final answer to the question **based on this snapshot only**.\nInstructions:\n- Your answer should be a direct, natural sentence that a human can understand.\n- DO NOT mention words like 'snapshot', 'in the image', 'on the left', or any reference to image layout.\n<|im_end|>\n<|im_start|>user\n<image>\nQuestion: What type of numbers are on the clock?\nHere is the selected snapshot that may help answer the question:\nObjects detected in this snapshot: clock\nP<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:49:20 [engine.py:317] Added request chatcmpl-013a5bc959134f59aa87c14d2f73ba9d.
+INFO:     127.0.0.1:36976 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:05 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:05 - Response: [snapshot 1]
+Reason: [The numbers on the clock are Roman numerals.]
+00:01:05 - Prediction: snapshot, 1
+00:01:05 - The index of target snapshot 2
+00:01:05 - Pred_target_class: clock bottle
+00:01:05 - Next choice Snapshot of 0-view_4.png
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:01:05 - Current position: [   -0.38308    0.021223      6.8057], 0.671
+00:01:08 - Question id 0df60236-15ad-4166-a31a-a98d14214fdb finished after arriving at target!
+00:01:08 - Question id 0df60236-15ad-4166-a31a-a98d14214fdb finish successfully, 0.670820393249937 length
+00:01:08 - 4/41: Success rate: 4/4
+00:01:08 - Mean path length for success exploration: 5.64796059936003
+00:01:08 - Filtered snapshots/Total snapshots/Total frames: 2/7/7
+00:01:08 - Scene graph of question 0df60236-15ad-4166-a31a-a98d14214fdb:
+00:01:08 - Question: What type of numbers are on the clock?
+00:01:08 - Answer: Roman numerals
+00:01:08 - Prediction: The numbers on the clock are Roman numerals.
+00:01:08 - 0-view_0.png:
+00:01:08 - 	1: lamp 1
+00:01:08 - 	2: pillow 3
+00:01:08 - 	4: couch 2
+00:01:08 - 	5: coffee table 1
+00:01:08 - 	6: potted plant 1
+00:01:08 - 	7: pillow 2
+00:01:08 - 	8: pillow 2
+00:01:08 - 	9: pillow 1
+00:01:08 - 0-view_2.png:
+00:01:08 - 	3: pillow 3
+00:01:08 - 	18: couch 2
+00:01:08 - 0-view_1.png:
+00:01:08 - 	10: coffee table 3
+00:01:08 - 	11: sofa chair 3
+00:01:08 - 	14: pillow 1
+00:01:08 - 0-view_6.png:
+00:01:08 - 	21: cabinet 3
+00:01:08 - 	25: tv 2
+00:01:08 - 	26: potted plant 3
+00:01:08 - 0-view_3.png:
+00:01:08 - 	24: mirror 1
+00:01:08 - 0-view_4.png:
+00:01:08 - 	28: clock 2
+00:01:08 - 	29: bottle 2
+00:01:08 - 0-view_5.png:
+00:01:08 - 	30: mirror 2
+00:01:08 - 	32: clock 2
+00:01:08 - 	35: lamp 2
+00:01:08 - 	39: curtain 1
+00:01:08 - 	40: candle 1
+00:01:08 - 	41: potted plant 1
+00:01:08 - 
+========
+Index: 4 Scene: 00880-Nfvxx8J5NCo
+00:01:11 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:01:11 - Load scene 00880-Nfvxx8J5NCo successfully with semantic texture
+00:01:11 - 
+
+Question id 109eaad4-6e68-4da1-8f98-a0d8589ec26d initialization successful!
+00:01:11 - 
+== step: 0
+00:01:12 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:01:14 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.09 seconds
+INFO 06-22 22:49:30 [metrics.py:417] Avg prompt throughput: 116.3 tokens/s, Avg generation throughput: 1.4 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:01:16 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.15 seconds
+00:01:18 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.12 seconds
+00:01:20 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:01:22 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.09 seconds
+00:01:24 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.12 seconds
+00:01:25 - Step 0, update snapshots, 24 objects, 6 snapshots
+INFO 06-22 22:49:40 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+INFO 06-22 22:49:43 [logger.py:43] Received request chatcmpl-29a9bbc8f576474a979d40894418e751: prompt: '<s><|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: where can I keep a photo frame? \nFollowing is a list of objects that you can choose, each object one line book cabinet coffee table couch counter fan mat microwave paper bag picture refrigerator shelf sink stool stove tissue box trash bin Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:49:43 [engine.py:317] Added request chatcmpl-29a9bbc8f576474a979d40894418e751.
+INFO:     127.0.0.1:46928 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:28 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:28 - Prefiltering selected classes: ['cabinet', 'shelf']
+00:01:28 - Prefiltering snapshot: 6 -> 3
+INFO 06-22 22:49:43 [logger.py:43] Received request chatcmpl-7189562b21744a62935aeb8585bc19f9: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: cabinet\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: where can I keep a photo frame?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:49:43 [engine.py:317] Added request chatcmpl-7189562b21744a62935aeb8585bc19f9.
+INFO:     127.0.0.1:46928 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:28 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:49:43 [logger.py:43] Received request chatcmpl-c84a5ecd5ca449e5978e422fec1f3a62: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: shelf\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: where can I keep a photo frame?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:49:43 [engine.py:317] Added request chatcmpl-c84a5ecd5ca449e5978e422fec1f3a62.
+INFO:     127.0.0.1:46928 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:28 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:49:43 [logger.py:43] Received request chatcmpl-519842fd3062437ba1a2c402c7e553a5: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: shelf\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: where can I keep a photo frame?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:49:43 [engine.py:317] Added request chatcmpl-519842fd3062437ba1a2c402c7e553a5.
+INFO:     127.0.0.1:46928 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:29 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+len(success_list) 4
+len(fail_list) 0
+len(gpt_answer_list) 4
+len(n_filtered_snapshots_list) 4
+len(n_total_snapshots_list) 4
+len(n_total_frames_list) 4
+是否有满足阈值的snapshot: True
+最大概率index: 1
+INFO 06-22 22:49:44 [logger.py:43] Received request chatcmpl-95c38266999e414b81846115f574ebf5: prompt: "<s><|im_start|>system\nTask: You are an agent in a 3D indoor environment tasked with answering a question.\nYou have already selected one snapshot image that contains several detected objects.\nNow, you should give a final answer to the question **based on this snapshot only**.\nInstructions:\n- Your answer should be a direct, natural sentence that a human can understand.\n- DO NOT mention words like 'snapshot', 'in the image', 'on the left', or any reference to image layout.\n<|im_end|>\n<|im_start|>user\n<image>\nQuestion: where can I keep a photo frame?\nHere is the selected snapshot that may help answer the question:\nObjects detected in this snapshot: shelf\nP<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:49:44 [engine.py:317] Added request chatcmpl-95c38266999e414b81846115f574ebf5.
+INFO:     127.0.0.1:46928 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:29 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:29 - Response: [snapshot 1]
+Reason: [You can keep a photo frame on the shelf.]
+00:01:29 - Prediction: snapshot, 1
+00:01:29 - The index of target snapshot 2
+00:01:29 - Pred_target_class: microwave shelf stove picture stool stool stool
+00:01:29 - Next choice Snapshot of 0-view_3.png
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:01:29 - Current position: [    -9.0166     0.18086     0.35245], 0.860
+00:01:32 - Question id 109eaad4-6e68-4da1-8f98-a0d8589ec26d finished after arriving at target!
+00:01:32 - Question id 109eaad4-6e68-4da1-8f98-a0d8589ec26d finish successfully, 0.8602325267042628 length
+00:01:32 - 5/41: Success rate: 5/5
+00:01:32 - Mean path length for success exploration: 4.690414984828877
+00:01:32 - Filtered snapshots/Total snapshots/Total frames: 3/6/7
+00:01:32 - Scene graph of question 109eaad4-6e68-4da1-8f98-a0d8589ec26d:
+00:01:32 - Question: where can I keep a photo frame?
+00:01:32 - Answer: on the counter below the television with other frames
+00:01:32 - Prediction: You can keep a photo frame on the shelf.
+00:01:32 - 0-view_0.png:
+00:01:32 - 	1: couch 4
+00:01:32 - 	2: coffee table 2
+00:01:32 - 	3: book 2
+00:01:32 - 	4: mat 1
+00:01:32 - 0-view_6.png:
+00:01:32 - 	8: fan 2
+00:01:32 - 0-view_2.png:
+00:01:32 - 	10: microwave 1
+00:01:32 - 	11: stool 1
+00:01:32 - 	12: trash bin 1
+00:01:32 - 	13: counter 1
+00:01:32 - 0-view_4.png:
+00:01:32 - 	14: sink 4
+00:01:32 - 	15: refrigerator 3
+00:01:32 - 	25: paper bag 1
+00:01:32 - 	27: tissue box 1
+00:01:32 - 	29: picture 2
+00:01:32 - 	32: cabinet 1
+00:01:32 - 0-view_3.png:
+00:01:32 - 	16: stool 3
+00:01:32 - 	17: stool 2
+00:01:32 - 	18: stool 2
+00:01:32 - 	19: microwave 2
+00:01:32 - 	20: picture 2
+00:01:32 - 	21: shelf 2
+00:01:32 - 	23: stove 2
+00:01:32 - 0-view_5.png:
+00:01:32 - 	37: shelf 1
+00:01:32 - 	38: picture 1
+00:01:32 - 
+========
+Index: 5 Scene: 00876-mv2HUxq3B53
+00:01:38 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:01:38 - Load scene 00876-mv2HUxq3B53 successfully with semantic texture
+00:01:38 - 
+
+Question id 1b36e675-74ff-46ad-8caa-c33da46a5a67 initialization successful!
+00:01:38 - 
+== step: 0
+INFO 06-22 22:49:54 [metrics.py:417] Avg prompt throughput: 129.5 tokens/s, Avg generation throughput: 1.7 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:01:40 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.04 seconds
+00:01:42 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:01:44 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.08 seconds
+00:01:45 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:01:47 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:01:48 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+INFO 06-22 22:50:04 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:01:49 - Step 0, update snapshots, 15 objects, 4 snapshots
+INFO 06-22 22:50:06 [logger.py:43] Received request chatcmpl-28c08946c7e14526b7d5aaba74bff6d1: prompt: '<s><|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: I want to host a dinner party on a summer evening, where should I set the table? \nFollowing is a list of objects that you can choose, each object one line bed blanket cabinet curtain lamp nightstand picture pillow telephone tv Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:50:06 [engine.py:317] Added request chatcmpl-28c08946c7e14526b7d5aaba74bff6d1.
+INFO:     127.0.0.1:59308 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:51 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:01:51 - Prefiltering selected classes: ['cabinet', 'curtain']
+00:01:51 - Prefiltering snapshot: 4 -> 1
+INFO 06-22 22:50:06 [logger.py:43] Received request chatcmpl-680b8206d6be4ccd9fb69eb2222c8747: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: cabinet, curtain\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: I want to host a dinner party on a summer evening, where should I set the table?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:50:06 [engine.py:317] Added request chatcmpl-680b8206d6be4ccd9fb69eb2222c8747.
+INFO:     127.0.0.1:59308 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:52 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+len(success_list) 5
+len(fail_list) 0
+len(gpt_answer_list) 5
+len(n_filtered_snapshots_list) 5
+len(n_total_snapshots_list) 5
+len(n_total_frames_list) 5
+是否有满足阈值的snapshot: False
+最大概率index: -1
+00:01:52 - Input prompt:
+00:01:52 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: I want to host a dinner party on a summer evening, where should I set the table? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. Snapshot 0 [iVBORw0KGg...]cabinet, curtain The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. 
+INFO 06-22 22:50:07 [logger.py:43] Received request chatcmpl-741a535dd01843cdb1f702c7f9d66d08: prompt: "<s><|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n<image>\n<image>\n<image>\n<image>\nQuestion: I want to host a dinner party on a summer evening, where should I set the table? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nSnapshot 0 \ncabinet, curtain\n \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:50:07 [engine.py:317] Added request chatcmpl-741a535dd01843cdb1f702c7f9d66d08.
+INFO:     127.0.0.1:59308 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:53 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:50:08 [logger.py:43] Received request chatcmpl-7af03124120d4db69360c60835afc374: prompt: '<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou need to choose which frontier to explore next in order to answer the question.\nQuestion: I want to host a dinner party on a summer evening, where should I set the table?\nYou are given two frontier observation images (Frontier A and Frontier B).\nDecide which one is more likely to lead you to the answer.\nAnswer in the following format exactly:\nChoice: A or B\nReason: <your explanation>\nOnly return the above, nothing else.<|im_end|>\n<|im_start|>user\n<image>\n<image>\nFrontier A:\nFrontier B:<|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:50:08 [engine.py:317] Added request chatcmpl-7af03124120d4db69360c60835afc374.
+INFO 06-22 22:50:09 [metrics.py:417] Avg prompt throughput: 583.3 tokens/s, Avg generation throughput: 13.0 tokens/s, Running: 1 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.2%, CPU KV cache usage: 0.0%.
+INFO:     127.0.0.1:59308 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:01:54 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+Compared frontier 0 vs 1, chose B because Frontier B shows a hallway leading to other rooms, which are more likely to contain dining areas where a table can be set for a dinner party.
+00:01:54 - Response: [frontier 1]
+Reason: [Compared frontier 0 vs 1, chose B because Frontier B shows a hallway leading to other rooms, which are more likely to contain dining areas where a table can be set for a dinner party.]
+00:01:54 - Prediction: frontier, 1
+00:01:54 - Next choice: Frontier at [ 44 102]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:01:55 - Current position: [    -6.9732    0.050354      8.3939], 1.005
+00:01:57 - 
+== step: 1
+00:02:00 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.01 seconds
+00:02:00 - Step 1, update snapshots, 15 objects, 4 snapshots
+INFO 06-22 22:50:16 [logger.py:43] Received request chatcmpl-20560244a9594b9e94f63d1db06d2821: prompt: '<s><|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: I want to host a dinner party on a summer evening, where should I set the table? \nFollowing is a list of objects that you can choose, each object one line bed blanket cabinet curtain lamp nightstand picture pillow telephone tv Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:50:16 [engine.py:317] Added request chatcmpl-20560244a9594b9e94f63d1db06d2821.
+INFO 06-22 22:50:17 [metrics.py:417] Avg prompt throughput: 38.9 tokens/s, Avg generation throughput: 1.5 tokens/s, Running: 1 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.1%, CPU KV cache usage: 0.0%.
+INFO:     127.0.0.1:43344 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:02 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:02:02 - Prefiltering selected classes: ['cabinet', 'nightstand']
+00:02:02 - Prefiltering snapshot: 4 -> 2
+INFO 06-22 22:50:17 [logger.py:43] Received request chatcmpl-5f9e868b60ab4256a58ee14fae244f5d: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: cabinet\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: I want to host a dinner party on a summer evening, where should I set the table?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:50:17 [engine.py:317] Added request chatcmpl-5f9e868b60ab4256a58ee14fae244f5d.
+INFO:     127.0.0.1:43344 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:02 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:50:17 [logger.py:43] Received request chatcmpl-50a2ab8d6abc4256a5111f4e0a6f8158: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: nightstand\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: I want to host a dinner party on a summer evening, where should I set the table?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:50:17 [engine.py:317] Added request chatcmpl-50a2ab8d6abc4256a5111f4e0a6f8158.
+INFO:     127.0.0.1:43344 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:02 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+是否有满足阈值的snapshot: False
+最大概率index: -1
+00:02:02 - Input prompt:
+00:02:02 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: I want to host a dinner party on a summer evening, where should I set the table? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. Snapshot 0 [iVBORw0KGg...]cabinet Snapshot 1 [iVBORw0KGg...]nightstand The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. 
+INFO 06-22 22:50:17 [logger.py:43] Received request chatcmpl-4bd1c22b97ba417e95a6bebd5f262629: prompt: "<s><|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n<image>\n<image>\n<image>\n<image>\n<image>\nQuestion: I want to host a dinner party on a summer evening, where should I set the table? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nSnapshot 0 \ncabinet\n \nSnapshot 1 \nnightstand\n \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:50:17 [engine.py:317] Added request chatcmpl-4bd1c22b97ba417e95a6bebd5f262629.
+INFO:     127.0.0.1:43344 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:03 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:02:03 - Response: [snapshot 0]
+Reason: [I see a cabinet that could be used to set up a table for a dinner party.]
+00:02:03 - Prediction: snapshot, 0
+00:02:03 - The index of target snapshot 0
+00:02:03 - Pred_target_class: cabinet picture curtain picture tv
+00:02:03 - Next choice Snapshot of 0-view_5.png
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:02:04 - Current position: [    -7.8732    0.050354      7.9939], 1.990
+00:02:06 - 
+== step: 2
+00:02:07 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:02:08 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:02:10 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:02:11 - Step 2, update snapshots, 15 objects, 4 snapshots
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:02:13 - Current position: [    -8.7732    0.050354      7.6939], 2.939
+INFO 06-22 22:50:29 [metrics.py:417] Avg prompt throughput: 219.1 tokens/s, Avg generation throughput: 2.8 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:02:15 - 
+== step: 3
+00:02:16 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.04 seconds
+00:02:17 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.03 seconds
+00:02:19 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:02:20 - Done! Execution time of denoise_objects function: 0.91 seconds
+00:02:21 - Done! Execution time of merge_objects function: 0.25 seconds
+00:02:21 - Step 3, update snapshots, 15 objects, 5 snapshots
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:02:22 - Current position: [    -9.2732    0.050354      7.4939], 3.477
+INFO 06-22 22:50:39 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:02:24 - Question id 1b36e675-74ff-46ad-8caa-c33da46a5a67 finished after arriving at target!
+00:02:24 - Question id 1b36e675-74ff-46ad-8caa-c33da46a5a67 finish successfully, 3.4770731210556636 length
+00:02:24 - 6/41: Success rate: 6/6
+00:02:24 - Mean path length for success exploration: 4.488191340866675
+00:02:24 - Filtered snapshots/Total snapshots/Total frames: 2/5/12
+00:02:24 - Scene graph of question 1b36e675-74ff-46ad-8caa-c33da46a5a67:
+00:02:24 - Question: I want to host a dinner party on a summer evening, where should I set the table?
+00:02:24 - Answer: On the table on the porch.
+00:02:24 - Prediction: I see a cabinet that could be used to set up a table for a dinner party.
+00:02:24 - 0-view_1.png:
+00:02:24 - 	1: telephone 2
+00:02:24 - 	2: nightstand 3
+00:02:24 - 	3: lamp 3
+00:02:24 - 	4: pillow 1
+00:02:24 - 0-view_3.png:
+00:02:24 - 	7: bed 7
+00:02:24 - 	8: pillow 3
+00:02:24 - 	12: pillow 2
+00:02:24 - 	13: pillow 2
+00:02:24 - 0-view_5.png:
+00:02:24 - 	11: cabinet 7
+00:02:24 - 	16: picture 5
+00:02:24 - 	21: picture 3
+00:02:24 - 	23: tv 3
+00:02:24 - 3-view_2.png:
+00:02:24 - 	18: curtain 3
+00:02:24 - 	44: stool 1
+00:02:24 - 0-view_6.png:
+00:02:24 - 	27: picture 1
+00:02:24 - 
+========
+Index: 6 Scene: 00880-Nfvxx8J5NCo
+00:02:27 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:02:27 - Load scene 00880-Nfvxx8J5NCo successfully with semantic texture
+00:02:28 - 
+
+Question id 1dcdd225-eba2-4ba1-97b6-c4cdc7ca4e9b initialization successful!
+00:02:28 - 
+== step: 0
+00:02:28 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:02:30 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.09 seconds
+00:02:33 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.13 seconds
+00:02:34 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.12 seconds
+00:02:36 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.11 seconds
+00:02:38 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.08 seconds
+00:02:40 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.13 seconds
+00:02:42 - Step 0, update snapshots, 24 objects, 6 snapshots
+INFO 06-22 22:50:59 [logger.py:43] Received request chatcmpl-a71f1d7addb84a778dacb579c3223944: prompt: '<s><|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: where can I keep a new knife I got? \nFollowing is a list of objects that you can choose, each object one line book cabinet coffee table couch counter fan mat microwave paper bag picture refrigerator shelf sink stool stove tissue box trash bin Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:50:59 [engine.py:317] Added request chatcmpl-a71f1d7addb84a778dacb579c3223944.
+INFO:     127.0.0.1:55894 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:45 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:02:45 - Prefiltering selected classes: ['cabinet', 'shelf']
+00:02:45 - Prefiltering snapshot: 6 -> 3
+INFO 06-22 22:51:00 [logger.py:43] Received request chatcmpl-11acba8b4ca44ed99da07f2c9b1c65b8: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: cabinet\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: where can I keep a new knife I got?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:51:00 [engine.py:317] Added request chatcmpl-11acba8b4ca44ed99da07f2c9b1c65b8.
+INFO:     127.0.0.1:55894 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:45 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:51:00 [logger.py:43] Received request chatcmpl-df2244561e5e43edba8f3db98030c867: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: shelf\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: where can I keep a new knife I got?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:51:00 [engine.py:317] Added request chatcmpl-df2244561e5e43edba8f3db98030c867.
+INFO:     127.0.0.1:55894 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:45 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:51:00 [logger.py:43] Received request chatcmpl-2f7b0ccf7473481c9c8ffc6fa6198f4e: prompt: "<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou are given a question and a snapshot image that contains the following detected objects:\nDetected objects: shelf\nDetermine if the snapshot contains enough information to confidently answer the question.\nQuestion: where can I keep a new knife I got?\nDoes this image provide enough information to confidently and correctly answer the question above?\nPlease answer with only 'Yes' or 'No', and nothing else.<|im_end|>\n<|im_start|>user\n<image>\nSnapshot image<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:51:00 [engine.py:317] Added request chatcmpl-2f7b0ccf7473481c9c8ffc6fa6198f4e.
+INFO:     127.0.0.1:55894 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:45 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+Before filtering: 16
+After filtering: 16
+Before merging: 16
+After merging: 15
+len(success_list) 6
+len(fail_list) 0
+len(gpt_answer_list) 6
+len(n_filtered_snapshots_list) 6
+len(n_total_snapshots_list) 6
+len(n_total_frames_list) 6
+是否有满足阈值的snapshot: True
+最大概率index: 1
+INFO 06-22 22:51:00 [logger.py:43] Received request chatcmpl-04fb1bffd1a243ffa03feff3aaedc776: prompt: "<s><|im_start|>system\nTask: You are an agent in a 3D indoor environment tasked with answering a question.\nYou have already selected one snapshot image that contains several detected objects.\nNow, you should give a final answer to the question **based on this snapshot only**.\nInstructions:\n- Your answer should be a direct, natural sentence that a human can understand.\n- DO NOT mention words like 'snapshot', 'in the image', 'on the left', or any reference to image layout.\n<|im_end|>\n<|im_start|>user\n<image>\nQuestion: where can I keep a new knife I got?\nHere is the selected snapshot that may help answer the question:\nObjects detected in this snapshot: shelf\nP<|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:51:00 [engine.py:317] Added request chatcmpl-04fb1bffd1a243ffa03feff3aaedc776.
+INFO:     127.0.0.1:55894 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:02:46 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:02:46 - Response: [snapshot 1]
+Reason: [You can keep the new knife on the shelf in the kitchen.]
+00:02:46 - Prediction: snapshot, 1
+00:02:46 - The index of target snapshot 2
+00:02:46 - Pred_target_class: microwave shelf stove picture stool stool stool
+00:02:46 - Next choice Snapshot of 0-view_3.png
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:02:46 - Current position: [    -9.0166     0.18086     0.35245], 0.860
+00:02:49 - Question id 1dcdd225-eba2-4ba1-97b6-c4cdc7ca4e9b finished after arriving at target!
+00:02:49 - Question id 1dcdd225-eba2-4ba1-97b6-c4cdc7ca4e9b finish successfully, 0.8602325267042628 length
+00:02:49 - 7/41: Success rate: 7/7
+00:02:49 - Mean path length for success exploration: 3.9699115102720444
+00:02:49 - Filtered snapshots/Total snapshots/Total frames: 3/6/7
+00:02:49 - Scene graph of question 1dcdd225-eba2-4ba1-97b6-c4cdc7ca4e9b:
+00:02:49 - Question: where can I keep a new knife I got?
+00:02:49 - Answer: there is a knife holder in the kitchen counter next to the gas stove.
+00:02:49 - Prediction: You can keep the new knife on the shelf in the kitchen.
+00:02:49 - 0-view_0.png:
+00:02:49 - 	1: couch 4
+00:02:49 - 	2: coffee table 2
+00:02:49 - 	3: book 2
+00:02:49 - 	4: mat 1
+00:02:49 - 0-view_6.png:
+00:02:49 - 	8: fan 2
+00:02:49 - 0-view_2.png:
+00:02:49 - 	10: microwave 1
+00:02:49 - 	11: stool 1
+00:02:49 - 	12: trash bin 1
+00:02:49 - 	13: counter 1
+00:02:49 - 0-view_4.png:
+00:02:49 - 	14: sink 4
+00:02:49 - 	15: refrigerator 3
+00:02:49 - 	25: paper bag 1
+00:02:49 - 	27: tissue box 1
+00:02:49 - 	29: picture 2
+00:02:49 - 	32: cabinet 1
+00:02:49 - 0-view_3.png:
+00:02:49 - 	16: stool 3
+00:02:49 - 	17: stool 2
+00:02:49 - 	18: stool 2
+00:02:49 - 	19: microwave 2
+00:02:49 - 	20: picture 2
+00:02:49 - 	21: shelf 2
+00:02:49 - 	23: stove 2
+00:02:49 - 0-view_5.png:
+00:02:49 - 	37: shelf 1
+00:02:49 - 	38: picture 1
+00:02:49 - 
+========
+Index: 7 Scene: 00824-Dd4bFSTQ8gi
+00:02:52 - Loaded 192 classes from scannet 200: data/scannet200_classes.txt!!!
+00:02:52 - Load scene 00824-Dd4bFSTQ8gi successfully with semantic texture
+00:02:52 - 
+
+Question id 30dc765d-80c3-4901-9c69-65e6b48e254a initialization successful!
+00:02:52 - 
+== step: 0
+00:02:53 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+INFO 06-22 22:51:11 [metrics.py:417] Avg prompt throughput: 149.9 tokens/s, Avg generation throughput: 2.4 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+00:02:56 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.10 seconds
+00:02:57 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:02:59 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.05 seconds
+00:03:00 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.06 seconds
+00:03:03 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:03:04 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.07 seconds
+00:03:05 - Step 0, update snapshots, 12 objects, 4 snapshots
+INFO 06-22 22:51:21 [metrics.py:417] Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Swapped: 0 reqs, Pending: 0 reqs, GPU KV cache usage: 0.0%, CPU KV cache usage: 0.0%.
+INFO 06-22 22:51:22 [logger.py:43] Received request chatcmpl-4184114edb2e40cebc44ea010f8f3387: prompt: '<s><|im_start|>system\nYou are an AI agent in a 3D indoor scene. <|im_end|>\n<|im_start|>user\nYour goal is to answer questions about the scene through exploration. To efficiently solve the problem, you should first rank objects in the scene based on their importance. These are the rules for the task. 1. Read through the whole object list. 2. Rank objects in the list based on how well they can help your exploration given the question. 3. Reprint the name of all objects that may help your exploration given the question. 4. Do not print any object not included in the list or include any additional information in your response. \nHere is an example of selecting helpful objects: Question: What can I use to watch my favorite shows and movies? Following is a list of objects that you can choose, each object one line painting speaker box cabinet lamp tv book rack sofa oven bed curtain Answer: tv speaker sofa bed \nFollowing is the concrete content of the task and you should retrieve helpful objects in order: Question: What color is the front door? \nFollowing is a list of objects that you can choose, each object one line bed chair folded chair picture pillow plate potted plant sofa chair table Answer: <|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:51:22 [engine.py:317] Added request chatcmpl-4184114edb2e40cebc44ea010f8f3387.
+INFO:     127.0.0.1:55012 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:03:07 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+00:03:07 - Prefiltering selected classes: []
+00:03:07 - Prefiltering snapshot: 4 -> 0
+len(success_list) 7
+len(fail_list) 0
+len(gpt_answer_list) 7
+len(n_filtered_snapshots_list) 7
+len(n_total_snapshots_list) 7
+len(n_total_frames_list) 7
+是否有满足阈值的snapshot: False
+最大概率index: -1
+00:03:07 - Input prompt:
+00:03:07 - Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. Question: What color is the front door? Select the Frontier/Snapshot that would help find the answer of the question. The following is the egocentric view of the agent in forward direction: [iVBORw0KGg...] The followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. No Snapshot is available The followings are all the Frontiers that you can explore:  Frontier 0 [iVBORw0KGg...] Frontier 1 [iVBORw0KGg...] Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. 
+INFO 06-22 22:51:22 [logger.py:43] Received request chatcmpl-022a409d21f34922ac926312365a51ea: prompt: "<s><|im_start|>system\nTask: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. Definitions: Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. If you choose a Frontier, you need to explain why you would like to choose that direction to explore. <|im_end|>\n<|im_start|>user\n<image>\n<image>\n<image>\nQuestion: What color is the front door? \nSelect the Frontier/Snapshot that would help find the answer of the question. \nThe following is the egocentric view of the agent in forward direction: \n \nThe followings are all the snapshots that you can choose (followed with contained object classes) Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. So you still need to utilize the images to make decisions. \nNo Snapshot is available \nThe followings are all the Frontiers that you can explore:  \nFrontier 0 \n \nFrontier 1 \n \nPlease provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. If you choose the second frontier, you can return 'Frontier 1 I see a door that may lead to the living room.'. Note that if you choose a snapshot to answer the question, (1) you should give a direct answer that can be understood by others. Don't mention words like 'snapshot', 'on the left of the image', etc; (2) you can also utilize other snapshots, frontiers and egocentric views to gather more information, but you should always choose one most relevant snapshot to answer the question. <|im_end|>\n<|im_start|>assistant\n", params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:51:22 [engine.py:317] Added request chatcmpl-022a409d21f34922ac926312365a51ea.
+INFO:     127.0.0.1:55012 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:03:09 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+INFO 06-22 22:51:24 [logger.py:43] Received request chatcmpl-c02b3f09356b4efab2f028f9bba1502e: prompt: '<s><|im_start|>system\nYou are an intelligent agent in a 3D indoor environment.\nYou need to choose which frontier to explore next in order to answer the question.\nQuestion: What color is the front door?\nYou are given two frontier observation images (Frontier A and Frontier B).\nDecide which one is more likely to lead you to the answer.\nAnswer in the following format exactly:\nChoice: A or B\nReason: <your explanation>\nOnly return the above, nothing else.<|im_end|>\n<|im_start|>user\n<image>\n<image>\nFrontier A:\nFrontier B:<|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=0.7, top_p=0.95, top_k=0, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=None, extra_args=None), prompt_token_ids: None, prompt_embeds shape: None, lora_request: None, prompt_adapter_request: None.
+INFO 06-22 22:51:24 [engine.py:317] Added request chatcmpl-c02b3f09356b4efab2f028f9bba1502e.
+INFO:     127.0.0.1:55012 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+00:03:10 - HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+Compared frontier 0 vs 1, chose A because Frontier A shows a door that appears to be the front door, which is more likely to provide the answer to the question about its color.
+00:03:10 - Response: [frontier 0]
+Reason: [Compared frontier 0 vs 1, chose A because Frontier A shows a door that appears to be the front door, which is more likely to provide the answer to the question about its color.]
+00:03:10 - Prediction: frontier, 0
+00:03:10 - Next choice: Frontier at [107  57]
+UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence, which should be avoided as value-mapping will have precedence in case its length matches with *x* & *y*.  Please use the *color* keyword-argument or provide a 2D array with a single row if you intend to specify the same RGB or RGBA value for all points.
+00:03:10 - Current position: [     6.0147    0.068824      1.9036], 0.985
+00:03:12 - 
+== step: 1
+00:03:13 - Done! Execution time of detections_to_obj_pcd_and_bbox function: 0.13 seconds
+slurmstepd: error: *** JOB 75212 ON worker-2 CANCELLED AT 2025-06-22T22:51:28 ***

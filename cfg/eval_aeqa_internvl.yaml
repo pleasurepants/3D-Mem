@@ -1,7 +1,7 @@
 # General
 seed: 88
-exp_name: "exp_eval_aeqa"
-output_parent_dir: "/home/wiss/zhang/projects/openeqa/aeqa_baseline/internvl_baseline_41"
+exp_name: "baseline_41"
+output_parent_dir: "/home/wiss/zhang/projects/openeqa/aeqa_baseline/internvl"
 scene_dataset_config_path: "/home/wiss/zhang/code/openeqa/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/nfs/data2/zhang/openeqa/hm3d/data/3dmem"
 questions_list_path: 'data/aeqa_questions-41.json'

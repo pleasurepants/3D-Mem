@@ -1,0 +1,197 @@
+=== JOB START ===
+Sun Jun 22 11:05:19 PM CEST 2025
+worker-7
+Sun Jun 22 23:05:19 2025       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 535.216.01             Driver Version: 535.216.01   CUDA Version: 12.2     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  NVIDIA A40                     Off | 00000000:05:00.0 Off |                    0 |
+|  0%   29C    P8              21W / 300W |      0MiB / 46068MiB |      0%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+|   1  NVIDIA A40                     Off | 00000000:06:00.0 Off |                    0 |
+|  0%   30C    P8              21W / 300W |      0MiB / 46068MiB |      0%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+|   2  NVIDIA A40                     Off | 00000000:45:00.0 Off |                    0 |
+|  0%   38C    P0              80W / 300W |   1666MiB / 46068MiB |     13%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+|   3  NVIDIA A40                     Off | 00000000:46:00.0 Off |                    0 |
+|  0%   37C    P0              76W / 300W |  42380MiB / 46068MiB |      0%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|    2   N/A  N/A   2750547      C   python                                     1658MiB |
+|    3   N/A  N/A    341397      C   ...conda3/envs/llamafactory/bin/python    42372MiB |
++---------------------------------------------------------------------------------------+
+SLURM_JOB_ID: 75217
+[INFO] CUDA_VISIBLE_DEVICES=0,1
+[INFO] Starting vLLM (minicpm) server on GPU 0...
+[INFO] Waiting for vLLM (minicpm) server to be ready...
+  ... waiting (2s)
+  ... waiting (4s)
+  ... waiting (6s)
+  ... waiting (8s)
+  ... waiting (10s)
+  ... waiting (12s)
+  ... waiting (14s)
+  ... waiting (16s)
+  ... waiting (18s)
+  ... waiting (20s)
+  ... waiting (22s)
+  ... waiting (24s)
+  ... waiting (26s)
+  ... waiting (28s)
+  ... waiting (30s)
+INFO 06-22 23:05:52 [__init__.py:244] Automatically detected platform cuda.
+  ... waiting (32s)
+  ... waiting (34s)
+  ... waiting (36s)
+  ... waiting (38s)
+  ... waiting (40s)
+  ... waiting (42s)
+  ... waiting (44s)
+  ... waiting (46s)
+INFO 06-22 23:06:07 [api_server.py:1287] vLLM API server version 0.9.1
+INFO 06-22 23:06:08 [cli_args.py:309] non-default args: {'model': 'openbmb/MiniCPM-V-2_6', 'trust_remote_code': True, 'served_model_name': ['minicpm'], 'limit_mm_per_prompt': {'image': 20}}
+  ... waiting (48s)
+  ... waiting (50s)
+  ... waiting (52s)
+  ... waiting (54s)
+  ... waiting (56s)
+  ... waiting (58s)
+  ... waiting (60s)
+  ... waiting (62s)
+INFO 06-22 23:06:25 [config.py:823] This model supports multiple tasks: {'generate', 'score', 'classify', 'reward', 'embed'}. Defaulting to 'generate'.
+INFO 06-22 23:06:26 [config.py:2195] Chunked prefill is enabled with max_num_batched_tokens=2048.
+  ... waiting (64s)
+  ... waiting (66s)
+WARNING 06-22 23:06:29 [env_override.py:17] NCCL_CUMEM_ENABLE is set to 0, skipping override. This may increase memory overhead with cudagraph+allreduce: https://github.com/NVIDIA/nccl/issues/1234
+  ... waiting (68s)
+  ... waiting (70s)
+INFO 06-22 23:06:33 [__init__.py:244] Automatically detected platform cuda.
+  ... waiting (72s)
+  ... waiting (74s)
+INFO 06-22 23:06:38 [core.py:455] Waiting for init message from front-end.
+INFO 06-22 23:06:38 [core.py:70] Initializing a V1 LLM engine (v0.9.1) with config: model='openbmb/MiniCPM-V-2_6', speculative_config=None, tokenizer='openbmb/MiniCPM-V-2_6', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config={}, tokenizer_revision=None, trust_remote_code=True, dtype=torch.bfloat16, max_seq_len=32768, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_backend=''), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None), seed=0, served_model_name=minicpm, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=True, chunked_prefill_enabled=True, use_async_output_proc=True, pooler_config=None, compilation_config={"level":3,"debug_dump_path":"","cache_dir":"","backend":"","custom_ops":["none"],"splitting_ops":["vllm.unified_attention","vllm.unified_attention_with_output"],"use_inductor":true,"compile_sizes":[],"inductor_compile_config":{"enable_auto_functionalized_v2":false},"inductor_passes":{},"use_cudagraph":true,"cudagraph_num_of_warmups":1,"cudagraph_capture_sizes":[512,504,496,488,480,472,464,456,448,440,432,424,416,408,400,392,384,376,368,360,352,344,336,328,320,312,304,296,288,280,272,264,256,248,240,232,224,216,208,200,192,184,176,168,160,152,144,136,128,120,112,104,96,88,80,72,64,56,48,40,32,24,16,8,4,2,1],"cudagraph_copy_inputs":false,"full_cuda_graph":false,"max_capture_size":512,"local_cache_dir":null}
+  ... waiting (76s)
+WARNING 06-22 23:06:39 [utils.py:2737] Methods determine_num_available_blocks,device_config,get_cache_block_size_bytes,initialize_cache not implemented in <vllm.v1.worker.gpu_worker.Worker object at 0x7db9758b42e0>
+INFO 06-22 23:06:40 [parallel_state.py:1065] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0
+  ... waiting (78s)
+/home/wiss/zhang/anaconda3/envs/vllm/lib/python3.10/site-packages/transformers/models/auto/image_processing_auto.py:609: FutureWarning: The image_processor_class argument is deprecated and will be removed in v4.42. Please use `slow_image_processor_class`, or `fast_image_processor_class` instead
+  warnings.warn(
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+  ... waiting (80s)
+  ... waiting (82s)
+  ... waiting (84s)
+  ... waiting (86s)
+WARNING 06-22 23:06:48 [topk_topp_sampler.py:59] FlashInfer is not available. Falling back to the PyTorch-native implementation of top-p & top-k sampling. For the best performance, please install FlashInfer.
+INFO 06-22 23:06:48 [gpu_model_runner.py:1595] Starting to load model openbmb/MiniCPM-V-2_6...
+INFO 06-22 23:06:49 [gpu_model_runner.py:1600] Loading model from scratch...
+INFO 06-22 23:06:49 [cuda.py:252] Using Flash Attention backend on V1 engine.
+INFO 06-22 23:06:50 [weight_utils.py:292] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+  ... waiting (88s)
+  ... waiting (90s)
+  ... waiting (92s)
+  ... waiting (94s)
+  ... waiting (96s)
+  ... waiting (98s)
+  ... waiting (100s)
+  ... waiting (102s)
+  ... waiting (104s)
+  ... waiting (106s)
+  ... waiting (108s)
+  ... waiting (110s)
+  ... waiting (112s)
+  ... waiting (114s)
+  ... waiting (116s)
+  ... waiting (118s)
+  ... waiting (120s)
+  ... waiting (122s)
+  ... waiting (124s)
+  ... waiting (126s)
+  ... waiting (128s)
+  ... waiting (130s)
+Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:45<02:16, 45.49s/it]
+  ... waiting (132s)
+  ... waiting (134s)
+  ... waiting (136s)
+  ... waiting (138s)
+  ... waiting (140s)
+  ... waiting (142s)
+  ... waiting (144s)
+  ... waiting (146s)
+  ... waiting (148s)
+  ... waiting (150s)
+  ... waiting (152s)
+  ... waiting (154s)
+  ... waiting (156s)
+  ... waiting (158s)
+  ... waiting (160s)
+  ... waiting (162s)
+  ... waiting (164s)
+  ... waiting (166s)
+  ... waiting (168s)
+  ... waiting (170s)
+  ... waiting (172s)
+  ... waiting (174s)
+  ... waiting (176s)
+  ... waiting (178s)
+  ... waiting (180s)
+  ... waiting (182s)
+  ... waiting (184s)
+  ... waiting (186s)
+  ... waiting (188s)
+  ... waiting (190s)
+  ... waiting (192s)
+  ... waiting (194s)
+  ... waiting (196s)
+  ... waiting (198s)
+  ... waiting (200s)
+  ... waiting (202s)
+  ... waiting (204s)
+  ... waiting (206s)
+  ... waiting (208s)
+  ... waiting (210s)
+  ... waiting (212s)
+  ... waiting (214s)
+  ... waiting (216s)
+  ... waiting (218s)
+  ... waiting (220s)
+  ... waiting (222s)
+  ... waiting (224s)
+  ... waiting (226s)
+  ... waiting (228s)
+  ... waiting (230s)
+  ... waiting (232s)
+  ... waiting (234s)
+  ... waiting (236s)
+  ... waiting (238s)
+  ... waiting (240s)
+  ... waiting (242s)
+  ... waiting (244s)
+Loading safetensors checkpoint shards:  50% Completed | 2/4 [02:53<03:08, 94.23s/it]
+  ... waiting (246s)
+  ... waiting (248s)
+  ... waiting (250s)
+  ... waiting (252s)
+  ... waiting (254s)
+  ... waiting (256s)
+  ... waiting (258s)
+  ... waiting (260s)
+  ... waiting (262s)
+  ... waiting (264s)
+  ... waiting (266s)
+  ... waiting (268s)
+slurmstepd: error: *** JOB 75217 ON worker-7 CANCELLED AT 2025-06-22T23:10:08 ***
