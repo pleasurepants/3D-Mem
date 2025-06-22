@@ -181,3 +181,7 @@ cython_debug/
 
 slurm/*.out
 .env
+# 忽略所有 slurm 输出文件
+slurm*
+*.slurm
+*.out
