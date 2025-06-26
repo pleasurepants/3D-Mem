@@ -13,7 +13,7 @@ date
 hostname
 nvidia-smi
 echo "SLURM_JOB_ID: $SLURM_JOB_ID"
-# srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:1 --time=4:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-8,worker-9 --partition all bash
+# srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:2 --time=8:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-8,worker-9,worker-1,worker-2,worker-3,worker-4 --partition all bash
 
 if [ -z "$SLURM_JOB_GPUS" ]; then
     export CUDA_VISIBLE_DEVICES=0,1
@@ -37,14 +37,14 @@ VLLM_PID=$!
 
 
 echo "[INFO] Waiting for vLLM (internvl) server to be ready..."
-for i in {1..120}; do
+for i in {1..300}; do
     if curl -s http://localhost:8000/v1/models > /dev/null; then
         echo "[INFO] ✅ internvl API is ready!"
         break
     fi
     echo "  ... waiting ($((i*2))s)"
     sleep 2
-    if [ $i -eq 120 ]; then
+    if [ $i -eq 300 ]; then
         echo "[ERROR] ❌ Timeout: internvl server failed to start."
         if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
             kill "$VLLM_PID"
@@ -57,8 +57,10 @@ done
 echo "[INFO] Starting AEQA evaluation on GPU 1 (3dmem env)..."
 source /home/wiss/zhang/anaconda3/bin/activate 3dmem
 source .env
+export LD_LIBRARY_PATH=/home/wiss/zhang/local_cuda118/cuda_cudart/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
 
-CUDA_VISIBLE_DEVICES=1 python /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_internvl.py \
+CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
+ /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_internvl.py \
     -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_debug.yaml
 
 

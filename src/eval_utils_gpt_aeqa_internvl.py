@@ -32,26 +32,7 @@ def format_content(contents):
             )
     return formated_content
 
-# def format_content(contents):
-#     formated_content = []
-#     for c in contents:
-#         # 跳过内容仅为换行或空的text，避免污染
-#         if c[0].strip() == "":
-#             continue
-#         if c[0].strip() == " ":
-#             continue
-#         formated_content.append({"type": "text", "text": c[0]})
-#         if len(c) == 2:
-#             formated_content.append(
-#                 {
-#                     "type": "image_url",
-#                     "image_url": {
-#                         "url": f"data:image/png;base64,{c[1]}",
-#                         # detail参数可以删掉，llava/vllm并不识别这个key
-#                     },
-#                 }
-#             )
-#     return formated_content
+
 
 
 
@@ -89,42 +70,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
             continue
 
     return None
-# def call_openai_api(sys_prompt, contents) -> Optional[str]:
-#     max_tries = 5
-#     retry_count = 0
-#     formated_content = format_content(contents)
-#     # ====== 最小修改 START ======
-#     # 把 sys_prompt 塞到 user 的 content 数组第一个
-#     formated_content = [{"type": "text", "text": sys_prompt}] + formated_content
-#     message_text = [
-#         {"role": "user", "content": formated_content},
-#     ]
-#     # ====== 最小修改 END ======
 
-#     while retry_count < max_tries:
-#         try:
-#             completion = client.chat.completions.create(
-#                 model="llava",  # gpt-4o
-#                 messages=message_text,
-#                 temperature=0.7,
-#                 max_tokens=2048, # 4096 for gpt-4o
-#                 top_p=0.95,
-#                 frequency_penalty=0,
-#                 presence_penalty=0,
-#             )
-#             return completion.choices[0].message.content
-#         except openai.RateLimitError as e:
-#             print("Rate limit error, waiting for 60s")
-#             time.sleep(30)
-#             retry_count += 1
-#             continue
-#         except Exception as e:
-#             print("Error: ", e)
-#             time.sleep(60)
-#             retry_count += 1
-#             continue
-
-#     return None
 
 
 # encode tensor images to base64 format
@@ -278,6 +224,153 @@ def format_explore_prompt(
     return sys_prompt, content
 
 
+def format_explore_prompt_frontier(
+    question,
+    egocentric_imgs,
+    frontier_imgs,
+    snapshot_imgs,
+    snapshot_classes,
+    egocentric_view=False,
+    use_snapshot_class=True,
+    image_goal=None,
+):
+    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose a Frontier to further explore. "
+    sys_prompt += "Definitions: "
+    # sys_prompt += "Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. "
+    # sys_prompt += "If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. "
+    sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
+    sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore. "
+
+    content = []
+    # 1 first is the question
+    text = f"Question: {question}"
+    if image_goal is not None:
+        content.append((text, image_goal))
+        content.append((" ",))
+    else:
+        content.append((text + " ",))
+
+    text = "Select the Frontier that would help find the answer of the question. "
+    content.append((text,))
+
+    # 2 add egocentric view
+    if egocentric_view:
+        text = (
+            "The following is the egocentric view of the agent in forward direction: "
+        )
+        content.append((text, egocentric_imgs[-1]))
+        content.append((" ",))
+
+
+    # 4 here is the frontier images
+    text = "The followings are all the Frontiers that you can explore:  "
+    content.append((text,))
+    if len(frontier_imgs) == 0:
+        content.append(("No Frontier is available",))
+    else:
+        for i in range(len(frontier_imgs)):
+            content.append((f"Frontier {i} ", frontier_imgs[i]))
+            content.append((" ",))
+
+    # 5 here is the format of the answer
+    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose."
+    text += (
+        "You MUST select one and only one of the provided Frontier indices. "
+        "You are NOT allowed to say that none is suitable, or to refuse to choose. "
+        "Select the frontier that is MOST likely to lead to information needed to answer the question, based on any visible clues, semantic hints, or the likely location of target objects. "
+        "Always connect your reasoning with the specific content of the question and with what is visible in the frontier image. "
+        "Avoid vague reasons such as 'explore more' or 'see what is there'. "
+        "Instead, provide clear, question-focused reasoning such as 'Frontier 2 There is a visible door that may lead to the kitchen, where the object in the question is likely to be found.' "
+        "You must only choose from the provided Frontier indices. Do not make up an index that is not listed above. "
+    )
+
+
+    content.append((text,))
+
+    return sys_prompt, content
+
+
+
+
+def format_explore_prompt_snapshot(
+    question,
+    egocentric_imgs,
+    frontier_imgs,
+    snapshot_imgs,
+    snapshot_classes,
+    egocentric_view=False,
+    use_snapshot_class=True,
+    image_goal=None,
+    ):
+    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. "
+    sys_prompt += "Definitions: "
+    sys_prompt += "Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. "
+    sys_prompt += "If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. "
+    sys_prompt += "If none of the snapshots is sufficient, reply with 'No Snapshot is available'."
+    # sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
+    # sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore. "
+
+    content = []
+    # 1 first is the question
+    text = f"Question: {question}"
+    if image_goal is not None:
+        content.append((text, image_goal))
+        content.append((" ",))
+    else:
+        content.append((text + " ",))
+
+    text = "Select the Snapshot that would help find the answer of the question. "
+    content.append((text,))
+
+    # 2 add egocentric view
+    if egocentric_view:
+        text = (
+            "The following is the egocentric view of the agent in forward direction: "
+        )
+        content.append((text, egocentric_imgs[-1]))
+        content.append((" ",))
+
+    # 3 here is the snapshot images
+    text = "The followings are all the snapshots that you can choose (followed with contained object classes) "
+    text += "Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. "
+    text += "So you still need to utilize the images to make decisions. "
+    content.append((text,))
+    if len(snapshot_imgs) == 0:
+        content.append(("No Snapshot is available",))
+    else:
+        for i in range(len(snapshot_imgs)):
+            content.append((f"Snapshot {i} ", snapshot_imgs[i]))
+            if use_snapshot_class:
+                text = ", ".join(snapshot_classes[i])
+                content.append((text,))
+            content.append((" ",))
+
+
+    # 5 here is the format of the answer
+    text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
+    text += (
+        "You should always try your best to select one of the provided Snapshots and give a direct, concrete answer to the question itself, not just describe the image. "
+        "Use all available visual and object class information to make your answer as complete and precise as possible, even if you have to make a reasonable guess based on the snapshot. "
+        "Your answer should be phrased as if you are telling someone the actual answer, not just listing what you see. "
+        "For example, instead of 'Snapshot 0 A bowl is visible', say 'Snapshot 0 The bowl is on the dining table.' "
+        "Avoid being over-conservative. If any snapshot contains even partial or likely information to answer the question, you MUST choose that snapshot and provide your best possible answer. "
+        "Only if you are absolutely sure that NONE of the provided snapshots contains enough information, you may reply with 'No Snapshot is available', and briefly state the main reason. "
+        "You must only choose from the provided Snapshot indices. Do not make up an index that is not listed above. "
+    )
+
+
+    content.append((text,))
+
+    return sys_prompt, content
+
+
+
+
+
+
+
+
+
 def format_prefiltering_prompt(question, class_list, top_k=10, image_goal=None):
     content = []
     sys_prompt = "You are an AI agent in a 3D indoor scene. "
@@ -360,6 +453,125 @@ def prefiltering(
     return snapshot_classes, keep_index
 
 
+# def explore_step(step, cfg, verbose=False):
+#     step["use_prefiltering"] = cfg.prefiltering
+#     step["top_k_categories"] = cfg.top_k_categories
+#     (
+#         question,
+#         image_goal,
+#         egocentric_imgs,
+#         frontier_imgs,
+#         snapshot_imgs,
+#         snapshot_classes,
+#         snapshot_id_mapping,
+#     ) = get_step_info(step, verbose)
+#     sys_prompt, content = format_explore_prompt(
+#         question,
+#         egocentric_imgs,
+#         frontier_imgs,
+#         snapshot_imgs,
+#         snapshot_classes,
+#         egocentric_view=step.get("use_egocentric_views", False),
+#         use_snapshot_class=True,
+#         image_goal=image_goal,
+#     )
+
+#     if verbose:
+#         logging.info(f"Input prompt:")
+#         message = sys_prompt
+#         for c in content:
+#             message += c[0]
+#             if len(c) == 2:
+#                 message += f"[{c[1][:10]}...]"
+#         logging.info(message)
+
+#     retry_bound = 3
+#     final_response = None
+#     final_reason = None
+#     for _ in range(retry_bound):
+#         full_response = call_openai_api(sys_prompt, content)
+
+#         if full_response is None:
+#             print("call_openai_api returns None, retrying")
+#             continue
+
+
+#         # 如果 full_response 是 token list（vLLM 的返回格式），先拼成字符串
+#         if isinstance(full_response, list):
+#             full_response = " ".join(full_response)
+
+#         # 去掉前后空格
+#         full_response = full_response.strip()
+
+#         # 拆分 token 提取结果和理由
+#         tokens = full_response.split()
+#         if len(tokens) >= 2:
+#             response = f"{tokens[0]} {tokens[1]}"
+#             reason = " ".join(tokens[2:]).strip()
+#         else:
+#             print(f"Error in splitting response: {full_response}")
+#             continue
+
+#         response = response.lower()
+
+#         try:
+#             choice_type, choice_id = response.split(" ")
+#         except Exception as e:
+#             print(f"Error in splitting response: {response}")
+#             print(e)
+#             continue
+
+
+#         response_valid = False
+#         if (
+#             choice_type == "snapshot"
+#             and choice_id.isdigit()
+#             and 0 <= int(choice_id) < len(snapshot_imgs)
+#         ):
+#             response_valid = True
+#         elif (
+#             choice_type == "frontier"
+#             and choice_id.isdigit()
+#             and 0 <= int(choice_id) < len(frontier_imgs)
+#         ):
+#             response_valid = True
+
+#         if response_valid:
+#             final_response = response
+#             final_reason = reason
+#             break
+
+#     return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+
+
+
+
+
+
+
+
+
+import re
+
+def clean_reason(reason):
+    """
+    更鲁棒地去除reason/answer中带有 [answer: xxx] 或 [reason: xxx] 及所有[]，只保留核心文本
+    """
+    # 去掉开头类似于 [answer: xxxx] 或 [reason: xxx] 的内容（忽略大小写）
+    reason = re.sub(r'^\s*\[\s*(answer|reason)\s*:\s*([^\]]+)\]\s*', r'\2', reason, flags=re.IGNORECASE)
+    # 再去掉所有剩余的 []
+    reason = reason.replace('[', '').replace(']', '')
+    # 去除首尾引号和空格
+    reason = reason.strip().strip("\"'")
+    return reason
+
+
+
+
+
+
+
+
 def explore_step(step, cfg, verbose=False):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
@@ -372,7 +584,61 @@ def explore_step(step, cfg, verbose=False):
         snapshot_classes,
         snapshot_id_mapping,
     ) = get_step_info(step, verbose)
-    sys_prompt, content = format_explore_prompt(
+
+    # ==== Step 1: snapshot prompt ====
+    sys_prompt, content = format_explore_prompt_snapshot(
+        question,
+        egocentric_imgs,
+        frontier_imgs,  # 可以为空
+        snapshot_imgs,
+        snapshot_classes,
+        egocentric_view=step.get("use_egocentric_views", False),
+        use_snapshot_class=True,
+        image_goal=image_goal,
+    )
+
+    if verbose:
+        logging.info(f"Input prompt (snapshot):")
+        message = sys_prompt
+        for c in content:
+            message += c[0]
+            if len(c) == 2:
+                message += f"[{c[1][:10]}...]"
+        logging.info(message)
+
+    retry_bound = 3
+    for _ in range(retry_bound):
+        full_response = call_openai_api(sys_prompt, content)
+        if full_response is None:
+            print("call_openai_api (snapshot) returns None, retrying")
+            continue
+
+        if isinstance(full_response, list):
+            full_response = " ".join(full_response)
+        full_response = full_response.strip().lower()
+
+        # snapshot合规判定
+        if full_response.startswith("snapshot"):
+            tokens = full_response.split()
+            if len(tokens) >= 2 and tokens[1].isdigit():
+                idx = int(tokens[1])
+                if 0 <= idx < len(snapshot_imgs):
+                    response = f"{tokens[0]} {tokens[1]}"
+                    reason = " ".join(tokens[2:]).strip()
+                    reason = clean_reason(reason)  
+                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+                else:
+                    print(f"Snapshot index out of range: {tokens[1]}")
+                    continue
+        elif "no snapshot is available" in full_response:
+            # 明确拒绝，直接进入frontier
+            break
+        else:
+            print(f"Unrecognized snapshot response: {full_response}")
+            continue
+
+    # ==== Step 2: frontier prompt ====
+    sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
         frontier_imgs,
@@ -384,7 +650,7 @@ def explore_step(step, cfg, verbose=False):
     )
 
     if verbose:
-        logging.info(f"Input prompt:")
+        logging.info(f"Input prompt (frontier):")
         message = sys_prompt
         for c in content:
             message += c[0]
@@ -392,77 +658,31 @@ def explore_step(step, cfg, verbose=False):
                 message += f"[{c[1][:10]}...]"
         logging.info(message)
 
-    retry_bound = 3
-    final_response = None
-    final_reason = None
     for _ in range(retry_bound):
         full_response = call_openai_api(sys_prompt, content)
-
         if full_response is None:
-            print("call_openai_api returns None, retrying")
+            print("call_openai_api (frontier) returns None, retrying")
             continue
 
-        # full_response = full_response.strip()
-        # if isinstance(full_response, list):
-        #     full_response = " ".join(full_response)
-        # if " " in full_response:
-        #     full_response = full_response.split(" ")
-        #     response, reason = full_response[0], full_response[-1]
-        #     response, reason = response.strip(), reason.strip()
-        # else:
-        #     response = full_response
-        #     reason = ""
-        # response = response.lower()
-        # try:
-        #     choice_type, choice_id = response.split(" ")
-        # except Exception as e:
-        #     print(f"Error in splitting response: {response}")
-        #     print(e)
-        #     continue
-
-        # 如果 full_response 是 token list（vLLM 的返回格式），先拼成字符串
         if isinstance(full_response, list):
             full_response = " ".join(full_response)
+        full_response = full_response.strip().lower()
 
-        # 去掉前后空格
-        full_response = full_response.strip()
-
-        # 拆分 token 提取结果和理由
-        tokens = full_response.split()
-        if len(tokens) >= 2:
-            response = f"{tokens[0]} {tokens[1]}"
-            reason = " ".join(tokens[2:]).strip()
+        if full_response.startswith("frontier"):
+            tokens = full_response.split()
+            if len(tokens) >= 2 and tokens[1].isdigit():
+                idx = int(tokens[1])
+                if 0 <= idx < len(frontier_imgs):
+                    response = f"{tokens[0]} {tokens[1]}"
+                    reason = " ".join(tokens[2:]).strip()
+                    reason = clean_reason(reason)
+                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+                else:
+                    print(f"Frontier index out of range: {tokens[1]}")
+                    continue
         else:
-            print(f"Error in splitting response: {full_response}")
+            print(f"Unrecognized frontier response: {full_response}")
             continue
 
-        response = response.lower()
-
-        try:
-            choice_type, choice_id = response.split(" ")
-        except Exception as e:
-            print(f"Error in splitting response: {response}")
-            print(e)
-            continue
-
-
-        response_valid = False
-        if (
-            choice_type == "snapshot"
-            and choice_id.isdigit()
-            and 0 <= int(choice_id) < len(snapshot_imgs)
-        ):
-            response_valid = True
-        elif (
-            choice_type == "frontier"
-            and choice_id.isdigit()
-            and 0 <= int(choice_id) < len(frontier_imgs)
-        ):
-            response_valid = True
-
-        if response_valid:
-            final_response = response
-            final_reason = reason
-            break
-
-    return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+    # 如果都失败，返回None
+    return None, snapshot_id_mapping, None, len(snapshot_imgs)
