@@ -236,8 +236,6 @@ def format_explore_prompt_frontier(
 ):
     sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose a Frontier to further explore. "
     sys_prompt += "Definitions: "
-    # sys_prompt += "Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. "
-    # sys_prompt += "If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. "
     sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
     sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore. "
 
@@ -273,16 +271,25 @@ def format_explore_prompt_frontier(
             content.append((" ",))
 
     # 5 here is the format of the answer
-    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose."
+    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
     text += (
-        "You MUST select one and only one of the provided Frontier indices. "
-        "You are NOT allowed to say that none is suitable, or to refuse to choose. "
-        "Select the frontier that is MOST likely to lead to information needed to answer the question, based on any visible clues, semantic hints, or the likely location of target objects. "
-        "Always connect your reasoning with the specific content of the question and with what is visible in the frontier image. "
-        "Avoid vague reasons such as 'explore more' or 'see what is there'. "
-        "Instead, provide clear, question-focused reasoning such as 'Frontier 2 There is a visible door that may lead to the kitchen, where the object in the question is likely to be found.' "
+        "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable, or to refuse to choose. "
+    )
+    text += (
+        "You should select the frontier that is MOST likely to lead you closer to answering the question, based on visible clues, semantic hints, or the likely location of the target object. "
+        "Your reasoning should connect the current question to what you can see or infer from the frontier images, focusing on which direction seems most promising for finding the information needed to answer. "
+    )
+    text += (
+        "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
+    )
+    text += (
+        "Note that when you choose a frontier to answer the question: (1) You should provide a clear and specific reason related to the question. Do not mention words like 'frontier', 'on the left of the image', etc. "
         "You must only choose from the provided Frontier indices. Do not make up an index that is not listed above. "
     )
+    text += (
+        "(2) You may also consider information from other frontiers and egocentric views to help your decision, but you must always select the single most relevant frontier for progressing towards answering the question. Again, only choose from the provided Frontier indices and do not create any indices that are not listed above. "
+    )
+
 
 
     content.append((text,))
@@ -302,11 +309,12 @@ def format_explore_prompt_snapshot(
     use_snapshot_class=True,
     image_goal=None,
     ):
-    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose either a Snapshot as the answer or a Frontier to further explore. "
+    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. "
+    sys_prompt += "To answer the question, you are required to choose a Snapshot and provide your answer based on it. "
     sys_prompt += "Definitions: "
     sys_prompt += "Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. "
-    sys_prompt += "If you choose a Snapshot, you need to directly give an answer to the question. If you don't have enough information to give an answer, then don't choose a Snapshot. "
-    sys_prompt += "If none of the snapshots is sufficient, reply with 'No Snapshot is available'."
+    sys_prompt += "You should always try to select a Snapshot and answer the question directly based on the information it provides. "
+    sys_prompt += "Only if you are absolutely sure that none of the Snapshots contain enough information should you reply with 'No Snapshot is available'."
     # sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
     # sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore. "
 
@@ -349,14 +357,28 @@ def format_explore_prompt_snapshot(
     # 5 here is the format of the answer
     text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
     text += (
-        "You should always try your best to select one of the provided Snapshots and give a direct, concrete answer to the question itself, not just describe the image. "
-        "Use all available visual and object class information to make your answer as complete and precise as possible, even if you have to make a reasonable guess based on the snapshot. "
-        "Your answer should be phrased as if you are telling someone the actual answer, not just listing what you see. "
-        "For example, instead of 'Snapshot 0 A bowl is visible', say 'Snapshot 0 The bowl is on the dining table.' "
-        "Avoid being over-conservative. If any snapshot contains even partial or likely information to answer the question, you MUST choose that snapshot and provide your best possible answer. "
-        "Only if you are absolutely sure that NONE of the provided snapshots contains enough information, you may reply with 'No Snapshot is available', and briefly state the main reason. "
+        "You should always select one of the provided Snapshots and answer the question as directly and specifically as possible, using all available visual and object information from the Snapshot. "
+        "Only if you are absolutely certain that NONE of the Snapshots contains enough information to even make a reasonable guess, may you reply with 'No Snapshot is available'. "
+    )
+    text += (
+        "When answering, do NOT just describe the image. Instead, write your answer as if you are telling someone the real answer to the question, in a complete sentence. "
+        "For example, instead of 'Snapshot 0 A bowl is visible', you should write 'Snapshot 0 The fruit bowl is on the kitchen counter.' "
+    )
+    text += (
+        "If, and only if, none of the Snapshots is sufficient, you can return: 'No Snapshot is available.' "
+    )
+    text += (
+        "Note that if you choose a Snapshot to answer the question: "
+        "(1) You must provide a clear and direct answer to the question that can be understood without referring to the image. "
+        "Do not mention words like 'snapshot', 'on the left of the image', etc. "
         "You must only choose from the provided Snapshot indices. Do not make up an index that is not listed above. "
     )
+    text += (
+        "(2) You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot. "
+        "Again, only choose from the provided Snapshot indices and do not create any indices that are not listed above. "
+    )
+
+    content.append((text,))
 
 
     content.append((text,))

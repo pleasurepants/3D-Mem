@@ -49,7 +49,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="qwen",  # gpt-4o
+                model="internvl",  # gpt-4o
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
@@ -340,7 +340,7 @@ def format_explore_prompt_snapshot(
 
 
     # 5 here is the format of the answer
-    text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
+    text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshotr you choose. "
     text += "You should always try your best to select one of the provided Snapshots and give a direct answer. Only if you are absolutely sure that NONE of the provided snapshots contains enough information, you may reply with 'No Snapshot is available'. "
     text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
     text += "For another example, if you think none of the snapshots is sufficient, you can return 'No Snapshot is available'. "
@@ -544,11 +544,11 @@ def explore_step(step, cfg, verbose=False):
         snapshot_id_mapping,
     ) = get_step_info(step, verbose)
 
-    # ==== Step 1: snapshot prompt ====
+    # ==== Step 1: 先用 snapshot prompt ====
     sys_prompt, content = format_explore_prompt_snapshot(
         question,
         egocentric_imgs,
-        frontier_imgs,  # 可以为空
+        frontier_imgs,  # 不用也可以留空
         snapshot_imgs,
         snapshot_classes,
         egocentric_view=step.get("use_egocentric_views", False),
@@ -568,6 +568,7 @@ def explore_step(step, cfg, verbose=False):
     retry_bound = 3
     for _ in range(retry_bound):
         full_response = call_openai_api(sys_prompt, content)
+
         if full_response is None:
             print("call_openai_api (snapshot) returns None, retrying")
             continue
@@ -576,32 +577,26 @@ def explore_step(step, cfg, verbose=False):
             full_response = " ".join(full_response)
         full_response = full_response.strip().lower()
 
-        # snapshot合规判定
+        # 只要不是 "no snapshot is available"，就认为选了 snapshot
         if full_response.startswith("snapshot"):
             tokens = full_response.split()
             if len(tokens) >= 2 and tokens[1].isdigit():
-                idx = int(tokens[1])
-                if 0 <= idx < len(snapshot_imgs):
-                    response = f"{tokens[0]} {tokens[1]}"
-                    reason = " ".join(tokens[2:]).strip()
-                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
-                else:
-                    print(f"Snapshot index out of range: {tokens[1]}")
-                    continue
-        elif "no snapshot is available" in full_response:
-            # 明确拒绝，直接进入frontier
-            break
+                response = f"{tokens[0]} {tokens[1]}"
+                reason = " ".join(tokens[2:]).strip()
+                return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+        elif "no" in full_response:
+            break  # 明确无法回答，进入frontier阶段
         else:
             print(f"Unrecognized snapshot response: {full_response}")
             continue
 
-    # ==== Step 2: frontier prompt ====
+    # ==== Step 2: 再用 frontier prompt ====
     sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
         frontier_imgs,
-        snapshot_imgs,
-        snapshot_classes,
+        snapshot_imgs,  
+        snapshot_classes,  
         egocentric_view=step.get("use_egocentric_views", False),
         use_snapshot_class=True,
         image_goal=image_goal,
@@ -618,6 +613,7 @@ def explore_step(step, cfg, verbose=False):
 
     for _ in range(retry_bound):
         full_response = call_openai_api(sys_prompt, content)
+
         if full_response is None:
             print("call_openai_api (frontier) returns None, retrying")
             continue
@@ -629,17 +625,12 @@ def explore_step(step, cfg, verbose=False):
         if full_response.startswith("frontier"):
             tokens = full_response.split()
             if len(tokens) >= 2 and tokens[1].isdigit():
-                idx = int(tokens[1])
-                if 0 <= idx < len(frontier_imgs):
-                    response = f"{tokens[0]} {tokens[1]}"
-                    reason = " ".join(tokens[2:]).strip()
-                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
-                else:
-                    print(f"Frontier index out of range: {tokens[1]}")
-                    continue
+                response = f"{tokens[0]} {tokens[1]}"
+                reason = " ".join(tokens[2:]).strip()
+                return response, snapshot_id_mapping, reason, len(snapshot_imgs)
         else:
             print(f"Unrecognized frontier response: {full_response}")
             continue
 
-    # 如果都失败，返回None
+    # 如果还没得到结果
     return None, snapshot_id_mapping, None, len(snapshot_imgs)
