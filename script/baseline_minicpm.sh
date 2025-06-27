@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=m_bl_2
+#SBATCH --job-name=s_one_f_still
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
 #SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-3,worker-4,worker-8,worker-9,worker-7
-#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/minicpm/baseline_two-%j.out
+#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/minicpm/s_one_f_still-%j.out
 #SBATCH --partition all
 
 echo "=== JOB START ==="
