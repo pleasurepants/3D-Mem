@@ -271,6 +271,31 @@ def format_explore_prompt_frontier(
             content.append((" ",))
 
     # 5 here is the format of the answer
+
+
+
+    # 7
+    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index you choose. "
+    text += "You must select one of the provided Frontier indices. Choose the frontier most likely to lead to the answer, and briefly explain why it is helpful for answering the question. "
+    text += "For example: 'Frontier 1 There is a door that may lead to the kitchen, where the answer might be found.' "
+    text += "Only use the provided indices. Do not make up new indices."
+
+
+
+
+
+
+    # 6
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    # text += "You MUST select one of the provided Frontier indices. Do NOT say that none is suitable or refuse to choose. "
+    # text += "Choose the frontier that is most likely to help you answer the question, based on where the target object or information is likely to be found. "
+    # text += "Give a short and specific reason directly related to the question. Do not use vague phrases such as 'to explore more' or 'see what is there'. "
+    # text += "For example: 'Frontier 1 There is a doorway that may lead to the kitchen, where the object in the question could be.' "
+    # text += "Only use the provided Frontier indices. Do not invent any index that is not listed above."
+
+
+
+    # 5
     # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
     # text += (
     #     "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable, or to refuse to choose. "
@@ -289,13 +314,15 @@ def format_explore_prompt_frontier(
     # text += (
     #     "(2) You may also consider information from other frontiers and egocentric views to help your decision, but you must always select the single most relevant frontier for progressing towards answering the question. Again, only choose from the provided Frontier indices and do not create any indices that are not listed above. "
     # )
-    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
-    text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
-    text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
-    text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
-    text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
-    text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
-    text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question. Only choose from the provided Frontier indices and do not create any indices that are not listed above. "
+
+    # 4
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
+    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
+    # text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
+    # text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
+    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
+    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question. Only choose from the provided Frontier indices and do not create any indices that are not listed above. "
 
 
 
@@ -602,8 +629,63 @@ def clean_reason(reason):
 
 
 
+def format_frontier_single_prompt(
+    question,
+    egocentric_imgs,
+    frontier_img,
+    egocentric_view=False,
+    image_goal=None,
+):
+    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. "
+    sys_prompt += "To answer the question, you are required to judge whether this Frontier should be selected to further explore. "
+    sys_prompt += "Definitions: "
+    sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. "
+    sys_prompt += "Selecting a frontier means that you will further explore that direction. "
+
+    content = []
+    text = f"Question: {question}"
+    if image_goal is not None:
+        content.append((text, image_goal))
+        content.append((" ",))
+    else:
+        content.append((text + " ",))
+
+    # egocentric视角可选
+    if egocentric_view and len(egocentric_imgs) > 0:
+        text = "The following is the egocentric view of the agent in forward direction: "
+        content.append((text, egocentric_imgs[-1]))
+        content.append((" ",))
+
+    # 只给当前frontier
+    text = "Here is the Frontier you need to evaluate: "
+    content.append((text, frontier_img))
+    content.append((" ",))
+
+    # 0
+    # text = "Please answer in exactly one of the following two formats:\n"
+    # text += "Yes\n[State the reason why exploring this frontier is likely to help answer the question]\n"
+    # text += "or\n"
+    # text += "No\n[State the reason why exploring this frontier is unlikely to help answer the question]\n"
+    # text += "Write your answer as a complete sentence focused on whether this frontier could lead to finding the answer, not just describing the current image. "
+    # text += "Be as proactive as possible: select 'Yes' if there is any meaningful hint that this direction could help answer the question, even if the answer is not immediately obvious. "
+    # text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen, which is relevant to the question.\n"
+    # text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question.\n"
+    # text += "Only answer 'Yes' if you believe this frontier is helpful for progressing toward the answer. Otherwise, answer 'No'."
+
+    # 1
+    text = "Please answer in exactly one of the following two formats:\n"
+    text += "Yes\n[Explain why exploring this frontier could help answer the question]\n"
+    text += "or\n"
+    text += "No\n[Explain why exploring this frontier would not help answer the question]\n"
+    text += "Be proactive, but only answer 'Yes' if you see a real possibility to find clues or the answer. Only answer 'No' if you are confident this direction is not helpful at all. "
+    text += "Do not always say 'Yes' or 'No'; decide carefully based on the scene.\n"
+    text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen.\n"
+    text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question."
 
 
+    content.append((text,))
+
+    return sys_prompt, content
 
 
 
@@ -673,6 +755,46 @@ def explore_step(step, cfg, verbose=False):
             continue
 
     # ==== Step 2: frontier prompt ====
+    for i, frontier_img in enumerate(frontier_imgs):
+        sys_prompt, content = format_frontier_single_prompt(
+            question,
+            egocentric_imgs,
+            frontier_img,
+            egocentric_view=step.get("use_egocentric_views", False),
+            image_goal=image_goal,
+        )
+        if verbose:
+            logging.info(f"Input prompt (single frontier {i}):")
+            message = sys_prompt
+            for c in content:
+                message += c[0]
+                if len(c) == 2:
+                    message += f"[{c[1][:10]}...]"
+            logging.info(message)
+        for attempt in range(retry_bound):
+            full_response = call_openai_api(sys_prompt, content)
+            if full_response is None:
+                print("call_openai_api (single frontier) returns None, retrying")
+                continue
+            resp = full_response.strip().lower()
+            lines = [line.strip() for line in resp.split('\n') if line.strip()]
+            first_line = lines[0] if len(lines) > 0 else ""
+            if first_line == "yes":
+                reason = " ".join(lines[1:]) if len(lines) > 1 else ""
+                reason = clean_reason(reason)
+                return f"frontier {i}", snapshot_id_mapping, reason, len(snapshot_imgs)
+            elif first_line == "no":
+                reason = " ".join(lines[1:]) if len(lines) > 1 else ""
+                if verbose:
+                    logging.info(f"frontier {i} -> No (attempt {attempt+1}), reason: {reason}")
+                break
+            else:
+                if verbose:
+                    logging.warning(f"frontier {i} unrecognized response: '{first_line}', retrying...")
+                continue
+
+
+    # ==== Step 2b: 如果都没选出来，再用整体frontier prompt兜底 ====
     sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
@@ -685,7 +807,7 @@ def explore_step(step, cfg, verbose=False):
     )
 
     if verbose:
-        logging.info(f"Input prompt (frontier):")
+        logging.info(f"Input prompt (frontier ALL):")
         message = sys_prompt
         for c in content:
             message += c[0]
@@ -696,7 +818,7 @@ def explore_step(step, cfg, verbose=False):
     for _ in range(retry_bound):
         full_response = call_openai_api(sys_prompt, content)
         if full_response is None:
-            print("call_openai_api (frontier) returns None, retrying")
+            print("call_openai_api (frontier ALL) returns None, retrying")
             continue
 
         if isinstance(full_response, list):
@@ -719,5 +841,5 @@ def explore_step(step, cfg, verbose=False):
             print(f"Unrecognized frontier response: {full_response}")
             continue
 
-    # 如果都失败，返回None
+    # 如果兜底也失败，返回None
     return None, snapshot_id_mapping, None, len(snapshot_imgs)
