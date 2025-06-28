@@ -845,10 +845,15 @@ def explore_step(step, cfg, verbose=False):
             if first_line == "yes":
                 # 标准情况，第二行是答案
                 answer = lines[1].strip() if len(lines) > 1 else ""
+                print("full_response:", full_response, flush=True)
+
                 return f"snapshot {i}", snapshot_id_mapping, answer, len(snapshot_imgs)
+            
             elif first_line == "no":
                 # 第二行是reason（一般你不用返回，但你也可以log下来）
                 reason = lines[1].strip() if len(lines) > 1 else ""
+                # print("full_response:", full_response, flush=True)
+
                 if verbose:
                     logging.info(f"snapshot {i} -> No (attempt {attempt+1}), reason: {reason}")
                 break
