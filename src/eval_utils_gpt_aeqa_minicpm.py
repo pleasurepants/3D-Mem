@@ -682,22 +682,22 @@ def format_prompt_one_by_one(
 
 
     # 3
-    text += "Please answer in exactly one of the following two formats:\n"
-    text += "Yes\n[A single complete sentence that directly and specifically answers the question. "
-    text += "If the question involves locations, spatial relations, object states (such as open/closed, on/off), or object attributes (such as color, size, material), your answer must clearly describe the relevant information. "
-    text += "Do NOT include any reference to the image, snapshot, or phrases like 'Based on the image', 'In the picture', or similar.]\n"
-    text += "or\n"
-    text += "No\n[Briefly state the reason you cannot answer based on this image, in one short sentence.]\n"
-    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
-    text += "For example:\n"
-    text += "Yes\nThe microwave is located above the refrigerator.\n"
-    text += "Yes\nThe door is open.\n"
-    text += "Yes\nThe pillow is blue.\n"
-    text += "or\nNo\nThere is no microwave or refrigerator visible.\n"
-    text += "No\nThe state of the door cannot be determined.\n"
-    text += "No\nThe color of the pillow is not visible.\n"
-    text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this snapshot. "
-    text += "Note: Do NOT mention words like 'snapshot', 'image', 'picture', camera angles, or positions in your answer. Only output the direct answer."
+    # text += "Please answer in exactly one of the following two formats:\n"
+    # text += "Yes\n[A single complete sentence that directly and specifically answers the question. "
+    # text += "If the question involves locations, spatial relations, object states (such as open/closed, on/off), or object attributes (such as color, size, material), your answer must clearly describe the relevant information. "
+    # text += "Do NOT include any reference to the image, snapshot, or phrases like 'Based on the image', 'In the picture', or similar.]\n"
+    # text += "or\n"
+    # text += "No\n[Briefly state the reason you cannot answer based on this image, in one short sentence.]\n"
+    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
+    # text += "For example:\n"
+    # text += "Yes\nThe microwave is located above the refrigerator.\n"
+    # text += "Yes\nThe door is open.\n"
+    # text += "Yes\nThe pillow is blue.\n"
+    # text += "or\nNo\nThere is no microwave or refrigerator visible.\n"
+    # text += "No\nThe state of the door cannot be determined.\n"
+    # text += "No\nThe color of the pillow is not visible.\n"
+    # text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this snapshot. "
+    # text += "Note: Do NOT mention words like 'snapshot', 'image', 'picture', camera angles, or positions in your answer. Only output the direct answer."
 
     # 4
     # text += "Please answer in exactly one of the following two formats:\n"
@@ -715,6 +715,25 @@ def format_prompt_one_by_one(
     # text += "No\nThe color of the pillow is not visible.\n"
     # text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this Snapshot. "
     # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+
+
+    # 5
+    text += "Please answer in exactly one of the following two formats:\n"
+    text += "Yes\n[A single complete sentence that directly answers the question. You MUST provide a specific answer after 'Yes'. Never answer only with 'Yes' or leave it blank.]\n"
+    text += "or\n"
+    text += "No\n[A single complete sentence that clearly states the reason you cannot answer based on this image. You MUST provide a reason after 'No'. Never answer only with 'No', only an index, or leave it blank.]\n"
+    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Briefly state the reason you cannot answer, in one short sentence.\n"
+    text += "For example:\n"
+    text += "Yes\nThe fruit bowl is on the kitchen counter.\n"
+    text += "No\nThe image does not contain any fruit bowl or kitchen counter.\n"
+    text += "Incorrect answers (not allowed):\n"
+    text += "Yes\n"
+    text += "No\n"
+    text += "snapshot 0\n"
+    text += "No reason provided\n"
+    text += "(blank)\n"
+    text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this snapshot. "
+    text += "Note: Do NOT include any reference to the image, snapshot, or phrases like 'Based on the image', 'In the picture', or similar."
 
 
 
