@@ -414,12 +414,12 @@ def format_explore_prompt_snapshot(
 
 
     # 0
-    # text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
-    # text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
-    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Do not mention words like 'snapshot', 'on the left of the image', etc. "
-    # text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
-    # text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
-    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+    text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
+    text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
+    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Do not mention words like 'snapshot', 'on the left of the image', etc. "
+    text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
+    text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
+    text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
 
     # 1
     # text = "Please provide your answer in exactly one of the following two formats: 'Snapshot i [Your complete answer as a full sentence]' or 'No Snapshot is available'. "
@@ -433,20 +433,20 @@ def format_explore_prompt_snapshot(
     # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
 
     # 2
-    text = "Please answer in exactly one of the following two formats:\n"
-    text += "Snapshot i [Your complete answer as a full sentence]\n"
-    text += "or\n"
-    text += "No Snapshot is available\n"
-    text += "If you select a Snapshot, you MUST provide a specific, complete answer to the question, not a refusal or uncertainty.\n"
-    text += "NEVER combine a Snapshot index with any phrase like 'not available', 'no snapshot', 'cannot answer', or 'unknown'.\n"
-    text += "For example:\n"
-    text += "Snapshot 0 The fruit bowl is on the kitchen counter.\n"
-    text += "or\n"
-    text += "No Snapshot is available.\n"
-    text += "INCORRECT EXAMPLES (DO NOT USE):\n"
-    text += "Snapshot 0 No Snapshot is available.\n"
-    text += "You may ONLY reply 'No Snapshot is available' if NONE of the Snapshots allow you to answer the question at all. Do not use any other format.\n"
-    text += "Do not mention words like 'snapshot', 'in the image', or image positions in your answer, except as specified in the format."
+    # text = "Please answer in exactly one of the following two formats:\n"
+    # text += "Snapshot i [Your complete answer as a full sentence]\n"
+    # text += "or\n"
+    # text += "No Snapshot is available\n"
+    # text += "If you select a Snapshot, you MUST provide a specific, complete answer to the question, not a refusal or uncertainty.\n"
+    # text += "NEVER combine a Snapshot index with any phrase like 'not available', 'no snapshot', 'cannot answer', or 'unknown'.\n"
+    # text += "For example:\n"
+    # text += "Snapshot 0 The fruit bowl is on the kitchen counter.\n"
+    # text += "or\n"
+    # text += "No Snapshot is available.\n"
+    # text += "INCORRECT EXAMPLES (DO NOT USE):\n"
+    # text += "Snapshot 0 No Snapshot is available.\n"
+    # text += "You may ONLY reply 'No Snapshot is available' if NONE of the Snapshots allow you to answer the question at all. Do not use any other format.\n"
+    # text += "Do not mention words like 'snapshot', 'in the image', or image positions in your answer, except as specified in the format."
 
 
 
@@ -679,6 +679,145 @@ def king_of_the_hill_frontier(
     return current_winner, reason
 
 
+def format_prompt_one_by_one(
+    question,
+    snapshot_img,
+    idx,
+    snapshot_classes=None,
+    egocentric_imgs=None,
+    egocentric_view=False,
+    image_goal=None,
+    use_snapshot_class=True,
+):
+
+    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. "
+    sys_prompt += "To answer the question, you need to decide if this snapshot provides enough information for you to answer. "
+    sys_prompt += "Definitions: "
+    sys_prompt += "snapshot: A focused observation of several objects. "
+    sys_prompt += "If you can find reasonable clues in the image, try to answer the question. "
+    sys_prompt += "Only reply 'No' if you are confident that this image really cannot help answer the question. "
+
+    content = []
+    # 1 问题
+    text = f"Question: {question}"
+    if image_goal is not None:
+        content.append((text, image_goal))
+        text = ""
+        text += " "
+        content.append((text,))
+    else:
+        text += " "
+        content.append((text,))
+
+    # 2 egocentric view
+    if egocentric_view and egocentric_imgs is not None and len(egocentric_imgs) > 0:
+        text = ""
+        text += "The following is the egocentric view of the agent in forward direction: "
+        content.append((text, egocentric_imgs[-1]))
+        text = ""
+        text += " "
+        content.append((text,))
+
+    # 3 当前这张 snapshot 图像和类别
+    text = ""
+    text += f"snapshot {idx} (followed with contained object classes):"
+    content.append((text, snapshot_img))
+    if use_snapshot_class and snapshot_classes is not None:
+        text = ""
+        text += ", ".join(snapshot_classes)
+        content.append((text,))
+    text = ""
+    text += " "
+    content.append((text,))
+
+    # 0
+    # text += "Please answer in exactly one of the following two formats:\n"
+    # text += "Yes\n[Your complete answer as a full sentence]\n"
+    # text += "or\n"
+    # text += "No\n[Briefly state the reason you cannot answer based on this image]\n"
+    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
+    # text += "For example:\nYes\nThe fruit bowl is on the kitchen counter.\n"
+    # text += "or\nNo\nThe image does not contain any fruit bowl or kitchen counter.\n"
+    # text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this Snapshot. "
+    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+
+    # 2
+    # text += "Please answer in exactly one of the following two formats:\n"
+    # text += "Yes\n[A single complete sentence that answers the question directly.]\n"
+    # text += "or\n"
+    # text += "No\n[Briefly state the reason you cannot answer based on this image]\n"
+    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Briefly state the reason you cannot answer, in one short sentence."
+    # text += "For example:\nYes\nThe fruit bowl is on the kitchen counter.\n"
+    # text += "or\nNo\nThe image does not contain any fruit bowl or kitchen counter.\n"
+    # text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this snapshot. "
+    # text += "Note:  Do NOT include any reference to the image, snapshot, or phrases like 'Based on the image', 'In the picture', or similar."
+
+
+    # 3
+    text += "Please answer in exactly one of the following two formats:\n"
+    text += "Yes\n[A single complete sentence that directly and specifically answers the question. "
+    text += "If the question involves locations, spatial relations, object states (such as open/closed, on/off), or object attributes (such as color, size, material), your answer must clearly describe the relevant information. "
+    text += "Do NOT include any reference to the image, snapshot, or phrases like 'Based on the image', 'In the picture', or similar.]\n"
+    text += "or\n"
+    text += "No\n[Briefly state the reason you cannot answer based on this image, in one short sentence.]\n"
+    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
+    text += "For example:\n"
+    text += "Yes\nThe microwave is located above the refrigerator.\n"
+    text += "Yes\nThe door is open.\n"
+    text += "Yes\nThe pillow is blue.\n"
+    text += "or\nNo\nThere is no microwave or refrigerator visible.\n"
+    text += "No\nThe state of the door cannot be determined.\n"
+    text += "No\nThe color of the pillow is not visible.\n"
+    text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this snapshot. "
+    text += "Note: Do NOT mention words like 'snapshot', 'image', 'picture', camera angles, or positions in your answer. Only output the direct answer."
+
+    # 4
+    # text += "Please answer in exactly one of the following two formats:\n"
+    # text += "Yes\n[Your complete answer as a full sentence. If the question involves location, spatial relation, object state (such as open/closed, on/off), or object attribute (such as color, size, material), you must clearly specify this information in your answer. Do not include phrases like 'Based on the image', 'In the picture', or similar.]\n"
+    # text += "or\n"
+    # text += "No\n[Briefly state the reason you cannot answer based on this image, in one short sentence.]\n"
+    # text += "You should choose 'Yes' and give a direct answer whenever you can make a reasonable judgment from the image. Only choose 'No' if you are truly unable to determine the answer from this Snapshot.\n"
+    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image.\n"
+    # text += "For example:\n"
+    # text += "Yes\nThe microwave is located above the refrigerator.\n"
+    # text += "Yes\nThe door is open.\n"
+    # text += "Yes\nThe pillow is blue.\n"
+    # text += "or\nNo\nThere is no microwave or refrigerator visible.\n"
+    # text += "No\nThe state of the door cannot be determined.\n"
+    # text += "No\nThe color of the pillow is not visible.\n"
+    # text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this Snapshot. "
+    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+
+
+    # 5
+    # text += "Please answer in exactly one of the following two formats:\n"
+    # text += "Yes\n[A single complete sentence that directly answers the question. You MUST provide a specific answer after 'Yes'. Never answer only with 'Yes' or leave it blank.]\n"
+    # text += "or\n"
+    # text += "No\n[A single complete sentence that clearly states the reason you cannot answer based on this image. You MUST provide a reason after 'No'. Never answer only with 'No', only an index, or leave it blank.]\n"
+    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Briefly state the reason you cannot answer, in one short sentence.\n"
+    # text += "For example:\n"
+    # text += "Yes\nThe fruit bowl is on the kitchen counter.\n"
+    # text += "No\nThe image does not contain any fruit bowl or kitchen counter.\n"
+    # text += "Incorrect answers (not allowed):\n"
+    # text += "Yes\n"
+    # text += "No\n"
+    # text += "snapshot 0\n"
+    # text += "No reason provided\n"
+    # text += "(blank)\n"
+    # text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this snapshot. "
+    # text += "Note: Do NOT include any reference to the image, snapshot, or phrases like 'Based on the image', 'In the picture', or similar."
+
+
+
+    content.append((text,))
+
+    return sys_prompt, content
+
+
+
+
+
+
 def explore_step(step, cfg, verbose=False):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
@@ -693,57 +832,108 @@ def explore_step(step, cfg, verbose=False):
     ) = get_step_info(step, verbose)
 
     # ==== Step 1: snapshot prompt ====
-    sys_prompt, content = format_explore_prompt_snapshot(
-        question,
-        egocentric_imgs,
-        frontier_imgs,  # 可以为空
-        snapshot_imgs,
-        snapshot_classes,
-        egocentric_view=step.get("use_egocentric_views", False),
-        use_snapshot_class=True,
-        image_goal=image_goal,
-    )
+    # sys_prompt, content = format_explore_prompt_snapshot(
+    #     question,
+    #     egocentric_imgs,
+    #     frontier_imgs,  # 可以为空
+    #     snapshot_imgs,
+    #     snapshot_classes,
+    #     egocentric_view=step.get("use_egocentric_views", False),
+    #     use_snapshot_class=True,
+    #     image_goal=image_goal,
+    # )
 
-    if verbose:
-        logging.info(f"Input prompt (snapshot):")
-        message = sys_prompt
-        for c in content:
-            message += c[0]
-            if len(c) == 2:
-                message += f"[{c[1][:10]}...]"
-        logging.info(message)
+    # if verbose:
+    #     logging.info(f"Input prompt (snapshot):")
+    #     message = sys_prompt
+    #     for c in content:
+    #         message += c[0]
+    #         if len(c) == 2:
+    #             message += f"[{c[1][:10]}...]"
+    #     logging.info(message)
 
+    # retry_bound = 3
+    # for _ in range(retry_bound):
+    #     full_response = call_openai_api(sys_prompt, content)
+    #     if full_response is None:
+    #         print("call_openai_api (snapshot) returns None, retrying")
+    #         continue
+
+    #     if isinstance(full_response, list):
+    #         full_response = " ".join(full_response)
+    #     full_response = full_response.strip().lower()
+
+    #     # snapshot合规判定
+    #     if full_response.startswith("snapshot"):
+    #         tokens = full_response.split()
+    #         if len(tokens) >= 2 and tokens[1].isdigit():
+    #             idx = int(tokens[1])
+    #             if 0 <= idx < len(snapshot_imgs):
+    #                 response = f"{tokens[0]} {tokens[1]}"
+    #                 reason = " ".join(tokens[2:]).strip()
+    #                 reason = clean_reason(reason)  
+    #                 print("full_response:", full_response)
+    #                 return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+    #             else:
+    #                 print(f"Snapshot index out of range: {tokens[1]}")
+    #                 continue
+    #     elif "no snapshot is available" in full_response:
+    #         # 明确拒绝，直接进入frontier
+    #         break
+    #     else:
+    #         print(f"Unrecognized snapshot response: {full_response}")
+    #         continue
+
+
+
+    #step1 one by one
     retry_bound = 3
-    for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
-        if full_response is None:
-            print("call_openai_api (snapshot) returns None, retrying")
-            continue
+    for i, img_b64 in enumerate(snapshot_imgs):
+        if verbose:
+            logging.info(f"Start trying snapshot {i} with up to {retry_bound} retries")
+        for attempt in range(retry_bound):
+            sys_prompt, content = format_prompt_one_by_one(
+                question,
+                img_b64,
+                i,
+                snapshot_classes=snapshot_classes[i] if snapshot_classes else None,
+                egocentric_imgs=egocentric_imgs,
+                egocentric_view=step.get("use_egocentric_views", False),
+                image_goal=image_goal,
+            )
+            if verbose:
+                logging.info(f"snapshot {i}, attempt {attempt+1}")
+            full_response = call_openai_api(sys_prompt, content)
+            if full_response is None:
+                continue
+            lines = full_response.strip().splitlines()
+            if not lines:
+                continue  # 空回复
 
-        if isinstance(full_response, list):
-            full_response = " ".join(full_response)
-        full_response = full_response.strip().lower()
+            first_line = lines[0].strip().lower()
 
-        # snapshot合规判定
-        if full_response.startswith("snapshot"):
-            tokens = full_response.split()
-            if len(tokens) >= 2 and tokens[1].isdigit():
-                idx = int(tokens[1])
-                if 0 <= idx < len(snapshot_imgs):
-                    response = f"{tokens[0]} {tokens[1]}"
-                    reason = " ".join(tokens[2:]).strip()
-                    reason = clean_reason(reason)  
-                    print("full_response:", full_response)
-                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
-                else:
-                    print(f"Snapshot index out of range: {tokens[1]}")
-                    continue
-        elif "no snapshot is available" in full_response:
-            # 明确拒绝，直接进入frontier
-            break
-        else:
-            print(f"Unrecognized snapshot response: {full_response}")
-            continue
+            if first_line == "yes":
+                # 标准情况，第二行是答案
+                answer = lines[1].strip() if len(lines) > 1 else ""
+                print("full_response:", full_response, flush=True)
+
+                return f"snapshot {i}", snapshot_id_mapping, answer, len(snapshot_imgs)
+            
+            elif first_line == "no":
+                # 第二行是reason（一般你不用返回，但你也可以log下来）
+                reason = lines[1].strip() if len(lines) > 1 else ""
+                # print("full_response:", full_response, flush=True)
+
+                if verbose:
+                    logging.info(f"snapshot {i} -> No (attempt {attempt+1}), reason: {reason}")
+                break
+            else:
+                if verbose:
+                    logging.warning(f"snapshot {i} unrecognized response: '{first_line}', retrying...")
+                continue
+
+
+
 
 
 
