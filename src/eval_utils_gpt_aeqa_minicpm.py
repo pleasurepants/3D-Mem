@@ -411,12 +411,28 @@ def format_explore_prompt_snapshot(
     #     "(2) You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot. "
     #     "Again, only choose from the provided Snapshot indices and do not create any indices that are not listed above. "
     # )
-    text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
-    text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
-    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Do not mention words like 'snapshot', 'on the left of the image', etc. "
-    text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
+
+    # 0 
+    # text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
+    # text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
+    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Do not mention words like 'snapshot', 'on the left of the image', etc. "
+    # text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
+    # text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
+    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+
+
+    # 1
+    text = "Please provide your answer in exactly one of the following two formats: 'Snapshot i [Your complete answer as a full sentence]' or 'No Snapshot is available'. "
+    text += "If you select a Snapshot, you must provide a clear and direct answer to the question in a complete sentence, based on the chosen Snapshot. "
+    text += "You may only reply 'No Snapshot is available' if it is truly impossible to answer the question from any Snapshot. "
+    text += "Do not combine 'No Snapshot is available' with a Snapshot index. Never respond with 'Snapshot i No Snapshot is available'. "
+    text += "Your answer must be a complete sentence that directly answers the question, not just a description of the image. "
+    text += "For example, if you choose the first snapshot, your answer should be: 'Snapshot 0 The fruit bowl is on the kitchen counter.' "
+    text += "Or if you find no Snapshot suitable, you can simply say 'No Snapshot is available'. "
     text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
     text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+
+
 
     content.append((text,))
 
@@ -662,25 +678,25 @@ def format_frontier_single_prompt(
     content.append((" ",))
 
     # 0
-    # text = "Please answer in exactly one of the following two formats:\n"
-    # text += "Yes\n[State the reason why exploring this frontier is likely to help answer the question]\n"
-    # text += "or\n"
-    # text += "No\n[State the reason why exploring this frontier is unlikely to help answer the question]\n"
-    # text += "Write your answer as a complete sentence focused on whether this frontier could lead to finding the answer, not just describing the current image. "
-    # text += "Be as proactive as possible: select 'Yes' if there is any meaningful hint that this direction could help answer the question, even if the answer is not immediately obvious. "
-    # text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen, which is relevant to the question.\n"
-    # text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question.\n"
-    # text += "Only answer 'Yes' if you believe this frontier is helpful for progressing toward the answer. Otherwise, answer 'No'."
+    text = "Please answer in exactly one of the following two formats:\n"
+    text += "Yes\n[State the reason why exploring this frontier is likely to help answer the question]\n"
+    text += "or\n"
+    text += "No\n[State the reason why exploring this frontier is unlikely to help answer the question]\n"
+    text += "Write your answer as a complete sentence focused on whether this frontier could lead to finding the answer, not just describing the current image. "
+    text += "Be as proactive as possible: select 'Yes' if there is any meaningful hint that this direction could help answer the question, even if the answer is not immediately obvious. "
+    text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen, which is relevant to the question.\n"
+    text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question.\n"
+    text += "Only answer 'Yes' if you believe this frontier is helpful for progressing toward the answer. Otherwise, answer 'No'."
 
     # 1
-    text = "Please answer in exactly one of the following two formats:\n"
-    text += "Yes\n[Explain why exploring this frontier could help answer the question]\n"
-    text += "or\n"
-    text += "No\n[Explain why exploring this frontier would not help answer the question]\n"
-    text += "Be proactive, but only answer 'Yes' if you see a real possibility to find clues or the answer. Only answer 'No' if you are confident this direction is not helpful at all. "
-    text += "Do not always say 'Yes' or 'No'; decide carefully based on the scene.\n"
-    text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen.\n"
-    text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question."
+    # text = "Please answer in exactly one of the following two formats:\n"
+    # text += "Yes\n[Explain why exploring this frontier could help answer the question]\n"
+    # text += "or\n"
+    # text += "No\n[Explain why exploring this frontier would not help answer the question]\n"
+    # text += "Be proactive, but only answer 'Yes' if you see a real possibility to find clues or the answer. Only answer 'No' if you are confident this direction is not helpful at all. "
+    # text += "Do not always say 'Yes' or 'No'; decide carefully based on the scene.\n"
+    # text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen.\n"
+    # text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question."
 
 
     content.append((text,))
