@@ -414,23 +414,40 @@ def format_explore_prompt_snapshot(
 
 
     # 0
-    # text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
-    # text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
-    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Do not mention words like 'snapshot', 'on the left of the image', etc. "
-    # text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
+    text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
+    text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
+    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Do not mention words like 'snapshot', 'on the left of the image', etc. "
+    text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
+    text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
+    text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+
+    # 1
+    # text = "Please provide your answer in exactly one of the following two formats: 'Snapshot i [Your complete answer as a full sentence]' or 'No Snapshot is available'. "
+    # text += "If you select a Snapshot, you must provide a clear and direct answer to the question in a complete sentence, based on the chosen Snapshot. "
+    # text += "You may only reply 'No Snapshot is available' if it is truly impossible to answer the question from any Snapshot. "
+    # text += "Do not combine 'No Snapshot is available' with a Snapshot index. Never respond with 'Snapshot i No Snapshot is available'. "
+    # text += "Your answer must be a complete sentence that directly answers the question, not just a description of the image. "
+    # text += "For example, if you choose the first snapshot, your answer should be: 'Snapshot 0 The fruit bowl is on the kitchen counter.' "
+    # text += "Or if you find no Snapshot suitable, you can simply say 'No Snapshot is available'. "
     # text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
     # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
 
-    # 1
-    text = "Please provide your answer in exactly one of the following two formats: 'Snapshot i [Your complete answer as a full sentence]' or 'No Snapshot is available'. "
-    text += "If you select a Snapshot, you must provide a clear and direct answer to the question in a complete sentence, based on the chosen Snapshot. "
-    text += "You may only reply 'No Snapshot is available' if it is truly impossible to answer the question from any Snapshot. "
-    text += "Do not combine 'No Snapshot is available' with a Snapshot index. Never respond with 'Snapshot i No Snapshot is available'. "
-    text += "Your answer must be a complete sentence that directly answers the question, not just a description of the image. "
-    text += "For example, if you choose the first snapshot, your answer should be: 'Snapshot 0 The fruit bowl is on the kitchen counter.' "
-    text += "Or if you find no Snapshot suitable, you can simply say 'No Snapshot is available'. "
-    text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
-    text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+    # 2
+    # text = "Please answer in exactly one of the following two formats:\n"
+    # text += "Snapshot i [Your complete answer as a full sentence]\n"
+    # text += "or\n"
+    # text += "No Snapshot is available\n"
+    # text += "If you select a Snapshot, you MUST provide a specific, complete answer to the question, not a refusal or uncertainty.\n"
+    # text += "NEVER combine a Snapshot index with any phrase like 'not available', 'no snapshot', 'cannot answer', or 'unknown'.\n"
+    # text += "For example:\n"
+    # text += "Snapshot 0 The fruit bowl is on the kitchen counter.\n"
+    # text += "or\n"
+    # text += "No Snapshot is available.\n"
+    # text += "INCORRECT EXAMPLES (DO NOT USE):\n"
+    # text += "Snapshot 0 No Snapshot is available.\n"
+    # text += "You may ONLY reply 'No Snapshot is available' if NONE of the Snapshots allow you to answer the question at all. Do not use any other format.\n"
+    # text += "Do not mention words like 'snapshot', 'in the image', or image positions in your answer, except as specified in the format."
+
 
 
 
@@ -624,7 +641,7 @@ def king_of_the_hill_frontier(
     # 初始随机选出第一个王者
     current_winner = random.choice(indices)
     indices.remove(current_winner)
-
+    reason = "Only one frontier available, so it is the initial winner."
     print(f"Initial winner: Frontier {current_winner}")
 
     round_num = 1
@@ -716,6 +733,7 @@ def explore_step(step, cfg, verbose=False):
                     response = f"{tokens[0]} {tokens[1]}"
                     reason = " ".join(tokens[2:]).strip()
                     reason = clean_reason(reason)  
+                    print("full_response:", full_response)
                     return response, snapshot_id_mapping, reason, len(snapshot_imgs)
                 else:
                     print(f"Snapshot index out of range: {tokens[1]}")
