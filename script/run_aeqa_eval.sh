@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=pred-eval
+#SBATCH --job-name=gpt-2bs
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
 #SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6
-#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/pred-aeqa-eval-%j.out 
+#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/gpt/two_stage-%j.out 
 #SBATCH --partition all
 
 
@@ -23,6 +23,8 @@ which python
 
 export NCCL_P2P_DISABLE=1
 export PATH=/home/wiss/zhang/anaconda3/envs/3dmem/bin:$PATH
+export LD_LIBRARY_PATH=/home/wiss/zhang/local_cuda118/cuda_cudart/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
+export $(grep -v '^#' .env | xargs)
 
 MASTER_ADDR=localhost
 
