@@ -732,9 +732,10 @@ def format_prompt_one_by_one(
 
     # 0
     # text += "Please answer in exactly one of the following two formats:\n"
-    # text += "Yes\n[Your complete answer as a full sentence]\n"
+    # text += "Yes [Your complete answer as a full sentence]\n"
     # text += "or\n"
-    # text += "No\n[Briefly state the reason you cannot answer based on this image]\n"
+    # text += "No [Briefly state the reason you cannot answer based on this image]\n"
+    # text += "You must give a direct answer or reason that can be understood by others. "
     # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
     # text += "For example:\nYes\nThe fruit bowl is on the kitchen counter.\n"
     # text += "or\nNo\nThe image does not contain any fruit bowl or kitchen counter.\n"
@@ -755,19 +756,19 @@ def format_prompt_one_by_one(
 
     # 3
     text += "Please answer in exactly one of the following two formats:\n"
-    text += "Yes\n[A single complete sentence that directly and specifically answers the question. "
+    text += "Yes [A single complete sentence that directly and specifically answers the question. "
     text += "If the question involves locations, spatial relations, object states (such as open/closed, on/off), or object attributes (such as color, size, material), your answer must clearly describe the relevant information. "
     text += "Do NOT include any reference to the image, snapshot, or phrases like 'Based on the image', 'In the picture', or similar.]\n"
     text += "or\n"
-    text += "No\n[Briefly state the reason you cannot answer based on this image, in one short sentence.]\n"
+    text += "No [Briefly state the reason you cannot answer based on this image, in one short sentence.]\n"
     text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
     text += "For example:\n"
-    text += "Yes\nThe microwave is located above the refrigerator.\n"
-    text += "Yes\nThe door is open.\n"
-    text += "Yes\nThe pillow is blue.\n"
-    text += "or\nNo\nThere is no microwave or refrigerator visible.\n"
-    text += "No\nThe state of the door cannot be determined.\n"
-    text += "No\nThe color of the pillow is not visible.\n"
+    text += "Yes The microwave is located above the refrigerator.\n"
+    text += "Yes The door is open.\n"
+    text += "Yes The pillow is blue.\n"
+    text += "or\nNo There is no microwave or refrigerator visible.\n"
+    text += "No The state of the door cannot be determined.\n"
+    text += "No The color of the pillow is not visible.\n"
     text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this snapshot. "
     text += "Note: Do NOT mention words like 'snapshot', 'image', 'picture', camera angles, or positions in your answer. Only output the direct answer."
 
@@ -812,6 +813,69 @@ def format_prompt_one_by_one(
     content.append((text,))
 
     return sys_prompt, content
+
+
+
+def format_frontier_single_prompt(
+    question,
+    egocentric_imgs,
+    frontier_img,
+    egocentric_view=False,
+    image_goal=None,
+):
+    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. "
+    sys_prompt += "To answer the question, you are required to judge whether this Frontier should be selected to further explore. "
+    sys_prompt += "Definitions: "
+    sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. "
+    sys_prompt += "Selecting a frontier means that you will further explore that direction. "
+
+    content = []
+    text = f"Question: {question}"
+    if image_goal is not None:
+        content.append((text, image_goal))
+        content.append((" ",))
+    else:
+        content.append((text + " ",))
+
+    # egocentric视角可选
+    if egocentric_view and len(egocentric_imgs) > 0:
+        text = "The following is the egocentric view of the agent in forward direction: "
+        content.append((text, egocentric_imgs[-1]))
+        content.append((" ",))
+
+    # 只给当前frontier
+    text = "Here is the Frontier you need to evaluate: "
+    content.append((text, frontier_img))
+    content.append((" ",))
+
+    # 0
+    text = "Please answer in exactly one of the following two formats:\n"
+    text += "Yes\n[State the reason why exploring this frontier is likely to help answer the question]\n"
+    text += "or\n"
+    text += "No\n[State the reason why exploring this frontier is unlikely to help answer the question]\n"
+    text += "Write your answer as a complete sentence focused on whether this frontier could lead to finding the answer, not just describing the current image. "
+    text += "Be as proactive as possible: select 'Yes' if there is any meaningful hint that this direction could help answer the question, even if the answer is not immediately obvious. "
+    text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen, which is relevant to the question.\n"
+    text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question.\n"
+    text += "Only answer 'Yes' if you believe this frontier is helpful for progressing toward the answer. Otherwise, answer 'No'."
+
+    # 1
+    # text = "Please answer in exactly one of the following two formats:\n"
+    # text += "Yes\n[Explain why exploring this frontier could help answer the question]\n"
+    # text += "or\n"
+    # text += "No\n[Explain why exploring this frontier would not help answer the question]\n"
+    # text += "Be proactive, but only answer 'Yes' if you see a real possibility to find clues or the answer. Only answer 'No' if you are confident this direction is not helpful at all. "
+    # text += "Do not always say 'Yes' or 'No'; decide carefully based on the scene.\n"
+    # text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen.\n"
+    # text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question."
+
+
+    content.append((text,))
+
+    return sys_prompt, content
+
+
+
 
 
 
@@ -910,20 +974,21 @@ def explore_step(step, cfg, verbose=False):
             if not lines:
                 continue  # 空回复
 
-            first_line = lines[0].strip().lower()
+            first_line = lines[0].strip()
 
-            if first_line == "yes":
-                # 标准情况，第二行是答案
-                answer = lines[1].strip() if len(lines) > 1 else ""
+            if first_line.lower().startswith("yes"):
+                # 提取 "Yes "后面的内容
+                answer = first_line[3:].strip()
+                # 防止万一有换行后面还有内容
+                if not answer and len(lines) > 1:
+                    answer = lines[1].strip()
                 print("full_response:", full_response, flush=True)
-
                 return f"snapshot {i}", snapshot_id_mapping, answer, len(snapshot_imgs)
-            
-            elif first_line == "no":
-                # 第二行是reason（一般你不用返回，但你也可以log下来）
-                reason = lines[1].strip() if len(lines) > 1 else ""
-                # print("full_response:", full_response, flush=True)
 
+            elif first_line.lower().startswith("no"):
+                reason = first_line[2:].strip()
+                if not reason and len(lines) > 1:
+                    reason = lines[1].strip()
                 if verbose:
                     logging.info(f"snapshot {i} -> No (attempt {attempt+1}), reason: {reason}")
                 break
@@ -935,20 +1000,92 @@ def explore_step(step, cfg, verbose=False):
 
 
 
+    # ==== Step 2: frontier prompt ====
+    for i, frontier_img in enumerate(frontier_imgs):
+        sys_prompt, content = format_frontier_single_prompt(
+            question,
+            egocentric_imgs,
+            frontier_img,
+            egocentric_view=step.get("use_egocentric_views", False),
+            image_goal=image_goal,
+        )
+        if verbose:
+            logging.info(f"Input prompt (single frontier {i}):")
+            message = sys_prompt
+            for c in content:
+                message += c[0]
+                if len(c) == 2:
+                    message += f"[{c[1][:10]}...]"
+            logging.info(message)
+        for attempt in range(retry_bound):
+            full_response = call_openai_api(sys_prompt, content)
+            if full_response is None:
+                print("call_openai_api (single frontier) returns None, retrying")
+                continue
+            resp = full_response.strip().lower()
+            lines = [line.strip() for line in resp.split('\n') if line.strip()]
+            first_line = lines[0] if len(lines) > 0 else ""
+            if first_line == "yes":
+                reason = " ".join(lines[1:]) if len(lines) > 1 else ""
+                reason = clean_reason(reason)
+                return f"frontier {i}", snapshot_id_mapping, reason, len(snapshot_imgs)
+            elif first_line == "no":
+                reason = " ".join(lines[1:]) if len(lines) > 1 else ""
+                if verbose:
+                    logging.info(f"frontier {i} -> No (attempt {attempt+1}), reason: {reason}")
+                break
+            else:
+                if verbose:
+                    logging.warning(f"frontier {i} unrecognized response: '{first_line}', retrying...")
+                continue
 
 
-
-    # === Step 2: frontier tournament ===
-    if len(frontier_imgs) == 0:
-        return None, snapshot_id_mapping, None, len(snapshot_imgs)
-
-    winner_index, reason = king_of_the_hill_frontier(
+    # ==== Step 2b: 如果都没选出来，再用整体frontier prompt兜底 ====
+    sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
         frontier_imgs,
+        snapshot_imgs,
+        snapshot_classes,
         egocentric_view=step.get("use_egocentric_views", False),
+        use_snapshot_class=True,
         image_goal=image_goal,
-        call_api_func=call_openai_api,  # 你自己的API调用函数
     )
-    response = f"frontier {winner_index}"
-    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+
+    if verbose:
+        logging.info(f"Input prompt (frontier ALL):")
+        message = sys_prompt
+        for c in content:
+            message += c[0]
+            if len(c) == 2:
+                message += f"[{c[1][:10]}...]"
+        logging.info(message)
+
+    for _ in range(retry_bound):
+        full_response = call_openai_api(sys_prompt, content)
+        if full_response is None:
+            print("call_openai_api (frontier ALL) returns None, retrying")
+            continue
+
+        if isinstance(full_response, list):
+            full_response = " ".join(full_response)
+        full_response = full_response.strip().lower()
+
+        if full_response.startswith("frontier"):
+            tokens = full_response.split()
+            if len(tokens) >= 2 and tokens[1].isdigit():
+                idx = int(tokens[1])
+                if 0 <= idx < len(frontier_imgs):
+                    response = f"{tokens[0]} {tokens[1]}"
+                    reason = " ".join(tokens[2:]).strip()
+                    reason = clean_reason(reason)
+                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+                else:
+                    print(f"Frontier index out of range: {tokens[1]}")
+                    continue
+        else:
+            print(f"Unrecognized frontier response: {full_response}")
+            continue
+
+    # 如果兜底也失败，返回None
+    return None, snapshot_id_mapping, None, len(snapshot_imgs)
