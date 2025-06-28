@@ -574,110 +574,6 @@ def clean_reason(reason):
 
 
 
-def format_frontier_vs_prompt(
-    question,
-    egocentric_imgs,
-    frontier_imgs,   # 只传2个元素的list
-    egocentric_view=False,
-    image_goal=None,
-):
-    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose one of the Frontiers to further explore. "
-    sys_prompt += "Definitions: "
-    sys_prompt += "Frontier: An observation of an unexplored region that could potentially provide new information for answering the question. Selecting a frontier means that you will explore that direction further. "
-    sys_prompt += "When you choose a Frontier, you should explain why you selected that direction for further exploration. "
-
-    content = []
-    # 1. Question
-    text = f"Question: {question}"
-    if image_goal is not None:
-        content.append((text, image_goal))
-        content.append((" ",))
-    else:
-        content.append((text + " ",))
-
-    # 2. Add egocentric view if available
-    if egocentric_view and len(egocentric_imgs) > 0:
-        text = "The following is the egocentric view of the agent in forward direction: "
-        content.append((text, egocentric_imgs[-1]))
-        content.append((" ",))
-
-    # 3. Show two frontiers as A and B
-    text = "The followings are the two candidate Frontiers you can choose: "
-    content.append((text,))
-    content.append(("Frontier A", frontier_imgs[0]))
-    content.append((" ",))
-    content.append(("Frontier B", frontier_imgs[1]))
-    content.append((" ",))
-
-    # 4. How to answer
-    text = "Please provide your answer in the following format: 'A [Reason]' or 'B [Reason]', where 'A' means you choose Frontier A and 'B' means you choose Frontier B. "
-    text += "You must select one and only one of the two provided Frontiers. "
-    text += "Choose the Frontier that is most likely to help you answer the question, and briefly explain why it is helpful for answering the question. "
-    text += "For example: 'A The corridor ahead may lead to the kitchen, which is relevant to the question.' "
-    text += "Or: 'B The open door may lead to the living room, where the answer might be found.' "
-    text += "Only use 'A' or 'B' as your choice. Do not make up other answers."
-
-    content.append((text,))
-
-    return sys_prompt, content
-
-
-
-
-import random
-
-def king_of_the_hill_frontier(
-    question,
-    egocentric_imgs,
-    frontier_imgs,
-    egocentric_view=False,
-    image_goal=None,
-    call_api_func=None,  # 比如 call_openai_api
-):
-    """
-    王者挑战制，每次随机选一个frontier和当前胜者PK，用模型API判决，直到只剩一个胜者index
-    """
-    indices = list(range(len(frontier_imgs)))
-    # 初始随机选出第一个王者
-    current_winner = random.choice(indices)
-    indices.remove(current_winner)
-    reason = "Only one frontier available, so it is the initial winner."
-    print(f"Initial winner: Frontier {current_winner}")
-
-    round_num = 1
-    while indices:
-        challenger = random.choice(indices)
-        indices.remove(challenger)
-
-        print(f"Round {round_num}: Frontier {current_winner} vs Frontier {challenger}",flush=True)
-
-        imgs = [frontier_imgs[current_winner], frontier_imgs[challenger]]
-        sys_prompt, content = format_frontier_vs_prompt(
-            question, egocentric_imgs, imgs, egocentric_view, image_goal
-        )
-        # A为current_winner, B为challenger
-        response = call_api_func(sys_prompt, content)
-        if response is None:
-            winner = current_winner  # fallback
-            reason = "No response"
-        else:
-            resp = response.strip().lower()
-            if resp.startswith('a'):
-                winner = current_winner
-                reason = resp[1:].strip()
-            elif resp.startswith('b'):
-                winner = challenger
-                reason = resp[1:].strip()
-            else:
-                winner = current_winner
-                reason = resp
-        print(f"Result: Winner is Frontier {winner} | Reason: {reason}",flush=True)
-        current_winner = winner
-        round_num += 1
-
-    print(f"\n=== King of the Hill finished. Winner: Frontier {current_winner} ===",flush=True)
-    return current_winner, reason
-
 
 def format_prompt_one_by_one(
     question,
@@ -731,16 +627,16 @@ def format_prompt_one_by_one(
     content.append((text,))
 
     # 0
-    # text += "Please answer in exactly one of the following two formats:\n"
-    # text += "Yes [Your complete answer as a full sentence]\n"
-    # text += "or\n"
-    # text += "No [Briefly state the reason you cannot answer based on this image]\n"
-    # text += "You must give a direct answer or reason that can be understood by others. "
-    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
-    # text += "For example:\nYes\nThe fruit bowl is on the kitchen counter.\n"
-    # text += "or\nNo\nThe image does not contain any fruit bowl or kitchen counter.\n"
-    # text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this Snapshot. "
-    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+    text += "Please answer in exactly one of the following two formats:\n"
+    text += "Yes [Your complete answer as a full sentence]\n"
+    text += "or\n"
+    text += "No [Briefly state the reason you cannot answer based on this image]\n"
+    text += "You MUST give a direct answer or reason that can be understood by others. "
+    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
+    text += "For example:\nYes The fruit bowl is on the kitchen counter.\n"
+    text += "or\nNo The image does not contain any fruit bowl or kitchen counter.\n"
+    text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this Snapshot. "
+    text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
 
     # 2
     # text += "Please answer in exactly one of the following two formats:\n"
@@ -755,22 +651,22 @@ def format_prompt_one_by_one(
 
 
     # 3
-    text += "Please answer in exactly one of the following two formats:\n"
-    text += "Yes [A single complete sentence that directly and specifically answers the question. "
-    text += "If the question involves locations, spatial relations, object states (such as open/closed, on/off), or object attributes (such as color, size, material), your answer must clearly describe the relevant information. "
-    text += "Do NOT include any reference to the image, snapshot, or phrases like 'Based on the image', 'In the picture', or similar.]\n"
-    text += "or\n"
-    text += "No [Briefly state the reason you cannot answer based on this image, in one short sentence.]\n"
-    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
-    text += "For example:\n"
-    text += "Yes The microwave is located above the refrigerator.\n"
-    text += "Yes The door is open.\n"
-    text += "Yes The pillow is blue.\n"
-    text += "or\nNo There is no microwave or refrigerator visible.\n"
-    text += "No The state of the door cannot be determined.\n"
-    text += "No The color of the pillow is not visible.\n"
-    text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this snapshot. "
-    text += "Note: Do NOT mention words like 'snapshot', 'image', 'picture', camera angles, or positions in your answer. Only output the direct answer."
+    # text += "Please answer in exactly one of the following two formats:\n"
+    # text += "Yes [A single complete sentence that directly and specifically answers the question. "
+    # text += "If the question involves locations, spatial relations, object states (such as open/closed, on/off), or object attributes (such as color, size, material), your answer must clearly describe the relevant information. "
+    # text += "Do NOT include any reference to the image, snapshot, or phrases like 'Based on the image', 'In the picture', or similar.]\n"
+    # text += "or\n"
+    # text += "No [Briefly state the reason you cannot answer based on this image, in one short sentence.]\n"
+    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. "
+    # text += "For example:\n"
+    # text += "Yes The microwave is located above the refrigerator.\n"
+    # text += "Yes The door is open.\n"
+    # text += "Yes The pillow is blue.\n"
+    # text += "or\nNo There is no microwave or refrigerator visible.\n"
+    # text += "No The state of the door cannot be determined.\n"
+    # text += "No The color of the pillow is not visible.\n"
+    # text += "You may also use information from the egocentric view to help you answer, but you must make your decision based on this snapshot. "
+    # text += "Note: Do NOT mention words like 'snapshot', 'image', 'picture', camera angles, or positions in your answer. Only output the direct answer."
 
     # 4
     # text += "Please answer in exactly one of the following two formats:\n"
@@ -983,6 +879,7 @@ def explore_step(step, cfg, verbose=False):
                 if not answer and len(lines) > 1:
                     answer = lines[1].strip()
                 print("full_response:", full_response, flush=True)
+        
                 return f"snapshot {i}", snapshot_id_mapping, answer, len(snapshot_imgs)
 
             elif first_line.lower().startswith("no"):
