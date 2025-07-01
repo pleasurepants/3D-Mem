@@ -1,7 +1,7 @@
 import logging
 from typing import Tuple, Optional, Union
 
-from src.eval_utils_gpt_aeqa_gpt import explore_step
+from src.eval_utils_gpt_aeqa_internvl import explore_step
 from src.tsdf_planner_hdbscan import TSDFPlanner, SnapShot, Frontier
 from src.scene_aeqa import Scene
 

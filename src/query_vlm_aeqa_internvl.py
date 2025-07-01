@@ -106,13 +106,13 @@ def query_vlm_for_response(
         return pred_target_snapshot, reason, n_filtered_snapshots
     else:  # target_type == "frontier"
         target_index = int(target_index)
-        if target_index < 0 or target_index >= len(tsdf_planner.frontiers_layer1):
+        if target_index < 0 or target_index >= len(tsdf_planner.frontiers):
             logging.info(
                 f"Predicted frontier target index out of range: {target_index}, failed!"
             )
             return None
-        target_point = tsdf_planner.frontiers_layer1[target_index].position
+        target_point = tsdf_planner.frontiers[target_index].position
         logging.info(f"Next choice: Frontier at {target_point}")
-        pred_target_frontier = tsdf_planner.frontiers_layer1[target_index]
+        pred_target_frontier = tsdf_planner.frontiers[target_index]
 
         return pred_target_frontier, reason, n_filtered_snapshots

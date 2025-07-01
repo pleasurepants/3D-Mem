@@ -281,12 +281,12 @@ class TSDFPlanner(TSDFPlannerBase):
             frontier = self.create_frontier(
                 ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
             )
-            frontier.layer1_label = f"{parent_label}_{local_child}"  # 父ID_子ID格式
+            frontier.layer1_label = f"{parent_label}_{str(len(self.frontiers_layer1))}"  # 父ID_子ID格式
             frontier.parent_layer0 = parent_label
             self.frontiers_layer1.append(frontier)
 
         # 3. 默认细层用于self.frontiers
-        self.frontiers = self.frontiers_layer1
+        self.frontiers = self.frontiers_layer0 + self.frontiers_layer1
 
         # =========== 两层frontier都生成图片/feature ===========
         for i, frontier in enumerate(self.frontiers_layer0):

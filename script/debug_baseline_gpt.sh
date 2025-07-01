@@ -59,9 +59,9 @@ source /home/wiss/zhang/anaconda3/bin/activate 3dmem
 source .env
 export LD_LIBRARY_PATH=/home/wiss/zhang/local_cuda118/cuda_cudart/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
 
-CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
- /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation.py \
-    -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_debug.yaml
+python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
+ /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_internvl.py \
+    -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_internvl.yaml
 
 
 # echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

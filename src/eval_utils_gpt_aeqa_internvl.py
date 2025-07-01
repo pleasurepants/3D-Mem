@@ -49,7 +49,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="internvl",  # gpt-4o
+                model="internvl",  # gpt-4o-internvl
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
@@ -758,62 +758,69 @@ def explore_step(step, cfg, verbose=False):
     logging.info(f"[Layer0] VLM selected index: {idx0}")
     for k, v in step['layer0_to_layer1'].items():
         logging.info(f"  Layer0 {k}: {v}")
-        
     # ------- Step 2.2: 在选中的layer0大簇下所有layer1细簇中选 -------
-    layer1_indices = step['layer0_to_layer1'][idx0]   # 例如 [1, 2]
-    logging.info(f"[Layer0] Full Layer0-to-Layer1 mapping:")
-    
 
-    sys_prompt, content = format_explore_prompt_frontier(
-        question,
-        egocentric_imgs,
-        frontier_imgs_subgroup,    # 只给当前大簇下的所有layer1细簇
-        snapshot_imgs,
-        snapshot_classes,
-        egocentric_view=step.get("use_egocentric_views", False),
-        use_snapshot_class=True,
-        image_goal=image_goal,
-    )
-    if verbose:
-        logging.info(f"Input prompt (frontier layer1):")
-        message = sys_prompt
-        for c in content:
-            message += c[0]
-            if len(c) == 2:
-                message += f"[{c[1][:10]}...]"
-        logging.info(message)
+    if idx0 not in step['layer0_to_layer1']:
+        response = f"frontier {idx0}"
+        final_reason = full_response.lower()
+        logging.info(f"[Layer0] Layer0 index {idx0} has no corresponding layer1 subclusters. Directly returning layer0 as the frontier (global index: {idx0})")
+        return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+    else:
+        layer1_indices = step['layer0_to_layer1'][idx0]   # 例如 [1, 2]
+        frontier_imgs_subgroup = [frontier_imgs_1[i] for i in layer1_indices]
 
-    idx1_in_subgroup = None
-    final_reason = ""
-    
+        sys_prompt, content = format_explore_prompt_frontier(
+            question,
+            egocentric_imgs,
+            frontier_imgs_subgroup,    # 只给当前大簇下的所有layer1细簇
+            snapshot_imgs,
+            snapshot_classes,
+            egocentric_view=step.get("use_egocentric_views", False),
+            use_snapshot_class=True,
+            image_goal=image_goal,
+        )
+        if verbose:
+            logging.info(f"Input prompt (frontier layer1):")
+            message = sys_prompt
+            for c in content:
+                message += c[0]
+                if len(c) == 2:
+                    message += f"[{c[1][:10]}...]"
+            logging.info(message)
 
-    idx1_in_subgroup = None
-    final_reason = ""
-    for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
-        if full_response is None:
-            print("call_openai_api (frontier layer1) returns None, retrying")
-            continue
-        if isinstance(full_response, list):
-            full_response = " ".join(full_response)
-        full_response = full_response.strip().lower()
-        # 正则提取格式：frontier <idx> <reason...>
-        m = re.match(r"frontier\s+(\d+)\s*(.*)", full_response)
-        if m:
-            idx1_in_subgroup = int(m.group(1))
-            if 0 <= idx1_in_subgroup < len(frontier_imgs_subgroup):
-                final_reason = clean_reason(m.group(2))
-                break
+        idx1_in_subgroup = None
+        final_reason = ""
+        
+
+        idx1_in_subgroup = None
+        final_reason = ""
+        for _ in range(retry_bound):
+            full_response = call_openai_api(sys_prompt, content)
+            if full_response is None:
+                print("call_openai_api (frontier layer1) returns None, retrying")
+                continue
+            if isinstance(full_response, list):
+                full_response = " ".join(full_response)
+            full_response = full_response.strip().lower()
+            # 正则提取格式：frontier <idx> <reason...>
+            m = re.match(r"frontier\s+(\d+)\s*(.*)", full_response)
+            if m:
+                idx1_in_subgroup = int(m.group(1))
+                if 0 <= idx1_in_subgroup < len(frontier_imgs_subgroup):
+                    final_reason = clean_reason(m.group(2))
+                    break
+                else:
+                    print(f"Layer1 index out of range: {m.group(1)}")
             else:
-                print(f"Layer1 index out of range: {m.group(1)}")
-        else:
-            print(f"Layer1 format error: {full_response}")
-    if idx1_in_subgroup is None:
-        return None, snapshot_id_mapping, None, len(snapshot_imgs)
+                print(f"Layer1 format error: {full_response}")
+        if idx1_in_subgroup is None:
+            return None, snapshot_id_mapping, None, len(snapshot_imgs)
 
-    final_layer1_idx = layer1_indices[idx1_in_subgroup]
-    response = f"frontier {final_layer1_idx}"
-    logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
-    logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx}")
-    return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+        final_layer1_idx = layer1_indices[idx1_in_subgroup]
+        # frontier index = len(self.frontiers_layer0) + final_layer1_idx
+        global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
+        response = f"frontier {global_frontier_idx}"
+        logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
+        logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx} (global index: {global_frontier_idx})")
+        return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
 
