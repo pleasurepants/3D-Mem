@@ -8,7 +8,7 @@ import time
 from typing import Optional
 import logging
 from src.const import *
-
+import re
 
 client = OpenAI(
     base_url=END_POINT,
@@ -108,6 +108,13 @@ def get_step_info(step, verbose=False):
     frontier_imgs = []
     for frontier in step["frontier_imgs"]:
         frontier_imgs.append(encode_tensor2base64(frontier))
+    frontier_imgs_0 = []
+    for frontier in step["frontier_imgs_0"]:
+        frontier_imgs_0.append(encode_tensor2base64(frontier))
+    frontier_imgs_1 = []
+    for frontier in step["frontier_imgs_1"]:
+        frontier_imgs_1.append(encode_tensor2base64(frontier))
+
 
     # 2.3 get snapshots
     snapshot_imgs, snapshot_classes = [], []
@@ -145,6 +152,8 @@ def get_step_info(step, verbose=False):
         image_goal,
         egocentric_imgs,
         frontier_imgs,
+        frontier_imgs_0,
+        frontier_imgs_1,
         snapshot_imgs,
         snapshot_classes,
         keep_index,
@@ -271,6 +280,31 @@ def format_explore_prompt_frontier(
             content.append((" ",))
 
     # 5 here is the format of the answer
+
+
+
+    # 7
+    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index you choose. "
+    text += "You must select one of the provided Frontier indices. Choose the frontier most likely to lead to the answer, and briefly explain why it is helpful for answering the question. "
+    text += "For example: 'Frontier 1 There is a door that may lead to the kitchen, where the answer might be found.' "
+    text += "Only use the provided indices. Do not make up new indices."
+
+
+
+
+
+
+    # 6
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    # text += "You MUST select one of the provided Frontier indices. Do NOT say that none is suitable or refuse to choose. "
+    # text += "Choose the frontier that is most likely to help you answer the question, based on where the target object or information is likely to be found. "
+    # text += "Give a short and specific reason directly related to the question. Do not use vague phrases such as 'to explore more' or 'see what is there'. "
+    # text += "For example: 'Frontier 1 There is a doorway that may lead to the kitchen, where the object in the question could be.' "
+    # text += "Only use the provided Frontier indices. Do not invent any index that is not listed above."
+
+
+
+    # 5
     # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
     # text += (
     #     "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable, or to refuse to choose. "
@@ -289,13 +323,15 @@ def format_explore_prompt_frontier(
     # text += (
     #     "(2) You may also consider information from other frontiers and egocentric views to help your decision, but you must always select the single most relevant frontier for progressing towards answering the question. Again, only choose from the provided Frontier indices and do not create any indices that are not listed above. "
     # )
-    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
-    text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
-    text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
-    text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
-    text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
-    text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
-    text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question. Only choose from the provided Frontier indices and do not create any indices that are not listed above. "
+
+    # 4
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
+    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
+    # text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
+    # text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
+    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
+    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question. Only choose from the provided Frontier indices and do not create any indices that are not listed above. "
 
 
 
@@ -386,12 +422,11 @@ def format_explore_prompt_snapshot(
     # )
     text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
     text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
-    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Do not mention words like 'snapshot', 'on the left of the image', etc. "
+    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Use simple and direct sentences, avoid vague or descriptive language. Do not mention words like 'snapshot', 'on the left of the image', etc. "
     text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
+    # text += "or if you choose the second snapshot, you can return 'Snapshot 1 Next to the fireplace'. "
     text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
-    text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
-
-    content.append((text,))
+    text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. Only output the complete answer as a direct response, without any extra words, explanation, or reasoning."
 
 
     content.append((text,))
@@ -615,6 +650,8 @@ def explore_step(step, cfg, verbose=False):
         image_goal,
         egocentric_imgs,
         frontier_imgs,
+        frontier_imgs_0,
+        frontier_imgs_1,
         snapshot_imgs,
         snapshot_classes,
         snapshot_id_mapping,
@@ -672,20 +709,22 @@ def explore_step(step, cfg, verbose=False):
             print(f"Unrecognized snapshot response: {full_response}")
             continue
 
-    # ==== Step 2: frontier prompt ====
+    # ==== Step 2: two-stage frontier prompt ====
+    retry_bound = 3
+
+    # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
     sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
-        frontier_imgs,
+        frontier_imgs_0,   # layer0候选
         snapshot_imgs,
         snapshot_classes,
         egocentric_view=step.get("use_egocentric_views", False),
         use_snapshot_class=True,
         image_goal=image_goal,
     )
-
     if verbose:
-        logging.info(f"Input prompt (frontier):")
+        logging.info(f"Input prompt (frontier layer0):")
         message = sys_prompt
         for c in content:
             message += c[0]
@@ -693,31 +732,88 @@ def explore_step(step, cfg, verbose=False):
                 message += f"[{c[1][:10]}...]"
         logging.info(message)
 
+    idx0 = None
     for _ in range(retry_bound):
         full_response = call_openai_api(sys_prompt, content)
         if full_response is None:
-            print("call_openai_api (frontier) returns None, retrying")
+            print("call_openai_api (frontier layer0) returns None, retrying")
             continue
-
         if isinstance(full_response, list):
             full_response = " ".join(full_response)
         full_response = full_response.strip().lower()
-
         if full_response.startswith("frontier"):
             tokens = full_response.split()
             if len(tokens) >= 2 and tokens[1].isdigit():
-                idx = int(tokens[1])
-                if 0 <= idx < len(frontier_imgs):
-                    response = f"{tokens[0]} {tokens[1]}"
-                    reason = " ".join(tokens[2:]).strip()
-                    reason = clean_reason(reason)
-                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+                idx0 = int(tokens[1])
+                if 0 <= idx0 < len(frontier_imgs_0):
+                    break
                 else:
-                    print(f"Frontier index out of range: {tokens[1]}")
-                    continue
+                    print(f"Layer0 index out of range: {tokens[1]}")
+            else:
+                print(f"Layer0 format error: {full_response}")
         else:
-            print(f"Unrecognized frontier response: {full_response}")
-            continue
+            print(f"Unrecognized frontier-layer0 response: {full_response}")
+    if idx0 is None:
+        return None, snapshot_id_mapping, None, len(snapshot_imgs)
+    logging.info(f"[Layer0] VLM selected index: {idx0}")
+    for k, v in step['layer0_to_layer1'].items():
+        logging.info(f"  Layer0 {k}: {v}")
+        
+    # ------- Step 2.2: 在选中的layer0大簇下所有layer1细簇中选 -------
+    layer1_indices = step['layer0_to_layer1'][idx0]   # 例如 [1, 2]
+    logging.info(f"[Layer0] Full Layer0-to-Layer1 mapping:")
+    
 
-    # 如果都失败，返回None
-    return None, snapshot_id_mapping, None, len(snapshot_imgs)
+    sys_prompt, content = format_explore_prompt_frontier(
+        question,
+        egocentric_imgs,
+        frontier_imgs_subgroup,    # 只给当前大簇下的所有layer1细簇
+        snapshot_imgs,
+        snapshot_classes,
+        egocentric_view=step.get("use_egocentric_views", False),
+        use_snapshot_class=True,
+        image_goal=image_goal,
+    )
+    if verbose:
+        logging.info(f"Input prompt (frontier layer1):")
+        message = sys_prompt
+        for c in content:
+            message += c[0]
+            if len(c) == 2:
+                message += f"[{c[1][:10]}...]"
+        logging.info(message)
+
+    idx1_in_subgroup = None
+    final_reason = ""
+    
+
+    idx1_in_subgroup = None
+    final_reason = ""
+    for _ in range(retry_bound):
+        full_response = call_openai_api(sys_prompt, content)
+        if full_response is None:
+            print("call_openai_api (frontier layer1) returns None, retrying")
+            continue
+        if isinstance(full_response, list):
+            full_response = " ".join(full_response)
+        full_response = full_response.strip().lower()
+        # 正则提取格式：frontier <idx> <reason...>
+        m = re.match(r"frontier\s+(\d+)\s*(.*)", full_response)
+        if m:
+            idx1_in_subgroup = int(m.group(1))
+            if 0 <= idx1_in_subgroup < len(frontier_imgs_subgroup):
+                final_reason = clean_reason(m.group(2))
+                break
+            else:
+                print(f"Layer1 index out of range: {m.group(1)}")
+        else:
+            print(f"Layer1 format error: {full_response}")
+    if idx1_in_subgroup is None:
+        return None, snapshot_id_mapping, None, len(snapshot_imgs)
+
+    final_layer1_idx = layer1_indices[idx1_in_subgroup]
+    response = f"frontier {final_layer1_idx}"
+    logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
+    logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx}")
+    return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+

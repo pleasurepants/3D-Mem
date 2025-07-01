@@ -2,7 +2,7 @@ import logging
 from typing import Tuple, Optional, Union
 
 from src.eval_utils_gpt_aeqa_minicpm import explore_step
-from src.tsdf_planner import TSDFPlanner, SnapShot, Frontier
+from src.tsdf_planner_hdbscan import TSDFPlanner, SnapShot, Frontier
 from src.scene_aeqa import Scene
 
 
@@ -33,6 +33,16 @@ def query_vlm_for_response(
     step_dict["frontier_imgs"] = [
         frontier.feature for frontier in tsdf_planner.frontiers
     ]
+    step_dict["frontier_imgs_0"] = [
+        frontier.feature for frontier in tsdf_planner.frontiers_layer0
+    ]
+    step_dict["frontier_imgs_1"] = [
+        frontier.feature for frontier in tsdf_planner.frontiers_layer1
+    ]
+
+    step_dict["layer0_to_layer1"] = tsdf_planner.layer0_to_layer1  
+    step_dict["layer1_to_layer0"] = tsdf_planner.layer1_to_layer0
+
 
     # prepare egocentric views
     if cfg.egocentric_views:
@@ -96,13 +106,13 @@ def query_vlm_for_response(
         return pred_target_snapshot, reason, n_filtered_snapshots
     else:  # target_type == "frontier"
         target_index = int(target_index)
-        if target_index < 0 or target_index >= len(tsdf_planner.frontiers):
+        if target_index < 0 or target_index >= len(tsdf_planner.frontiers_layer1):
             logging.info(
                 f"Predicted frontier target index out of range: {target_index}, failed!"
             )
             return None
-        target_point = tsdf_planner.frontiers[target_index].position
+        target_point = tsdf_planner.frontiers_layer1[target_index].position
         logging.info(f"Next choice: Frontier at {target_point}")
-        pred_target_frontier = tsdf_planner.frontiers[target_index]
+        pred_target_frontier = tsdf_planner.frontiers_layer1[target_index]
 
         return pred_target_frontier, reason, n_filtered_snapshots

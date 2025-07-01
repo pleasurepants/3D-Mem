@@ -1,4 +1,4 @@
-# # about habitat scene
+# about habitat scene
 # INVALID_SCENE_ID = []
 # import os
 # # about chatgpt api

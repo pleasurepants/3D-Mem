@@ -8,7 +8,7 @@ import time
 from typing import Optional
 import logging
 from src.const import *
-
+import re
 
 client = OpenAI(
     base_url=END_POINT,
@@ -108,6 +108,13 @@ def get_step_info(step, verbose=False):
     frontier_imgs = []
     for frontier in step["frontier_imgs"]:
         frontier_imgs.append(encode_tensor2base64(frontier))
+    frontier_imgs_0 = []
+    for frontier in step["frontier_imgs_0"]:
+        frontier_imgs_0.append(encode_tensor2base64(frontier))
+    frontier_imgs_1 = []
+    for frontier in step["frontier_imgs_1"]:
+        frontier_imgs_1.append(encode_tensor2base64(frontier))
+
 
     # 2.3 get snapshots
     snapshot_imgs, snapshot_classes = [], []
@@ -145,6 +152,8 @@ def get_step_info(step, verbose=False):
         image_goal,
         egocentric_imgs,
         frontier_imgs,
+        frontier_imgs_0,
+        frontier_imgs_1,
         snapshot_imgs,
         snapshot_classes,
         keep_index,
@@ -641,6 +650,8 @@ def explore_step(step, cfg, verbose=False):
         image_goal,
         egocentric_imgs,
         frontier_imgs,
+        frontier_imgs_0,
+        frontier_imgs_1,
         snapshot_imgs,
         snapshot_classes,
         snapshot_id_mapping,
@@ -698,20 +709,22 @@ def explore_step(step, cfg, verbose=False):
             print(f"Unrecognized snapshot response: {full_response}")
             continue
 
-    # ==== Step 2: frontier prompt ====
+    # ==== Step 2: two-stage frontier prompt ====
+    retry_bound = 3
+
+    # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
     sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
-        frontier_imgs,
+        frontier_imgs_0,   # layer0候选
         snapshot_imgs,
         snapshot_classes,
         egocentric_view=step.get("use_egocentric_views", False),
         use_snapshot_class=True,
         image_goal=image_goal,
     )
-
     if verbose:
-        logging.info(f"Input prompt (frontier):")
+        logging.info(f"Input prompt (frontier layer0):")
         message = sys_prompt
         for c in content:
             message += c[0]
@@ -719,31 +732,86 @@ def explore_step(step, cfg, verbose=False):
                 message += f"[{c[1][:10]}...]"
         logging.info(message)
 
+    idx0 = None
     for _ in range(retry_bound):
         full_response = call_openai_api(sys_prompt, content)
         if full_response is None:
-            print("call_openai_api (frontier) returns None, retrying")
+            print("call_openai_api (frontier layer0) returns None, retrying")
             continue
-
         if isinstance(full_response, list):
             full_response = " ".join(full_response)
         full_response = full_response.strip().lower()
-
         if full_response.startswith("frontier"):
             tokens = full_response.split()
             if len(tokens) >= 2 and tokens[1].isdigit():
-                idx = int(tokens[1])
-                if 0 <= idx < len(frontier_imgs):
-                    response = f"{tokens[0]} {tokens[1]}"
-                    reason = " ".join(tokens[2:]).strip()
-                    reason = clean_reason(reason)
-                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+                idx0 = int(tokens[1])
+                if 0 <= idx0 < len(frontier_imgs_0):
+                    break
                 else:
-                    print(f"Frontier index out of range: {tokens[1]}")
-                    continue
+                    print(f"Layer0 index out of range: {tokens[1]}")
+            else:
+                print(f"Layer0 format error: {full_response}")
         else:
-            print(f"Unrecognized frontier response: {full_response}")
-            continue
+            print(f"Unrecognized frontier-layer0 response: {full_response}")
+    if idx0 is None:
+        return None, snapshot_id_mapping, None, len(snapshot_imgs)
+    logging.info(f"[Layer0] VLM selected index: {idx0}")
+    for k, v in step['layer0_to_layer1'].items():
+        logging.info(f"  Layer0 {k}: {v}")
+    # ------- Step 2.2: 在选中的layer0大簇下所有layer1细簇中选 -------
+    layer1_indices = step['layer0_to_layer1'][idx0]   # 例如 [1, 2]
+    frontier_imgs_subgroup = [frontier_imgs_1[i] for i in layer1_indices]
 
-    # 如果都失败，返回None
-    return None, snapshot_id_mapping, None, len(snapshot_imgs)
+    sys_prompt, content = format_explore_prompt_frontier(
+        question,
+        egocentric_imgs,
+        frontier_imgs_subgroup,    # 只给当前大簇下的所有layer1细簇
+        snapshot_imgs,
+        snapshot_classes,
+        egocentric_view=step.get("use_egocentric_views", False),
+        use_snapshot_class=True,
+        image_goal=image_goal,
+    )
+    if verbose:
+        logging.info(f"Input prompt (frontier layer1):")
+        message = sys_prompt
+        for c in content:
+            message += c[0]
+            if len(c) == 2:
+                message += f"[{c[1][:10]}...]"
+        logging.info(message)
+
+    idx1_in_subgroup = None
+    final_reason = ""
+    
+
+    idx1_in_subgroup = None
+    final_reason = ""
+    for _ in range(retry_bound):
+        full_response = call_openai_api(sys_prompt, content)
+        if full_response is None:
+            print("call_openai_api (frontier layer1) returns None, retrying")
+            continue
+        if isinstance(full_response, list):
+            full_response = " ".join(full_response)
+        full_response = full_response.strip().lower()
+        # 正则提取格式：frontier <idx> <reason...>
+        m = re.match(r"frontier\s+(\d+)\s*(.*)", full_response)
+        if m:
+            idx1_in_subgroup = int(m.group(1))
+            if 0 <= idx1_in_subgroup < len(frontier_imgs_subgroup):
+                final_reason = clean_reason(m.group(2))
+                break
+            else:
+                print(f"Layer1 index out of range: {m.group(1)}")
+        else:
+            print(f"Layer1 format error: {full_response}")
+    if idx1_in_subgroup is None:
+        return None, snapshot_id_mapping, None, len(snapshot_imgs)
+
+    final_layer1_idx = layer1_indices[idx1_in_subgroup]
+    response = f"frontier {final_layer1_idx}"
+    logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
+    logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx}")
+    return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+

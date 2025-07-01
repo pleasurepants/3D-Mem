@@ -13,7 +13,7 @@ date
 hostname
 nvidia-smi
 echo "SLURM_JOB_ID: $SLURM_JOB_ID"
-# srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:2 --time=8:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-8,worker-9,worker-1,worker-2,worker-3,worker-4 --partition all bash
+# srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:2 --time=12:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-8,worker-9,worker-1,worker-2,worker-3,worker-4 --partition all bash
 
 if [ -z "$SLURM_JOB_GPUS" ]; then
     export CUDA_VISIBLE_DEVICES=0,1
@@ -28,7 +28,7 @@ echo "[INFO] Starting vLLM (internvl) server on GPU 0..."
 source /home/wiss/zhang/anaconda3/bin/activate vllm
 
 CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-vllm serve OpenGVLab/InternVL3-9B \
+vllm serve OpenGVLab/InternVL3-8B \
     --served-model-name internvl \
     --port 8000 \
     --limit-mm-per-prompt image=20 \
