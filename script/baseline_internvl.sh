@@ -44,8 +44,8 @@ for i in {1..300}; do
         echo "[INFO] ✅ internvl API is ready!"
         break
     fi
-    echo "  ... waiting ($((i*2))s)"
-    sleep 2
+    echo "  ... waiting ($((i*10))s)"
+    sleep 10
     if [ $i -eq 300 ]; then
         echo "[ERROR] ❌ Timeout: internvl server failed to start."
         if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
