@@ -13,7 +13,10 @@ date
 hostname
 nvidia-smi
 echo "SLURM_JOB_ID: $SLURM_JOB_ID"
-# srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:2 --time=12:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-8,worker-9,worker-1,worker-2,worker-3,worker-4 --partition all bash
+# srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:2 --time=21:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-8,worker-9,worker-1,worker-2,worker-3,worker-4,worker-6 --partition all bash
+
+# srun --pty --nodes=1 --ntasks=1 --cpus-per-task=16 --gres=gpu:1 --time=12:00:00 --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-8,worker-9 --partition all bash
+
 
 # if [ -z "$SLURM_JOB_GPUS" ]; then
 #     export CUDA_VISIBLE_DEVICES=0,1
@@ -28,8 +31,8 @@ echo "SLURM_JOB_ID: $SLURM_JOB_ID"
 # source /home/wiss/zhang/anaconda3/bin/activate vllm
 
 # CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-# vllm serve OpenGVLab/InternVL3-8B \
-#     --served-model-name internvl \
+# vllm serve openbmb/MiniCPM-V-2_6 \
+#     --served-model-name minicpm \
 #     --port 8000 \
 #     --limit-mm-per-prompt image=20 \
 #     --trust-remote-code &
@@ -42,8 +45,8 @@ echo "SLURM_JOB_ID: $SLURM_JOB_ID"
 #         echo "[INFO] ✅ internvl API is ready!"
 #         break
 #     fi
-#     echo "  ... waiting ($((i*2))s)"
-#     sleep 2
+#     echo "  ... waiting ($((i*10))s)"
+#     sleep 10
 #     if [ $i -eq 300 ]; then
 #         echo "[ERROR] ❌ Timeout: internvl server failed to start."
 #         if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
@@ -61,7 +64,7 @@ export LD_LIBRARY_PATH=/home/wiss/zhang/local_cuda118/cuda_cudart/targets/x86_64
 
 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
  /home/wiss/zhang/code/openeqa/3D-Mem/run_aeqa_evaluation_internvl.py \
-    -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_internvl.yaml
+    -cf /home/wiss/zhang/code/openeqa/3D-Mem/cfg/eval_aeqa_debug.yaml
 
 
 # echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

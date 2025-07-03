@@ -12,7 +12,7 @@ from typing import Union
 import habitat_sim
 
 from src.scene_goatbench import Scene
-from src.tsdf_planner import TSDFPlanner, Frontier, SnapShot
+from src.tsdf_planner_hdbscan import TSDFPlanner, Frontier, SnapShot
 
 
 class Logger:

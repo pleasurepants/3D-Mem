@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image
 from typing import Union
 
-from src.tsdf_planner import TSDFPlanner, Frontier, SnapShot
+from src.tsdf_planner_hdbscan import TSDFPlanner, Frontier, SnapShot
 
 
 class Logger:

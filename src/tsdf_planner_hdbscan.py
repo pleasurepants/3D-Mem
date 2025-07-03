@@ -340,12 +340,28 @@ class TSDFPlanner(TSDFPlannerBase):
         layer0_label2idx = {frontier.layer0_label: i for i, frontier in enumerate(self.frontiers_layer0)}
 
         # 2. 每个layer1归属哪个layer0的下标
+        # self.layer1_to_layer0 = []
+        # for frontier in self.frontiers_layer1:
+        #     parent_label = frontier.parent_layer0
+        #     parent_idx = layer0_label2idx[parent_label]
+        #     self.layer1_to_layer0.append(parent_idx)
+
+
         self.layer1_to_layer0 = []
         for frontier in self.frontiers_layer1:
             parent_label = frontier.parent_layer0
+            # 如果parent_label丢失，归类到最近的大簇
+            if parent_label not in layer0_label2idx:
+                # 归到最近的coarse
+                pos = frontier.position
+                nearest_label = min(
+                    layer0_label2idx.keys(),
+                    key=lambda l: np.linalg.norm(pos - self.frontiers_layer0[layer0_label2idx[l]].position)
+                )
+                logging.warning(f"parent_label {parent_label} not in layer0_label2idx, reassign to nearest {nearest_label}")
+                parent_label = nearest_label
             parent_idx = layer0_label2idx[parent_label]
             self.layer1_to_layer0.append(parent_idx)
-
         layer0_to_layer1 = defaultdict(list)
         for idx1, parent_idx0 in enumerate(self.layer1_to_layer0):
             layer0_to_layer1[parent_idx0].append(idx1)
@@ -379,6 +395,7 @@ class TSDFPlanner(TSDFPlannerBase):
         self.max_point = choice
 
         if type(choice) == SnapShot:
+        # if isinstance(choice, SnapShot):
             obj_centers = [objects[obj_id]["bbox"].center for obj_id in choice.cluster]
             obj_centers = [self.habitat2voxel(center)[:2] for center in obj_centers]
             obj_centers = list(
@@ -469,6 +486,7 @@ class TSDFPlanner(TSDFPlannerBase):
                 self.target_point = target_point
                 return True
         elif type(choice) == Frontier:
+        # elif isinstance(choice, Frontier):
             # find the direction into unexplored
             ft_direction = self.max_point.orientation
 

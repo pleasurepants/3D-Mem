@@ -49,7 +49,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="internvl",  # gpt-4o-internvl
+                model="internvl",  # gpt-4o-internvl-minicpm
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
@@ -284,10 +284,10 @@ def format_explore_prompt_frontier(
 
 
     # 7
-    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index you choose. "
-    text += "You must select one of the provided Frontier indices. Choose the frontier most likely to lead to the answer, and briefly explain why it is helpful for answering the question. "
-    text += "For example: 'Frontier 1 There is a door that may lead to the kitchen, where the answer might be found.' "
-    text += "Only use the provided indices. Do not make up new indices."
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index you choose. "
+    # text += "You must select one of the provided Frontier indices. Choose the frontier most likely to lead to the answer, and briefly explain why it is helpful for answering the question. "
+    # text += "For example: 'Frontier 1 There is a door that may lead to the kitchen, where the answer might be found.' "
+    # text += "Only use the provided indices. Do not make up new indices."
 
 
 
@@ -325,13 +325,14 @@ def format_explore_prompt_frontier(
     # )
 
     # 4
-    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
-    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
-    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
-    # text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
-    # text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
-    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
-    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question. Only choose from the provided Frontier indices and do not create any indices that are not listed above. "
+    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
+    text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
+    text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
+    text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
+    text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
+    text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question."
+    text += "Only use the provided indices. Do NOT make up new indices."
 
 
 
@@ -420,11 +421,26 @@ def format_explore_prompt_snapshot(
     #     "(2) You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot. "
     #     "Again, only choose from the provided Snapshot indices and do not create any indices that are not listed above. "
     # )
-    text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
-    text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
+
+    # 2
+    # text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
+    # text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
     # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Use simple and direct sentences, avoid vague or descriptive language. Do not mention words like 'snapshot', 'on the left of the image', etc. "
-    text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
+    # text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
     # text += "or if you choose the second snapshot, you can return 'Snapshot 1 Next to the fireplace'. "
+    # text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
+    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. Only output the complete answer as a direct response, without any extra words, explanation, or reasoning."
+
+    text += "Please answer in exactly one of the following two formats:\n"
+    text += "1. Snapshot i [Your complete answer as a full sentence.]\n"
+    text += "2. No Snapshot is available.\n"
+    text += "The two formats are mutually exclusive. Never combine 'No Snapshot is available' with any Snapshot index.\n"
+    text += "If you select a Snapshot, you must provide a clear and direct answer in a complete sentence.\n"
+    text += "Only output your answer in one of the two formats above, with no extra words, explanation, or reasoning.\n"
+    text += "Examples:\n"
+    text += "Snapshot 0 The fruit bowl is on the kitchen counter.\n"
+    text += "Snapshot 1 Next to the fireplace.\n"
+    text += "No Snapshot is available.\n"
     text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
     text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. Only output the complete answer as a direct response, without any extra words, explanation, or reasoning."
 
@@ -759,7 +775,7 @@ def explore_step(step, cfg, verbose=False):
     for k, v in step['layer0_to_layer1'].items():
         logging.info(f"  Layer0 {k}: {v}")
     # ------- Step 2.2: 在选中的layer0大簇下所有layer1细簇中选 -------
-
+    full_response_layer0 = full_response.strip().lower()
     if idx0 not in step['layer0_to_layer1']:
         response = f"frontier {idx0}"
         final_reason = full_response.lower()
@@ -813,8 +829,11 @@ def explore_step(step, cfg, verbose=False):
                     print(f"Layer1 index out of range: {m.group(1)}")
             else:
                 print(f"Layer1 format error: {full_response}")
-        if idx1_in_subgroup is None:
-            return None, snapshot_id_mapping, None, len(snapshot_imgs)
+        if idx1_in_subgroup is None or idx1_in_subgroup >= len(layer1_indices):
+            logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
+            response = f"frontier {idx0}"
+            final_reason = full_response_layer0
+            return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
 
         final_layer1_idx = layer1_indices[idx1_in_subgroup]
         # frontier index = len(self.frontiers_layer0) + final_layer1_idx

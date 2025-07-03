@@ -25,7 +25,7 @@ from src.habitat import (
 )
 from src.geom import get_cam_intr, IoU
 from src.utils import rgba2rgb
-from src.tsdf_planner import SnapShot
+from src.tsdf_planner_hdbscan import SnapShot
 from src.hierarchy_clustering import SceneHierarchicalClustering
 
 # Local application/library specific imports

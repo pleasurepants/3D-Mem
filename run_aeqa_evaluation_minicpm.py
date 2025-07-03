@@ -30,7 +30,7 @@ from src.geom import get_cam_intr, get_scene_bnds
 from src.tsdf_planner_hdbscan import TSDFPlanner, Frontier, SnapShot
 from src.scene_aeqa import Scene
 from src.utils import resize_image, get_pts_angle_aeqa
-from src.query_vlm_aeqa_hdbscan import query_vlm_for_response
+from src.query_vlm_aeqa_minicpm import query_vlm_for_response
 from src.logger_aeqa import Logger
 from src.const import *
 

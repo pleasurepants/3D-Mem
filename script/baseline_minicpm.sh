@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
-#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-3,worker-4,worker-8,worker-7
+#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-3,worker-4,worker-8,worker-7,worker-6,worker-9
 #SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/minicpm/hierarchical-%j.out
 #SBATCH --partition all
 
@@ -45,9 +45,9 @@ for i in {1..300}; do
         echo "[INFO] ✅ minicpm API is ready!"
         break
     fi
-    echo "  ... waiting ($((i*2))s)"
-    sleep 2
-    if [ $i -eq 300 ]; then
+    echo "  ... waiting ($((i*10))s)"
+    sleep 10
+    if [ $i -eq 1000 ]; then
         echo "[ERROR] ❌ Timeout: minicpm server failed to start."
         if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
             kill "$VLLM_PID"
