@@ -1,8 +1,8 @@
 import logging
 from typing import Tuple, Optional, Union
 
-from src.eval_utils_gpt_aeqa_qwen import explore_step
-from src.tsdf_planner import TSDFPlanner, SnapShot, Frontier
+from src.eval_utils_gpt_aeqa_gpt import explore_step
+from src.tsdf_planner_hdbscan import TSDFPlanner, SnapShot, Frontier
 from src.scene_aeqa import Scene
 
 
@@ -13,6 +13,8 @@ def query_vlm_for_response(
     rgb_egocentric_views: list,
     cfg,
     verbose: bool = False,
+    chosen_frontier_path: str = None,
+    step_idx: int = 0,
 ) -> Optional[Tuple[Union[SnapShot, Frontier], str, int]]:
     # prepare input for vlm
     step_dict = {}
@@ -33,6 +35,16 @@ def query_vlm_for_response(
     step_dict["frontier_imgs"] = [
         frontier.feature for frontier in tsdf_planner.frontiers
     ]
+    step_dict["frontier_imgs_0"] = [
+        frontier.feature for frontier in tsdf_planner.frontiers_layer0
+    ]
+    step_dict["frontier_imgs_1"] = [
+        frontier.feature for frontier in tsdf_planner.frontiers_layer1
+    ]
+
+    step_dict["layer0_to_layer1"] = tsdf_planner.layer0_to_layer1  
+    step_dict["layer1_to_layer0"] = tsdf_planner.layer1_to_layer0
+
 
     # prepare egocentric views
     if cfg.egocentric_views:
@@ -44,7 +56,7 @@ def query_vlm_for_response(
 
     # query vlm
     outputs, snapshot_id_mapping, reason, n_filtered_snapshots = explore_step(
-        step_dict, cfg, verbose=verbose
+        step_dict, cfg, verbose=verbose, chosen_frontier_path=chosen_frontier_path, step_idx=step_idx
     )
     if outputs is None:
         logging.error(f"explore_step failed and returned None")

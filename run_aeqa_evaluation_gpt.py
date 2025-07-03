@@ -27,10 +27,10 @@ from ultralytics import SAM, YOLOWorld
 
 from src.habitat import pose_habitat_to_tsdf
 from src.geom import get_cam_intr, get_scene_bnds
-from src.tsdf_planner import TSDFPlanner, Frontier, SnapShot
+from src.tsdf_planner_hdbscan import TSDFPlanner, Frontier, SnapShot
 from src.scene_aeqa import Scene
 from src.utils import resize_image, get_pts_angle_aeqa
-from src.query_vlm_aeqa_qwen import query_vlm_for_response
+from src.query_vlm_aeqa_gpt import query_vlm_for_response
 from src.logger_aeqa import Logger
 from src.const import *
 
@@ -261,6 +261,11 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     tsdf_planner.max_point = None
                     tsdf_planner.target_point = None
 
+
+            # add chosen frontier dir
+            chosen_frontier_path = os.path.join(episode_dir, 'chosen_frontier')
+
+
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                 # query the VLM for the next navigation point, and the reason for the choice
                 vlm_response = query_vlm_for_response(
@@ -270,6 +275,8 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     rgb_egocentric_views=rgb_egocentric_views,
                     cfg=cfg,
                     verbose=True,
+                    chosen_frontier_path=chosen_frontier_path,
+                    step_idx=cnt_step,
                 )
                 if vlm_response is None:
                     logging.info(
