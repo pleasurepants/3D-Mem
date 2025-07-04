@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=i_ssfo
+#SBATCH --job-name=i_p_o
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
-#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-3,worker-4,worker-8,worker-9,worker-7,worker-5,worker-1
-#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/internvl/s_still_f_one-%j.out
+#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-3,worker-4,worker-8,worker-7,worker-5,worker-1
+#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/internvl/point_only-%j.out
 #SBATCH --partition all
 
 echo "=== JOB START ==="
@@ -44,8 +44,8 @@ for i in {1..300}; do
         echo "[INFO] ✅ internvl API is ready!"
         break
     fi
-    echo "  ... waiting ($((i*2))s)"
-    sleep 2
+    echo "  ... waiting ($((i*20))s)"
+    sleep 20
     if [ $i -eq 300 ]; then
         echo "[ERROR] ❌ Timeout: internvl server failed to start."
         if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
