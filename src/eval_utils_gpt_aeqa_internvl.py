@@ -553,30 +553,26 @@ def frontier_context(
 
     return sys_prompt, content
 
-def format_frontier_single_prompt(
+
+def format_frontier_vs_prompt(
     question,
     egocentric_imgs,
-    frontier_img,
+    frontier_imgs,
     egocentric_view=False,
     image_goal=None,
     context=None,
 ):
-    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. "
-    sys_prompt += "To answer the question, you are required to judge whether this Frontier should be selected to further explore. "
+    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose one of the Frontiers to further explore. "
     sys_prompt += "Definitions: "
-    sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. "
-    sys_prompt += "Selecting a frontier means that you will further explore that direction. "
-
-
-
+    sys_prompt += "Frontier: An observation of an unexplored region that could potentially provide new information for answering the question. Selecting a frontier means that you will explore that direction further. "
+    sys_prompt += "When you choose a Frontier, you should explain why you selected that direction for further exploration. "
     if context:
         sys_prompt += "Context: The following summary describes the agent's past exploration and current known status. Use this context to help you make a better choice, but do not treat it as a direct instruction.\n"
         sys_prompt += f"{context}\n"
 
 
-
-
     content = []
+    # 1. Question
     text = f"Question: {question}"
     if image_goal is not None:
         content.append((text, image_goal))
@@ -584,43 +580,90 @@ def format_frontier_single_prompt(
     else:
         content.append((text + " ",))
 
-    # egocentric视角可选
+    # 2. Add egocentric view if available
     if egocentric_view and len(egocentric_imgs) > 0:
         text = "The following is the egocentric view of the agent in forward direction: "
         content.append((text, egocentric_imgs[-1]))
         content.append((" ",))
 
-    # 只给当前frontier
-    text = "Here is the Frontier you need to evaluate: "
-    content.append((text, frontier_img))
+    # 3. Show two frontiers as A and B
+    text = "The followings are the two candidate Frontiers you can choose: "
+    content.append((text,))
+    content.append(("Frontier A", frontier_imgs[0]))
+    content.append((" ",))
+    content.append(("Frontier B", frontier_imgs[1]))
     content.append((" ",))
 
-    # 0
-    text = "Please answer in exactly one of the following two formats:\n"
-    text += "Yes\n[State the reason why exploring this frontier is likely to help answer the question]\n"
-    text += "or\n"
-    text += "No\n[State the reason why exploring this frontier is unlikely to help answer the question]\n"
-    text += "Write your answer as a complete sentence focused on whether this frontier could lead to finding the answer, not just describing the current image. "
-    text += "Be as proactive as possible: select 'Yes' if there is any meaningful hint that this direction could help answer the question, even if the answer is not immediately obvious. "
-    text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen, which is relevant to the question.\n"
-    text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question.\n"
-    text += "Only answer 'Yes' if you believe this frontier is helpful for progressing toward the answer. Otherwise, answer 'No'."
-
-    # 1
-    # text = "Please answer in exactly one of the following two formats:\n"
-    # text += "Yes\n[Explain why exploring this frontier could help answer the question]\n"
-    # text += "or\n"
-    # text += "No\n[Explain why exploring this frontier would not help answer the question]\n"
-    # text += "Be proactive, but only answer 'Yes' if you see a real possibility to find clues or the answer. Only answer 'No' if you are confident this direction is not helpful at all. "
-    # text += "Do not always say 'Yes' or 'No'; decide carefully based on the scene.\n"
-    # text += "For example:\nYes\nThere is a door in this frontier that may lead to the kitchen.\n"
-    # text += "or\nNo\nThis frontier only shows a blank wall and does not offer any clue for answering the question."
-
+    # 4. How to answer
+    text = "Please provide your answer in the following format: 'A [Reason]' or 'B [Reason]', where 'A' means you choose Frontier A and 'B' means you choose Frontier B. "
+    text += "You must select one and only one of the two provided Frontiers. "
+    text += "Choose the Frontier that is most likely to help you answer the question, and briefly explain why it is helpful for answering the question. "
+    text += "For example: 'A The corridor ahead may lead to the kitchen, which is relevant to the question.' "
+    text += "Or: 'B The open door may lead to the living room, where the answer might be found.' "
+    text += "Only use 'A' or 'B' as your choice. Do not make up other answers."
 
     content.append((text,))
 
     return sys_prompt, content
 
+
+
+
+import random
+
+def king_of_the_hill_frontier(
+    question,
+    egocentric_imgs,
+    frontier_imgs,
+    egocentric_view=False,
+    image_goal=None,
+    call_api_func=None, 
+    context=None,
+):
+    """
+    王者挑战制，每次随机选一个frontier和当前胜者PK，用模型API判决，直到只剩一个胜者index
+    """
+    indices = list(range(len(frontier_imgs)))
+    # 初始随机选出第一个王者
+    current_winner = random.choice(indices)
+    indices.remove(current_winner)
+    reason = "Only one frontier available, so it is the initial winner."
+    print(f"Initial winner: Frontier {current_winner}")
+
+    round_num = 1
+    while indices:
+        challenger = random.choice(indices)
+        indices.remove(challenger)
+
+        print(f"Round {round_num}: Frontier {current_winner} vs Frontier {challenger}",flush=True)
+
+        imgs = [frontier_imgs[current_winner], frontier_imgs[challenger]]
+        sys_prompt, content = format_frontier_vs_prompt(
+            question, egocentric_imgs, imgs, egocentric_view, image_goal, context
+        )
+        # A为current_winner, B为challenger
+        response = call_api_func(sys_prompt, content)
+        if response is None:
+            winner = current_winner  # fallback
+            reason = "No response"
+        else:
+            resp = response.strip().lower()
+            if resp.startswith('a'):
+                winner = current_winner
+                reason = resp[1:].strip()
+            elif resp.startswith('b'):
+                winner = challenger
+                reason = resp[1:].strip()
+            else:
+                winner = current_winner
+                reason = resp
+        print(f"Result: Winner is Frontier {winner} | Reason: {reason}",flush=True)
+        current_winner = winner
+        round_num += 1
+
+    print(f"\n=== King of the Hill finished. Winner: Frontier {current_winner} ===",flush=True)
+    
+    return current_winner, reason
 
 
 def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
@@ -704,96 +747,20 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         pass
 
 
-    # ==== Step 2: frontier prompt ====
-    for i, frontier_img in enumerate(frontier_imgs):
-        sys_prompt, content = format_frontier_single_prompt(
-            question,
-            egocentric_imgs,
-            frontier_img,
-            egocentric_view=step.get("use_egocentric_views", False),
-            image_goal=image_goal,
-            context=context,
-        )
-        if verbose:
-            logging.info(f"Input prompt (single frontier {i}):")
-            message = sys_prompt
-            for c in content:
-                message += c[0]
-                if len(c) == 2:
-                    message += f"[{c[1][:10]}...]"
-            logging.info(message)
-        for attempt in range(retry_bound):
-            full_response = call_openai_api(sys_prompt, content)
-            if full_response is None:
-                print("call_openai_api (single frontier) returns None, retrying")
-                continue
-            resp = full_response.strip().lower()
-            lines = [line.strip() for line in resp.split('\n') if line.strip()]
-            first_line = lines[0] if len(lines) > 0 else ""
-            if first_line == "yes":
-                reason = " ".join(lines[1:]) if len(lines) > 1 else ""
-                reason = clean_reason(reason)
-                save_base64_to_png(frontier_imgs[i], chosen_frontier_path, step_idx, i)
-                return f"frontier {i}", snapshot_id_mapping, reason, len(snapshot_imgs)
-            elif first_line == "no":
-                reason = " ".join(lines[1:]) if len(lines) > 1 else ""
-                if verbose:
-                    logging.info(f"frontier {i} -> No (attempt {attempt+1}), reason: {reason}")
-                break
-            else:
-                if verbose:
-                    logging.warning(f"frontier {i} unrecognized response: '{first_line}', retrying...")
-                continue
+        # === Step 2: frontier tournament ===
+    if len(frontier_imgs) == 0:
+        return None, snapshot_id_mapping, None, len(snapshot_imgs)
 
-
-    # ==== Step 2b: 如果都没选出来，再用整体frontier prompt兜底 ====
-    sys_prompt, content = format_explore_prompt_frontier(
+    winner_index, reason = king_of_the_hill_frontier(
         question,
         egocentric_imgs,
         frontier_imgs,
-        snapshot_imgs,
-        snapshot_classes,
         egocentric_view=step.get("use_egocentric_views", False),
-        use_snapshot_class=True,
         image_goal=image_goal,
+        call_api_func=call_openai_api,
         context=context,
     )
+    response = f"frontier {winner_index}"
 
-    if verbose:
-        logging.info(f"Input prompt (frontier ALL):")
-        message = sys_prompt
-        for c in content:
-            message += c[0]
-            if len(c) == 2:
-                message += f"[{c[1][:10]}...]"
-        logging.info(message)
-
-    for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
-        if full_response is None:
-            print("call_openai_api (frontier ALL) returns None, retrying")
-            continue
-
-        if isinstance(full_response, list):
-            full_response = " ".join(full_response)
-        full_response = full_response.strip().lower()
-
-        if full_response.startswith("frontier"):
-            tokens = full_response.split()
-            if len(tokens) >= 2 and tokens[1].isdigit():
-                idx = int(tokens[1])
-                if 0 <= idx < len(frontier_imgs):
-                    response = f"{tokens[0]} {tokens[1]}"
-                    reason = " ".join(tokens[2:]).strip()
-                    reason = clean_reason(reason)
-                    save_base64_to_png(frontier_imgs[int(tokens[1])], chosen_frontier_path, step_idx, int(tokens[1]))
-                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
-                else:
-                    print(f"Frontier index out of range: {tokens[1]}")
-                    continue
-        else:
-            print(f"Unrecognized frontier response: {full_response}")
-            continue
-
-    # 如果兜底也失败，返回None
-    return None, snapshot_id_mapping, None, len(snapshot_imgs)
+    save_base64_to_png(frontier_imgs[winner_index], chosen_frontier_path, step_idx, winner_index)
+    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
