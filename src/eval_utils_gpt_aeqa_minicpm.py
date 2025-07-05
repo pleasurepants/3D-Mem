@@ -414,12 +414,12 @@ def format_explore_prompt_snapshot(
 
 
     # 0
-    # text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
-    # text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
-    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Do not mention words like 'snapshot', 'on the left of the image', etc. "
-    # text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
-    # text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
-    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
+    text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
+    text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
+    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Do not mention words like 'snapshot', 'on the left of the image', etc. "
+    text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
+    text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
+    text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
 
     # 1
     # text = "Please provide your answer in exactly one of the following two formats: 'Snapshot i [Your complete answer as a full sentence]' or 'No Snapshot is available'. "
@@ -433,20 +433,20 @@ def format_explore_prompt_snapshot(
     # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. "
 
     # 2
-    text = "Please answer in exactly one of the following two formats:\n"
-    text += "Snapshot i [Your complete answer as a full sentence]\n"
-    text += "or\n"
-    text += "No Snapshot is available\n"
-    text += "If you select a Snapshot, you MUST provide a specific, complete answer to the question, not a refusal or uncertainty.\n"
-    text += "NEVER combine a Snapshot index with any phrase like 'not available', 'no snapshot', 'cannot answer', or 'unknown'.\n"
-    text += "For example:\n"
-    text += "Snapshot 0 The fruit bowl is on the kitchen counter.\n"
-    text += "or\n"
-    text += "No Snapshot is available.\n"
-    text += "INCORRECT EXAMPLES (DO NOT USE):\n"
-    text += "Snapshot 0 No Snapshot is available.\n"
-    text += "You may ONLY reply 'No Snapshot is available' if NONE of the Snapshots allow you to answer the question at all. Do not use any other format.\n"
-    text += "Do not mention words like 'snapshot', 'in the image', or image positions in your answer, except as specified in the format."
+    # text = "Please answer in exactly one of the following two formats:\n"
+    # text += "Snapshot i [Your complete answer as a full sentence]\n"
+    # text += "or\n"
+    # text += "No Snapshot is available\n"
+    # text += "If you select a Snapshot, you MUST provide a specific, complete answer to the question, not a refusal or uncertainty.\n"
+    # text += "NEVER combine a Snapshot index with any phrase like 'not available', 'no snapshot', 'cannot answer', or 'unknown'.\n"
+    # text += "For example:\n"
+    # text += "Snapshot 0 The fruit bowl is on the kitchen counter.\n"
+    # text += "or\n"
+    # text += "No Snapshot is available.\n"
+    # text += "INCORRECT EXAMPLES (DO NOT USE):\n"
+    # text += "Snapshot 0 No Snapshot is available.\n"
+    # text += "You may ONLY reply 'No Snapshot is available' if NONE of the Snapshots allow you to answer the question at all. Do not use any other format.\n"
+    # text += "Do not mention words like 'snapshot', 'in the image', or image positions in your answer, except as specified in the format."
 
 
 
@@ -621,10 +621,39 @@ def format_frontier_vs_prompt(
 
     return sys_prompt, content
 
-
-
-
+from collections import Counter
 import random
+import re
+import logging
+def ab_vote(sys_prompt, content, num_trials=5):
+    results = []
+    responses = []
+    for _ in range(num_trials):
+        resp = call_openai_api(sys_prompt, content)
+        if resp is not None:
+            m = re.match(r"([ab])[\s:：，,.、．. -]", resp.strip(), re.I)
+            if m:
+                choice = m.group(1).upper()
+                results.append(choice)
+                responses.append(resp.strip())
+            else:
+                results.append('None')
+        else:
+            results.append('None')
+    logging.info(f"[AB voting result] {results}")
+    # 去除无效项
+    results_valid = [x for x in results if x in ['A', 'B']]
+    if not results_valid:
+        logging.warning("[ABvoting failed] return None")
+        return None
+    winner = Counter(results_valid).most_common(1)[0][0]
+    logging.info(f"[AB voting final winner] {winner}")
+    # 返回第一个胜者的完整响应
+    for resp in responses:
+        if resp.upper().startswith(winner):
+            return resp
+    return winner
+
 
 def king_of_the_hill_frontier(
     question,
@@ -758,7 +787,7 @@ def explore_step(step, cfg, verbose=False):
         frontier_imgs,
         egocentric_view=step.get("use_egocentric_views", False),
         image_goal=image_goal,
-        call_api_func=call_openai_api,  # 你自己的API调用函数
+        call_api_func=ab_vote,  # 你自己的API调用函数
     )
     response = f"frontier {winner_index}"
     return response, snapshot_id_mapping, reason, len(snapshot_imgs)
