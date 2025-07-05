@@ -2,7 +2,7 @@ import logging
 from typing import Tuple, Optional, Union
 
 from src.eval_utils_gpt_aeqa_qwen import explore_step
-from src.tsdf_planner import TSDFPlanner, SnapShot, Frontier
+from src.tsdf_planner_hdbscan import TSDFPlanner, SnapShot, Frontier
 from src.scene_aeqa import Scene
 
 
@@ -33,6 +33,16 @@ def query_vlm_for_response(
     step_dict["frontier_imgs"] = [
         frontier.feature for frontier in tsdf_planner.frontiers
     ]
+    step_dict["frontier_imgs_0"] = [
+        frontier.feature for frontier in tsdf_planner.frontiers_layer0
+    ]
+    step_dict["frontier_imgs_1"] = [
+        frontier.feature for frontier in tsdf_planner.frontiers_layer1
+    ]
+
+    step_dict["layer0_to_layer1"] = tsdf_planner.layer0_to_layer1  
+    step_dict["layer1_to_layer0"] = tsdf_planner.layer1_to_layer0
+
 
     # prepare egocentric views
     if cfg.egocentric_views:

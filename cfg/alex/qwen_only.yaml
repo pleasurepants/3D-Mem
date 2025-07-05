@@ -1,12 +1,12 @@
 # General
 seed: 88
-exp_name: "vote-debug"
-output_parent_dir: "/anvme/workspace/v100dd12-3dmem/gpt/hierarchical"
-scene_dataset_config_path: "/home/wiss/zhang/code/openeqa/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
+exp_name: "hiera-only-only"
+output_parent_dir: "/anvme/workspace/v100dd12-3dmem/output/qwen/hierarchical"
+scene_dataset_config_path: "/home/hpc/v100dd/v100dd12/code/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/anvme/workspace/v100dd12-3dmem/hm3d/data/3dmem"
-questions_list_path: 'data/aeqa_questions-debug.json'
+questions_list_path: 'data/aeqa_questions-41.json'
 
-concept_graph_config_path: "/home/wiss/zhang/code/openeqa/3D-Mem/cfg/concept_graph_default.yaml"
+concept_graph_config_path: "/home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/concept_graph_default.yaml"
 
 # major settings
 choose_every_step: true  # whether to query vlm at each step, or only after arriving at the navigation target
@@ -15,8 +15,8 @@ prefiltering: true  # whether to use prefiltering (you in fact cannot turn this 
 top_k_categories: 10  # keep the top k relevant categories during prefiltering
 
 # about detection model
-yolo_model_name: yolov8x-world.pt
-sam_model_name: sam_l.pt
+yolo_model_name: /anvme/workspace/v100dd12-3dmem/model/yolov8x-world.pt
+sam_model_name: /anvme/workspace/v100dd12-3dmem/model/sam_l.pt
 class_set: scannet200  # use the 200-class set for yolo-world detector
 
 # about snapshots clustering
