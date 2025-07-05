@@ -49,7 +49,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="minicpm",  # gpt-4o-internvl-minicpm
+                model="minicpm",  # gpt-4o-internvl-minicpm-qwen
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
@@ -232,6 +232,7 @@ def format_explore_prompt(
 
     return sys_prompt, content
 
+
 def format_explore_prompt_frontier(
     question,
     egocentric_imgs,
@@ -295,10 +296,12 @@ def format_explore_prompt_frontier(
     text += "Only use the provided indices. Do NOT make up new indices."
 
 
+    
 
     content.append((text,))
 
     return sys_prompt, content
+
 
 
 
@@ -411,6 +414,58 @@ def format_explore_prompt_snapshot(
 
 
 
+from collections import Counter
+import random
+import re
+import logging
+
+def call_openai_api_vote(sys_prompt, content, num_trials=5, max_tiebreak_rounds=5):
+    """
+    Only for 'frontier' voting. Returns the most voted 'frontier <idx> ...' response.
+    Minimal logging: only frontier index count and final chosen index.
+    """
+    tiebreak_round = 0
+    candidate_indices = None
+    while True:
+        responses = []
+        raw_indices = []
+        for _ in range(num_trials):
+            resp = call_openai_api(sys_prompt, content)
+            if resp is not None:
+                resp = resp.strip()
+                m = re.match(r"frontier\s+(\d+)", resp.lower())
+                if m:
+                    idx = int(m.group(1))
+                    if candidate_indices is None or idx in candidate_indices:
+                        responses.append(resp)
+                        raw_indices.append(idx)
+        if not responses:
+            logging.warning("[Frontier Voting] All responses are None. Return None.")
+            return None
+        # 只看 index 计数
+        index_counter = Counter(raw_indices)
+        log_str = " | ".join([f"frontier {idx}: {count}" for idx, count in index_counter.items()])
+        logging.info(f"[Frontier Voting][Round {tiebreak_round+1}] {log_str}")
+        max_count = max(index_counter.values())
+        winners = [idx for idx, count in index_counter.items() if count == max_count]
+        if len(winners) == 1:
+            logging.info(f"[Frontier Voting] Selected: frontier {winners[0]}")
+            # 找到第一个对应index的完整响应返回
+            for resp in responses:
+                m = re.match(r"frontier\s+(\d+)", resp.lower())
+                if m and int(m.group(1)) == winners[0]:
+                    return resp
+        else:
+            candidate_indices = winners
+            tiebreak_round += 1
+            if tiebreak_round >= max_tiebreak_rounds:
+                chosen = random.choice(winners)
+                logging.info(f"[Frontier Voting] Max tie-break rounds reached. Randomly selected: frontier {chosen}")
+                for resp in responses:
+                    m = re.match(r"frontier\s+(\d+)", resp.lower())
+                    if m and int(m.group(1)) == chosen:
+                        return resp
+
 
 
 
@@ -496,99 +551,6 @@ def prefiltering(
         sorted(list(set(s_cls) & set(selected_classes))) for s_cls in snapshot_classes
     ]
     return snapshot_classes, keep_index
-
-
-# def explore_step(step, cfg, verbose=False):
-#     step["use_prefiltering"] = cfg.prefiltering
-#     step["top_k_categories"] = cfg.top_k_categories
-#     (
-#         question,
-#         image_goal,
-#         egocentric_imgs,
-#         frontier_imgs,
-#         snapshot_imgs,
-#         snapshot_classes,
-#         snapshot_id_mapping,
-#     ) = get_step_info(step, verbose)
-#     sys_prompt, content = format_explore_prompt(
-#         question,
-#         egocentric_imgs,
-#         frontier_imgs,
-#         snapshot_imgs,
-#         snapshot_classes,
-#         egocentric_view=step.get("use_egocentric_views", False),
-#         use_snapshot_class=True,
-#         image_goal=image_goal,
-#     )
-
-#     if verbose:
-#         logging.info(f"Input prompt:")
-#         message = sys_prompt
-#         for c in content:
-#             message += c[0]
-#             if len(c) == 2:
-#                 message += f"[{c[1][:10]}...]"
-#         logging.info(message)
-
-#     retry_bound = 3
-#     final_response = None
-#     final_reason = None
-#     for _ in range(retry_bound):
-#         full_response = call_openai_api(sys_prompt, content)
-
-#         if full_response is None:
-#             print("call_openai_api returns None, retrying")
-#             continue
-
-
-#         # 如果 full_response 是 token list（vLLM 的返回格式），先拼成字符串
-#         if isinstance(full_response, list):
-#             full_response = " ".join(full_response)
-
-#         # 去掉前后空格
-#         full_response = full_response.strip()
-
-#         # 拆分 token 提取结果和理由
-#         tokens = full_response.split()
-#         if len(tokens) >= 2:
-#             response = f"{tokens[0]} {tokens[1]}"
-#             reason = " ".join(tokens[2:]).strip()
-#         else:
-#             print(f"Error in splitting response: {full_response}")
-#             continue
-
-#         response = response.lower()
-
-#         try:
-#             choice_type, choice_id = response.split(" ")
-#         except Exception as e:
-#             print(f"Error in splitting response: {response}")
-#             print(e)
-#             continue
-
-
-#         response_valid = False
-#         if (
-#             choice_type == "snapshot"
-#             and choice_id.isdigit()
-#             and 0 <= int(choice_id) < len(snapshot_imgs)
-#         ):
-#             response_valid = True
-#         elif (
-#             choice_type == "frontier"
-#             and choice_id.isdigit()
-#             and 0 <= int(choice_id) < len(frontier_imgs)
-#         ):
-#             response_valid = True
-
-#         if response_valid:
-#             final_response = response
-#             final_reason = reason
-#             break
-
-#     return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
-
-
 
 
 
@@ -692,11 +654,7 @@ def frontier_context(
 
 
 
-
-
-
-
-def explore_step(step, cfg, verbose=False):
+def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
     (
@@ -767,15 +725,30 @@ def explore_step(step, cfg, verbose=False):
     retry_bound = 3
 
     # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
+
+
+    context = ''
+    if not os.path.exists(chosen_frontier_path):
+        os.makedirs(chosen_frontier_path, exist_ok=True)
+
+    png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
+    if len(png_files) > 0:
+        sys_prompt, content = frontier_context(chosen_frontier_path)
+        context = call_openai_api(sys_prompt, content)
+    else:
+        pass
+
+
     sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
         frontier_imgs_0,   # layer0候选
         snapshot_imgs,
-        snapshot_classes,
+        snapshot_classes, 
         egocentric_view=step.get("use_egocentric_views", False),
         use_snapshot_class=True,
         image_goal=image_goal,
+        context=context,
     )
     if verbose:
         logging.info(f"Input prompt (frontier layer0):")
@@ -788,6 +761,7 @@ def explore_step(step, cfg, verbose=False):
 
     idx0 = None
     for _ in range(retry_bound):
+        # full_response = call_openai_api_vote(sys_prompt, content)
         full_response = call_openai_api(sys_prompt, content)
         if full_response is None:
             print("call_openai_api (frontier layer0) returns None, retrying")
@@ -832,6 +806,7 @@ def explore_step(step, cfg, verbose=False):
             egocentric_view=step.get("use_egocentric_views", False),
             use_snapshot_class=True,
             image_goal=image_goal,
+            context=context,
         )
         if verbose:
             logging.info(f"Input prompt (frontier layer1):")
@@ -850,6 +825,8 @@ def explore_step(step, cfg, verbose=False):
         final_reason = ""
         for _ in range(retry_bound):
             full_response = call_openai_api(sys_prompt, content)
+            # full_response = call_openai_api_vote(sys_prompt, content)
+            
             if full_response is None:
                 print("call_openai_api (frontier layer1) returns None, retrying")
                 continue
@@ -879,5 +856,7 @@ def explore_step(step, cfg, verbose=False):
         response = f"frontier {global_frontier_idx}"
         logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
         logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx} (global index: {global_frontier_idx})")
+
+        save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, int(tokens[1]))
         return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
 
