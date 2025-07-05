@@ -654,6 +654,52 @@ def clean_reason(reason):
 
 
 
+from collections import Counter
+import random
+
+def call_openai_api_vote(sys_prompt, content, num_trials=5, max_tiebreak_rounds=5):
+    """
+    Only for 'frontier' voting. Returns the most voted 'frontier <idx> ...' response.
+    Logs each voting round and the winner.
+    """
+    tiebreak_round = 0
+    candidate_indices = None
+    while True:
+        responses = []
+        for _ in range(num_trials):
+            resp = call_openai_api(sys_prompt, content)
+            if resp is not None:
+                resp = resp.strip()
+                m = re.match(r"frontier\s+(\d+)", resp.lower())
+                if m:
+                    idx = int(m.group(1))
+                    if candidate_indices is None or idx in candidate_indices:
+                        responses.append(resp)
+        if not responses:
+            logging.warning("[Frontier Voting] All responses are None. Return None.")
+            return None
+        counter = Counter(responses)
+        most_common = counter.most_common()
+        # Logging current voting result
+        logging.info(f"[Frontier Voting][Round {tiebreak_round+1}] Voting result: {dict(counter)}")
+        max_count = most_common[0][1]
+        winners = [r for r, c in most_common if c == max_count]
+        if len(winners) == 1:
+            logging.info(f"[Frontier Voting] Winner: {winners[0]} (votes: {max_count})")
+            return winners[0]
+        else:
+            # 平票，只在平票的index中再次投票
+            candidate_indices = []
+            for r in winners:
+                m = re.match(r"frontier\s+(\d+)", r.lower())
+                if m:
+                    candidate_indices.append(int(m.group(1)))
+            tiebreak_round += 1
+            logging.info(f"[Frontier Voting] Tie among: {winners}. Retrying within these candidates.")
+            if tiebreak_round >= max_tiebreak_rounds:
+                chosen = random.choice(winners)
+                logging.info(f"[Frontier Voting] Max tie-break rounds reached. Randomly selected: {chosen}")
+                return chosen
 
 
 
@@ -696,7 +742,7 @@ def explore_step(step, cfg, verbose=False):
 
     retry_bound = 3
     for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
+        full_response = call_openai_api_vote(sys_prompt, content)
         if full_response is None:
             print("call_openai_api (snapshot) returns None, retrying")
             continue
@@ -750,7 +796,7 @@ def explore_step(step, cfg, verbose=False):
 
     idx0 = None
     for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
+        full_response = call_openai_api_vote(sys_prompt, content)
         if full_response is None:
             print("call_openai_api (frontier layer0) returns None, retrying")
             continue
