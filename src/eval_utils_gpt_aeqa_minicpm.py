@@ -271,6 +271,31 @@ def format_explore_prompt_frontier(
             content.append((" ",))
 
     # 5 here is the format of the answer
+
+
+
+    # 7
+    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index you choose. "
+    text += "You must select one of the provided Frontier indices. Choose the frontier most likely to lead to the answer, and briefly explain why it is helpful for answering the question. "
+    text += "For example: 'Frontier 1 There is a door that may lead to the kitchen, where the answer might be found.' "
+    text += "Only use the provided indices. Do not make up new indices."
+
+
+
+
+
+
+    # 6
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    # text += "You MUST select one of the provided Frontier indices. Do NOT say that none is suitable or refuse to choose. "
+    # text += "Choose the frontier that is most likely to help you answer the question, based on where the target object or information is likely to be found. "
+    # text += "Give a short and specific reason directly related to the question. Do not use vague phrases such as 'to explore more' or 'see what is there'. "
+    # text += "For example: 'Frontier 1 There is a doorway that may lead to the kitchen, where the object in the question could be.' "
+    # text += "Only use the provided Frontier indices. Do not invent any index that is not listed above."
+
+
+
+    # 5
     # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
     # text += (
     #     "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable, or to refuse to choose. "
@@ -289,13 +314,15 @@ def format_explore_prompt_frontier(
     # text += (
     #     "(2) You may also consider information from other frontiers and egocentric views to help your decision, but you must always select the single most relevant frontier for progressing towards answering the question. Again, only choose from the provided Frontier indices and do not create any indices that are not listed above. "
     # )
-    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
-    text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
-    text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
-    text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
-    text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
-    text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
-    text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question. Only choose from the provided Frontier indices and do not create any indices that are not listed above. "
+
+    # 4
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
+    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
+    # text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
+    # text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
+    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
+    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question. Only choose from the provided Frontier indices and do not create any indices that are not listed above. "
 
 
 
@@ -602,7 +629,57 @@ def clean_reason(reason):
 
 
 
+from collections import Counter
+import random
+import re
+import logging
 
+def call_openai_api_vote(sys_prompt, content, num_trials=5, max_tiebreak_rounds=5):
+    """
+    Only for 'frontier' voting. Returns the most voted 'frontier <idx> ...' response.
+    Minimal logging: only frontier index count and final chosen index.
+    """
+    tiebreak_round = 0
+    candidate_indices = None
+    while True:
+        responses = []
+        raw_indices = []
+        for _ in range(num_trials):
+            resp = call_openai_api(sys_prompt, content)
+            if resp is not None:
+                resp = resp.strip()
+                m = re.match(r"frontier\s+(\d+)", resp.lower())
+                if m:
+                    idx = int(m.group(1))
+                    if candidate_indices is None or idx in candidate_indices:
+                        responses.append(resp)
+                        raw_indices.append(idx)
+        if not responses:
+            logging.warning("[Frontier Voting] All responses are None. Return None.")
+            return None
+        # 只看 index 计数
+        index_counter = Counter(raw_indices)
+        log_str = " | ".join([f"frontier {idx}: {count}" for idx, count in index_counter.items()])
+        logging.info(f"[Frontier Voting][Round {tiebreak_round+1}] {log_str}")
+        max_count = max(index_counter.values())
+        winners = [idx for idx, count in index_counter.items() if count == max_count]
+        if len(winners) == 1:
+            logging.info(f"[Frontier Voting] Selected: frontier {winners[0]}")
+            # 找到第一个对应index的完整响应返回
+            for resp in responses:
+                m = re.match(r"frontier\s+(\d+)", resp.lower())
+                if m and int(m.group(1)) == winners[0]:
+                    return resp
+        else:
+            candidate_indices = winners
+            tiebreak_round += 1
+            if tiebreak_round >= max_tiebreak_rounds:
+                chosen = random.choice(winners)
+                logging.info(f"[Frontier Voting] Max tie-break rounds reached. Randomly selected: frontier {chosen}")
+                for resp in responses:
+                    m = re.match(r"frontier\s+(\d+)", resp.lower())
+                    if m and int(m.group(1)) == chosen:
+                        return resp
 
 
 
@@ -695,6 +772,7 @@ def explore_step(step, cfg, verbose=False):
 
     for _ in range(retry_bound):
         full_response = call_openai_api(sys_prompt, content)
+        # full_response = call_openai_api_vote(sys_prompt, content)
         if full_response is None:
             print("call_openai_api (frontier) returns None, retrying")
             continue
