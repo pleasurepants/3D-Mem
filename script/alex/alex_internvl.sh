@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=i-po-c-v
+#SBATCH --job-name=i-po-c-o
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/internvl/point-con-vote-%j.out 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/internvl/point-con-only-%j.out 
 #SBATCH --partition a40
 
 
@@ -84,7 +84,7 @@ source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_internvl.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/internvl_vote.yaml
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/internvl_only.yaml
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
