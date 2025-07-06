@@ -66,7 +66,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
 
     sam_predictor = SAM(cfg.sam_model_name)  # UltraLytics SAM
     logging.info(f"Load SAM model {cfg.sam_model_name} successful!")
-
+    
     clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
         "ViT-H-14", pretrained="/anvme/workspace/v100dd12-3dmem/model/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin"  # "ViT-H-14", "laion2b_s32b_b79k"
     )
@@ -261,6 +261,10 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     tsdf_planner.max_point = None
                     tsdf_planner.target_point = None
 
+
+            # add chosen frontier dir
+            chosen_frontier_path = os.path.join(episode_dir, 'chosen_frontier')
+
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                 # query the VLM for the next navigation point, and the reason for the choice
                 vlm_response = query_vlm_for_response(
@@ -270,6 +274,8 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     rgb_egocentric_views=rgb_egocentric_views,
                     cfg=cfg,
                     verbose=True,
+                    chosen_frontier_path=chosen_frontier_path,
+                    step_idx=cnt_step,
                 )
                 if vlm_response is None:
                     logging.info(
