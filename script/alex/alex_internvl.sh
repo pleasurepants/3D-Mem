@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=i-po-o-v
+#SBATCH --job-name=i-po-o-o
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1

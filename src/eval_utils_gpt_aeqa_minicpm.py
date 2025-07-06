@@ -707,53 +707,57 @@ from collections import Counter
 import random
 import re
 import logging
-
 def call_openai_api_vote(sys_prompt, content, num_trials=5, max_tiebreak_rounds=5):
     """
-    Only for 'frontier' voting. Returns the most voted 'frontier <idx> ...' response.
-    Minimal logging: only frontier index count and final chosen index.
+    只用于 'yes/no' 投票。返回得票最多的完整回答（开头为Yes或No）。
+    日志只记录yes/no计数和最终选择。
     """
     tiebreak_round = 0
-    candidate_indices = None
+    candidate_types = None  # yes or no
+    yes_no_pattern = re.compile(r"^\s*(yes|no)\b", re.IGNORECASE)
     while True:
         responses = []
-        raw_indices = []
+        yes_no_list = []
         for _ in range(num_trials):
             resp = call_openai_api(sys_prompt, content)
             if resp is not None:
                 resp = resp.strip()
-                m = re.match(r"frontier\s+(\d+)", resp.lower())
+                m = yes_no_pattern.match(resp)
                 if m:
-                    idx = int(m.group(1))
-                    if candidate_indices is None or idx in candidate_indices:
+                    vote_type = m.group(1).capitalize()
+                    if candidate_types is None or vote_type in candidate_types:
                         responses.append(resp)
-                        raw_indices.append(idx)
+                        yes_no_list.append(vote_type)
         if not responses:
-            logging.warning("[Frontier Voting] All responses are None. Return None.")
+            logging.warning("[Yes/No Voting] All responses are None. Return None.")
             return None
-        # 只看 index 计数
-        index_counter = Counter(raw_indices)
-        log_str = " | ".join([f"frontier {idx}: {count}" for idx, count in index_counter.items()])
-        logging.info(f"[Frontier Voting][Round {tiebreak_round+1}] {log_str}")
+        # 只统计 Yes/No 数量
+        index_counter = Counter(yes_no_list)
+        log_str = " | ".join([f"{k}: {v}" for k, v in index_counter.items()])
+        logging.info(f"[Yes/No Voting][Round {tiebreak_round+1}] {log_str}")
         max_count = max(index_counter.values())
-        winners = [idx for idx, count in index_counter.items() if count == max_count]
+        winners = [k for k, v in index_counter.items() if v == max_count]
         if len(winners) == 1:
-            logging.info(f"[Frontier Voting] Selected: frontier {winners[0]}")
-            # 找到第一个对应index的完整响应返回
+            chosen = winners[0]
+            logging.info(f"[Yes/No Voting] Selected: {chosen}")
+            # 返回第一个对应类型的完整回答
             for resp in responses:
-                m = re.match(r"frontier\s+(\d+)", resp.lower())
-                if m and int(m.group(1)) == winners[0]:
+                m = yes_no_pattern.match(resp)
+                if m and m.group(1).capitalize() == chosen:
                     return resp
         else:
-            candidate_indices = winners
+            candidate_types = winners
             tiebreak_round += 1
             if tiebreak_round >= max_tiebreak_rounds:
                 chosen = random.choice(winners)
-                logging.info(f"[Frontier Voting] Max tie-break rounds reached. Randomly selected: frontier {chosen}")
+                logging.info(f"[Yes/No Voting] Max tie-break rounds reached. Randomly selected: {chosen}")
                 for resp in responses:
-                    m = re.match(r"frontier\s+(\d+)", resp.lower())
-                    if m and int(m.group(1)) == chosen:
+                    m = yes_no_pattern.match(resp)
+                    if m and m.group(1).capitalize() == chosen:
                         return resp
+
+
+
 
 def explore_step(step, cfg, verbose=False):
     step["use_prefiltering"] = cfg.prefiltering
