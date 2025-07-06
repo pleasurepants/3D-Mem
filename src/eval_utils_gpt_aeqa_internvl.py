@@ -787,7 +787,7 @@ def explore_step(step, cfg, verbose=False):
         frontier_imgs,
         egocentric_view=step.get("use_egocentric_views", False),
         image_goal=image_goal,
-        call_api_func=ab_vote,  # 你自己的API调用函数
+        call_api_func=call_openai_api,  # 你自己的API调用函数
     )
     response = f"frontier {winner_index}"
     return response, snapshot_id_mapping, reason, len(snapshot_imgs)
