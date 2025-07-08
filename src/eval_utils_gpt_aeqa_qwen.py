@@ -52,7 +52,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="qwen",  # gpt-4o
+                model="qwenl",  # gpt-4o
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
@@ -626,6 +626,206 @@ import random
 import re
 import logging
 
+def call_openai_api_score(sys_prompt, content, num_trials=5, max_tiebreak_rounds=5, dimension_names=None):
+    """
+    兼容frontier/listwise/pairwise/yesno单图多维度判定。
+    - 如果输出格式为Yes.../No...，就只对那一张图多维度打分。
+    - 如果是A.../B...，就分别对两张图打分。
+    - 其它情况沿用原有frontier流程。
+    - 每次logging.info输出：Frontier X: 4 Yes，或A: 3 Yes/B: 2 Yes
+    """
+    def extract_imgs(content):
+        """
+        自动提取所有Frontier图片，顺序排列到extract_imgs列表。
+        """
+        img_dict = {}
+        for c in content:
+            if len(c) > 1:
+                text = c[0].strip().lower()
+                m = re.match(r'frontier\s*(\d+)', text)
+                if m:
+                    idx = int(m.group(1))
+                    img_dict[idx] = c[1]
+                elif text.startswith("a"):
+                    img_dict['A'] = c[1]
+                elif text.startswith("b"):
+                    img_dict['B'] = c[1]
+        # 按编号升序排列
+        # 返回dict，兼容A/B也兼容index
+        return img_dict
+    def extract_imgs_single(content):
+        """
+        只抽取('Here is the Frontier you need to evaluate:', <img>)对应的图片。
+        返回dict，key为'yes'，value为该图片（找不到则为None）。
+        """
+        for c in content:
+            if len(c) > 1 and isinstance(c[1], str):
+                if c[0].strip().lower().startswith('here is the frontier you need to evaluate'):
+                    return {'yes': c[1]}
+        return {'yes': None}
+
+
+    def format_frontier_multiscore_prompt(
+        question,
+        chosen_img,
+        dimension_names=None,
+        egocentric_img=None,
+    ):
+        if dimension_names is None:
+            dimension_names = [
+                "Is exploring this frontier likely to provide information directly related to the question?",
+                "Is this frontier likely to reveal new objects or areas relevant for answering the question?",
+                "Does this frontier seem to reduce uncertainty about the possible answer?",
+                "Will choosing this frontier avoid redundant exploration and save steps?",
+                "Is this frontier likely to bring you closer to finding the final answer?"
+            ]
+        text = ""
+        text += "Task: You are an agent exploring an indoor environment to answer a user's question. "
+        text += "You have selected a candidate direction (Frontier) to explore next. "
+        text += "For this frontier, please answer the following five questions. "
+        text += "For each, answer only 'Yes' or 'No' on a single line. "
+        text += "Do not add any explanation or extra words.\n"
+        text += "Here is an example of the expected output format:\n"
+        text += "Yes\nNo\nYes\nNo\nYes\n"
+        text += "Now answer the following:\n"
+
+        multi_content = []
+        multi_content.append((f"Question: {question}",))
+        if egocentric_img is not None:
+            multi_content.append(("Current agent egocentric view:", egocentric_img))
+            multi_content.append((" ",))
+        multi_content.append(("The selected Frontier image:", chosen_img))
+        multi_content.append((" ",))
+        multi_content.append(("For the selected Frontier, answer each question below with only Yes or No:",))
+        for i, dim in enumerate(dimension_names, 1):
+            multi_content.append((f"Q{i}: {dim}",))
+        multi_content.append(("Write your five answers in five lines, only Yes or No, nothing else.",))
+        return text, multi_content
+
+    # --- 自动提取图片（支持编号、A、B） ---
+    extract_imgs_dict = extract_imgs(content)
+    # 自动提取问题和egocentric视角图
+    question = None
+    egocentric_img = None
+    for c in content:
+        if c[0].lower().startswith("question:"):
+            question = c[0].replace("Question:", "").strip()
+        if "egocentric" in c[0].lower() and len(c) > 1:
+            egocentric_img = c[1]
+
+    # 先做一轮API调用，看看输出格式是什么
+    resp = call_openai_api(sys_prompt, content)
+    if resp is None:
+        logging.warning("[Score] API response is None.")
+        return None
+
+    resp_str = resp.strip().lower()
+
+    # 1. 只返回yes/no的情况（单张图）
+    if resp_str.startswith("yes") or resp_str.startswith("no"):
+        if resp_str.startswith("yes"):
+            extract_imgs_dict_single = extract_imgs_single(content)
+            if extract_imgs_dict_single:
+                chosen_img = list(extract_imgs_dict_single.values())[0]
+                sys_prompt_score, content_score = format_frontier_multiscore_prompt(
+                    question, chosen_img, dimension_names=dimension_names, egocentric_img=egocentric_img
+                )
+                score_resp = call_openai_api(sys_prompt_score, content_score)
+                yes_count = len(re.findall(r"\byes\b", score_resp.strip().lower())) if score_resp else 0
+                logging.info(f"[Score] Single Image: {yes_count} Yes")
+                if resp_str.startswith("yes") and yes_count < 3:
+                    # 替换首个Yes为No
+                    resp_new = re.sub(r"^yes", "No", resp, flags=re.IGNORECASE)
+                    logging.info("[Score] Changed output from Yes to No due to low multi-score")
+                    return resp_new
+            return resp
+        else:
+            # 如果是No，直接返回
+            logging.info("[Score] Single Image: No")
+            return resp
+
+    # 2. Pairwise（A/B）输出
+    elif resp_str.startswith("a") or resp_str.startswith("b"):
+        m = re.match(r"([ab])\b", resp_str)
+        if m:
+            label = m.group(1).upper()
+            other_label = 'B' if label == 'A' else 'A'
+            chosen_img = extract_imgs_dict.get(label, None)
+            if chosen_img is not None:
+                sys_prompt_score, content_score = format_frontier_multiscore_prompt(
+                    question, chosen_img, dimension_names=dimension_names, egocentric_img=egocentric_img
+                )
+                score_resp = call_openai_api(sys_prompt_score, content_score)
+                yes_count = len(re.findall(r"\byes\b", score_resp.strip().lower())) if score_resp else 0
+                logging.info(f"[Score] {label}: {yes_count} Yes")
+                # 如果Yes不超过2个，再检测另一个
+                if yes_count < 3 and other_label in extract_imgs_dict:
+                    other_img = extract_imgs_dict[other_label]
+                    sys_prompt_score2, content_score2 = format_frontier_multiscore_prompt(
+                        question, other_img, dimension_names=dimension_names, egocentric_img=egocentric_img
+                    )
+                    score_resp2 = call_openai_api(sys_prompt_score2, content_score2)
+                    yes_count2 = len(re.findall(r"\byes\b", score_resp2.strip().lower())) if score_resp2 else 0
+                    logging.info(f"[Score] {other_label}: {yes_count2} Yes")
+                    # 如果另一项通过，则直接选另一项
+                    if yes_count2 >= 3:
+                        logging.info(f"[Pairwise] Switch to {other_label} (score passed, {yes_count2} Yes)")
+                        # 这里需要返回格式为"{other_label} ..."，但通常LLM只返回你最初的resp
+                        # 你可以用正则把reason换过去，也可以直接造一个简单返回
+                        return f"{other_label} (switched by score) "
+                # 否则返回LLM最初选择的
+            return resp
+
+
+    # 3. 标准frontier投票形式
+    else:
+        tiebreak_round = 0
+        candidate_indices = None
+        tried_indices = set()
+        last_response = None
+
+        # 抽取所有图片index（按编号排序）
+        all_indices = sorted([k for k in extract_imgs_dict if isinstance(k, int)])
+        while tiebreak_round < max_tiebreak_rounds:
+            responses = []
+            indices = []
+            for _ in range(num_trials):
+                resp = call_openai_api(sys_prompt, content)
+                if resp is not None:
+                    m = re.match(r"frontier\s+(\d+)", resp.lower())
+                    if m:
+                        idx = int(m.group(1))
+                        if (candidate_indices is None or idx in candidate_indices) and idx not in tried_indices:
+                            responses.append(resp)
+                            indices.append(idx)
+            if not responses:
+                logging.warning("[Frontier Score] All responses are None. Return None.")
+                return None
+
+            for resp, idx in zip(responses, indices):
+                if idx not in extract_imgs_dict:
+                    continue
+                chosen_img = extract_imgs_dict[idx]
+                sys_prompt_score, content_score = format_frontier_multiscore_prompt(
+                    question, chosen_img, dimension_names=dimension_names, egocentric_img=egocentric_img
+                )
+                score_resp = call_openai_api(sys_prompt_score, content_score)
+                yes_count = len(re.findall(r"\byes\b", score_resp.strip().lower())) if score_resp else 0
+                logging.info(f"[Score] Frontier {idx}: {yes_count} Yes")
+                if yes_count >= 3:
+                    logging.info(f"[Frontier Score] Selected: frontier {idx} (score passed)")
+                    return resp
+                tried_indices.add(idx)
+
+            candidate_indices = [idx for idx in set(indices) if idx not in tried_indices]
+            tiebreak_round += 1
+
+        if responses:
+            logging.info("[Frontier Score] All rounds failed. Randomly returning last tried.")
+            return responses[-1]
+        else:
+            logging.warning("[Frontier Score] No response available at all.")
+            return None
 
 
 def call_openai_api_vote(sys_prompt, content, num_trials=5, max_tiebreak_rounds=5):
@@ -777,8 +977,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                     message += f"[{c[1][:10]}...]"
             logging.info(message)
         for attempt in range(retry_bound):
-            full_response = call_openai_api(sys_prompt, content)
+            # full_response = call_openai_api(sys_prompt, content)
             # full_response = call_openai_api_vote(sys_prompt, content)
+            full_response = call_openai_api_score(sys_prompt, content)
             if full_response is None:
                 print("call_openai_api (single frontier) returns None, retrying")
                 continue
@@ -824,7 +1025,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         logging.info(message)
 
     for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
+        # full_response = call_openai_api(sys_prompt, content)
+        full_response = call_openai_api_score(sys_prompt, content)
         if full_response is None:
             print("call_openai_api (frontier ALL) returns None, retrying")
             continue
