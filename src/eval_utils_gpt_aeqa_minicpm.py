@@ -52,7 +52,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="minicpml",  # gpt-4o
+                model="minicpm",  # gpt-4o
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
