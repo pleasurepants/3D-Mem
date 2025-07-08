@@ -795,7 +795,6 @@ def call_openai_api_score(sys_prompt, content, num_trials=5, max_tiebreak_rounds
 
     # 1. 只返回yes/no的情况（单张图）
     if resp_str.startswith("yes") or resp_str.startswith("no"):
-        # 默认只有一张图片，对该图片打分
         if extract_imgs_dict:
             chosen_img = list(extract_imgs_dict.values())[0]
             sys_prompt_score, content_score = format_frontier_multiscore_prompt(
@@ -804,23 +803,44 @@ def call_openai_api_score(sys_prompt, content, num_trials=5, max_tiebreak_rounds
             score_resp = call_openai_api(sys_prompt_score, content_score)
             yes_count = len(re.findall(r"\byes\b", score_resp.strip().lower())) if score_resp else 0
             logging.info(f"[Score] Single Image: {yes_count} Yes")
+            if resp_str.startswith("yes") and yes_count < 3:
+                # 替换首个Yes为No
+                resp_new = re.sub(r"^yes", "No", resp, flags=re.IGNORECASE)
+                logging.info("[Score] Changed output from Yes to No due to low multi-score")
+                return resp_new
         return resp
 
     # 2. Pairwise（A/B）输出
     elif resp_str.startswith("a") or resp_str.startswith("b"):
-        # 只检测LLM真正选择的label
         m = re.match(r"([ab])\b", resp_str)
         if m:
             label = m.group(1).upper()
-            if label in extract_imgs_dict:
-                chosen_img = extract_imgs_dict[label]
+            other_label = 'B' if label == 'A' else 'A'
+            chosen_img = extract_imgs_dict.get(label, None)
+            if chosen_img is not None:
                 sys_prompt_score, content_score = format_frontier_multiscore_prompt(
                     question, chosen_img, dimension_names=dimension_names, egocentric_img=egocentric_img
                 )
                 score_resp = call_openai_api(sys_prompt_score, content_score)
                 yes_count = len(re.findall(r"\byes\b", score_resp.strip().lower())) if score_resp else 0
                 logging.info(f"[Score] {label}: {yes_count} Yes")
-        return resp
+                # 如果Yes不超过2个，再检测另一个
+                if yes_count < 3 and other_label in extract_imgs_dict:
+                    other_img = extract_imgs_dict[other_label]
+                    sys_prompt_score2, content_score2 = format_frontier_multiscore_prompt(
+                        question, other_img, dimension_names=dimension_names, egocentric_img=egocentric_img
+                    )
+                    score_resp2 = call_openai_api(sys_prompt_score2, content_score2)
+                    yes_count2 = len(re.findall(r"\byes\b", score_resp2.strip().lower())) if score_resp2 else 0
+                    logging.info(f"[Score] {other_label}: {yes_count2} Yes")
+                    # 如果另一项通过，则直接选另一项
+                    if yes_count2 >= 3:
+                        logging.info(f"[Pairwise] Switch to {other_label} (score passed, {yes_count2} Yes)")
+                        # 这里需要返回格式为"{other_label} ..."，但通常LLM只返回你最初的resp
+                        # 你可以用正则把reason换过去，也可以直接造一个简单返回
+                        return f"{other_label} (switched by score) "
+                # 否则返回LLM最初选择的
+            return resp
 
 
     # 3. 标准frontier投票形式
