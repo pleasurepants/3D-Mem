@@ -17,7 +17,7 @@
             "type": "debugpy",
             "request": "attach",
             "connect": {
-                "host": "worker-5.dbs.ifi.lmu.de",
+                "host": "a0126.nhr.fau.de",
                 "port": 8798
             },
             "pathMappings": [

@@ -83,7 +83,7 @@ source .env
 
 CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
  /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_internvl.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex/eval_aeqa_debug.yaml
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/eval_aeqa_debug.yaml
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
