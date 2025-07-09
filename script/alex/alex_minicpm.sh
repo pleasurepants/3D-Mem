@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=m-h-c-o
+#SBATCH --job-name=m-h-c-s
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a40:2
+#SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/minicpm/hiera-con-only-%j.out 
-#SBATCH --partition a40
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/minicpm/hiera-con-score-%j.out 
+#SBATCH --partition a100
 
 
 
