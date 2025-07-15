@@ -272,7 +272,6 @@ def format_explore_prompt_frontier(
             "The following is the egocentric view of the agent in forward direction: "
         )
         content.append((text, egocentric_imgs[-1]))
-        content.append((" ",))
 
 
     # 4 here is the frontier images
@@ -283,7 +282,6 @@ def format_explore_prompt_frontier(
     else:
         for i in range(len(frontier_imgs)):
             content.append((f"Frontier {i} ", frontier_imgs[i]))
-            content.append((" ",))
 
 
     # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
@@ -307,14 +305,29 @@ def format_explore_prompt_frontier(
     # text += "Only use the provided indices. Do NOT make up new indices."
 
     # cot-v1
-    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
-    text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
-    text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
-    text += "Explain your reasoning step by step: First, state what the question is asking for. Then, briefly analyze the clues shown in each frontier image and their relevance to the question. Finally, state clearly why you select your chosen frontier."
-    text += "For example, you can answer: 'Frontier 2 The question asks about finding the refrigerator, which is commonly in the kitchen. Among the frontiers, Frontier 2 shows a doorway and a tiled floor, which are clues for a kitchen. The other frontiers look like living or bedroom spaces. Therefore, I choose Frontier 2 as it is most likely to lead to the kitchen and the answer.' "
-    text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
-    text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question."
-    text += "Only use the provided indices. Do NOT make up new indices."
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
+    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
+    # text += "Explain your reasoning step by step: First, state what the question is asking for. Then, briefly analyze the clues shown in each frontier image and their relevance to the question. Finally, state clearly why you select your chosen frontier."
+    # text += "For example, you can answer: 'Frontier 2 The question asks about finding the refrigerator, which is commonly in the kitchen. Among the frontiers, Frontier 2 shows a doorway and a tiled floor, which are clues for a kitchen. The other frontiers look like living or bedroom spaces. Therefore, I choose Frontier 2 as it is most likely to lead to the kitchen and the answer.' "
+    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
+    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question."
+    # text += "Only use the provided indices. Do NOT make up new indices."
+
+    # cot-v2
+    text = "You are required to reason step by step and only output your final choice at the end. Please follow the instructions below carefully. "
+    text += "Step 0: List all candidate images you are given and their indices in the following format: 'Candidate indices: frontier 0, frontier 1, ...' (listing only the actual indices provided below; do NOT add, omit, or change any index)."
+    text += "You must ONLY discuss and compare the images whose indices are listed in Step 0. You are STRICTLY FORBIDDEN to invent, mention, analyze, or refer to any images or indices that are not explicitly listed in Step 0."
+    text += "Step 1: For each provided Frontier image, describe in detail what you see. Focus on visible objects, scene layout, and any clues relevant to the question. ONLY describe the images with the indices listed in Step 0. Start your answer with 'Step 1:' and describe each candidate separately."
+    text += "Step 2: Analyze what the question is asking for. Then, compare ONLY the frontiers listed in Step 0, by analyzing the clues shown in each image and their relevance to the question. Do NOT mention, analyze, or imagine any other indices. Start this section with 'Step 2:'."
+    text += "Step 3: Based on your analysis above, select the single most relevant frontier for making progress toward answering the question. Clearly state your reasoning and why you select this one, but ONLY from the indices listed in Step 0. Begin this section with 'Step 3:'."
+    text += "After completing Step 3, output your final answer on a new line in the format: 'frontier i' (where i is one of the indices listed in Step 0). Do not include any other words, indices, or explanations on that line."
+    text += "You MUST select one and only one of the provided Frontier indices listed in Step 0. You are NOT allowed to say that none is suitable or refuse to choose."
+    text += "Choose the frontier that is MOST likely to help you answer the question, based ONLY on the visible clues, semantic hints, or where the target object is likely to be found in the images listed above."
+    text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question."
+    text += "Do NOT mention words like 'frontier', directions, or image positions in your reasoning except when referring to the candidate indices listed in Step 0. Only use the provided Frontier indices; do NOT make up or analyze any index that is not listed above."
+    text += "Only use the indices listed in Step 0. Any mention, analysis, or invention of other indices will be considered an error. Do NOT refer to images/frontiers not listed above."
+
 
 
 
@@ -593,6 +606,26 @@ def clean_reason(reason):
     return reason
 
 
+
+def parse_frontier_index(output: str) -> int:
+    """
+    从模型的CoT输出文本中解析出最后一行的frontier index
+    只支持如 'frontier 2'，不返回非数字或不合规内容
+    """
+    # 去除空白并分割为行
+    lines = [line.strip() for line in output.strip().split('\n') if line.strip()]
+    if not lines:
+        raise ValueError("Empty output")
+    last_line = lines[-1].lower()
+    # 使用正则匹配 'frontier 数字'
+    match = re.match(r'frontier\s*(\d+)', last_line)
+    if match:
+        return int(match.group(1))
+    else:
+        raise ValueError(f"Could not parse frontier index from: '{last_line}'")
+
+
+
 def save_base64_to_png(b64_str, save_dir, step_idx, idx):
     os.makedirs(save_dir, exist_ok=True)
     save_path = os.path.join(save_dir, f"step{step_idx}_frontier{idx}.png")
@@ -789,18 +822,14 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         if isinstance(full_response, list):
             full_response = " ".join(full_response)
         full_response = full_response.strip().lower()
-        if full_response.startswith("frontier"):
-            tokens = full_response.split()
-            if len(tokens) >= 2 and tokens[1].isdigit():
-                idx0 = int(tokens[1])
-                if 0 <= idx0 < len(frontier_imgs_0):
-                    break
-                else:
-                    print(f"Layer0 index out of range: {tokens[1]}")
+        try:
+            idx0 = parse_frontier_index(full_response)
+            if 0 <= idx0 < len(frontier_imgs_0):
+                break
             else:
-                print(f"Layer0 format error: {full_response}")
-        else:
-            print(f"Unrecognized frontier-layer0 response: {full_response}")
+                print(f"Layer0 index out of range: {idx0}")
+        except Exception as e:
+            print(f"Layer0 format error: {full_response} | {e}")
     if idx0 is None:
         return None, snapshot_id_mapping, None, len(snapshot_imgs)
     logging.info(f"[Layer0] VLM selected index: {idx0}")
@@ -816,7 +845,14 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     else:
         layer1_indices = step['layer0_to_layer1'][idx0]   # 例如 [1, 2]
         frontier_imgs_subgroup = [frontier_imgs_1[i] for i in layer1_indices]
-
+        if len(layer1_indices) == 1:
+            final_layer1_idx = layer1_indices[0]
+            global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
+            response = f"frontier {global_frontier_idx}"
+            final_reason = "Only one candidate in this subcluster, selected by default."
+            logging.info(f"[Layer1] Only one candidate ({global_frontier_idx}), selected by default.")
+            save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
+            return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
         sys_prompt, content = format_explore_prompt_frontier(
             question,
             egocentric_imgs,
@@ -853,17 +889,22 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             if isinstance(full_response, list):
                 full_response = " ".join(full_response)
             full_response = full_response.strip().lower()
-            # 正则提取格式：frontier <idx> <reason...>
-            m = re.match(r"frontier\s+(\d+)\s*(.*)", full_response)
-            if m:
-                idx1_in_subgroup = int(m.group(1))
+            try:
+                idx1_in_subgroup = parse_frontier_index(full_response)
                 if 0 <= idx1_in_subgroup < len(frontier_imgs_subgroup):
-                    final_reason = clean_reason(m.group(2))
+                    # 可以顺便保留推理部分（比如取出最后一行前的内容，作为reason）
+                    # 这里你原来是用 group(2) 取 reason，可以保留
+                    lines = [line.strip() for line in full_response.strip().split('\n') if line.strip()]
+                    if len(lines) > 1:
+                        final_reason = "\n".join(lines[:-1])
+                    else:
+                        final_reason = ""
                     break
                 else:
-                    print(f"Layer1 index out of range: {m.group(1)}")
-            else:
-                print(f"Layer1 format error: {full_response}")
+                    print(f"Layer1 index out of range: {idx1_in_subgroup}")
+            except Exception as e:
+                print(f"Layer1 format error: {full_response} | {e}")
+
         if idx1_in_subgroup is None or idx1_in_subgroup >= len(layer1_indices):
             logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
             response = f"frontier {idx0}"
@@ -877,6 +918,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
         logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx} (global index: {global_frontier_idx})")
 
-        save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, int(tokens[1]))
+        save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
+
         return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
 
