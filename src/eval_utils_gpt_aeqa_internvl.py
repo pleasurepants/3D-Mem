@@ -286,17 +286,37 @@ def format_explore_prompt_frontier(
             content.append((" ",))
 
 
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
+    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
+    # text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
+    # text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
+    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
+    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question."
+    # text += "Only use the provided indices. Do NOT make up new indices."
+
+    # cot
+    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
+    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
+    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
+    # text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
+    # text += "**Think step by step.**"
+    # text += "For example, if you choose the second frontier, you can return: 'Frontier 1 First, the question asks about the kitchen. Frontier 1 shows a door which may lead to the kitchen, so I choose it.' "
+    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
+    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question."
+    # text += "Only use the provided indices. Do NOT make up new indices."
+
+    # cot-v1
     text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
     text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
     text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
-    text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
-    text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
+    text += "Explain your reasoning step by step: First, state what the question is asking for. Then, briefly analyze the clues shown in each frontier image and their relevance to the question. Finally, state clearly why you select your chosen frontier."
+    text += "For example, you can answer: 'Frontier 2 The question asks about finding the refrigerator, which is commonly in the kitchen. Among the frontiers, Frontier 2 shows a doorway and a tiled floor, which are clues for a kitchen. The other frontiers look like living or bedroom spaces. Therefore, I choose Frontier 2 as it is most likely to lead to the kitchen and the answer.' "
     text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
     text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question."
     text += "Only use the provided indices. Do NOT make up new indices."
 
 
-    
 
     content.append((text,))
 
