@@ -253,7 +253,6 @@ def format_explore_prompt_frontier(
     text = f"Question: {question}"
     if image_goal is not None:
         content.append((text, image_goal))
-        content.append((" ",))
     else:
         content.append((text + " ",))
 
@@ -266,7 +265,6 @@ def format_explore_prompt_frontier(
             "The following is the egocentric view of the agent in forward direction: "
         )
         content.append((text, egocentric_imgs[-1]))
-        content.append((" ",))
 
 
     # 4 here is the frontier images
@@ -277,14 +275,21 @@ def format_explore_prompt_frontier(
     else:
         for i in range(len(frontier_imgs)):
             content.append((f"Frontier {i} ", frontier_imgs[i]))
-            content.append((" ",))
 
 
-    text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index you choose. "
-    text += "You must select one of the provided Frontier indices. Choose the frontier most likely to lead to the answer, and briefly explain why it is helpful for answering the question. "
-    text += "For example: 'Frontier 1 There is a door that may lead to the kitchen, where the answer might be found.' "
-    text += "Only use the provided indices. Do not make up new indices."
-
+    # cot-v2
+    text = "You are required to reason step by step and only output your final choice at the end. Please follow the instructions below carefully. "
+    text += "Step 0: List all candidate images you are given and their indices in the following format: 'Candidate indices: frontier 0, frontier 1, ...' (listing only the actual indices provided below; do NOT add, omit, or change any index)."
+    text += "You must ONLY discuss and compare the images whose indices are listed in Step 0. You are STRICTLY FORBIDDEN to invent, mention, analyze, or refer to any images or indices that are not explicitly listed in Step 0."
+    text += "Step 1: For each provided Frontier image, describe in detail what you see. Focus on visible objects, scene layout, and any clues relevant to the question. ONLY describe the images with the indices listed in Step 0. Start your answer with 'Step 1:' and describe each candidate separately."
+    text += "Step 2: Analyze what the question is asking for. Then, compare ONLY the frontiers listed in Step 0, by analyzing the clues shown in each image and their relevance to the question. Do NOT mention, analyze, or imagine any other indices. Start this section with 'Step 2:'."
+    text += "Step 3: Based on your analysis above, select the single most relevant frontier for making progress toward answering the question. Clearly state your reasoning and why you select this one, but ONLY from the indices listed in Step 0. Begin this section with 'Step 3:'."
+    text += "After completing Step 3, output your final answer on a new line in the format: 'frontier i' (where i is one of the indices listed in Step 0). Do not include any other words, indices, or explanations on that line."
+    text += "You MUST select one and only one of the provided Frontier indices listed in Step 0. You are NOT allowed to say that none is suitable or refuse to choose."
+    text += "Choose the frontier that is MOST likely to help you answer the question, based ONLY on the visible clues, semantic hints, or where the target object is likely to be found in the images listed above."
+    text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question."
+    text += "Do NOT mention words like 'frontier', directions, or image positions in your reasoning except when referring to the candidate indices listed in Step 0. Only use the provided Frontier indices; do NOT make up or analyze any index that is not listed above."
+    text += "Only use the indices listed in Step 0. Any mention, analysis, or invention of other indices will be considered an error. Do NOT refer to images/frontiers not listed above."
     
     content.append((text,))
 
@@ -777,6 +782,32 @@ def call_openai_api_score(sys_prompt, content, num_trials=5, max_tiebreak_rounds
 
 
 
+import re
+
+def parse_frontier_index(output: str):
+    """
+    从模型的CoT输出文本中解析出推理reason和最后一行frontier index
+    返回: (reason:str, index:int)
+    只支持如 'frontier 2'，不返回非数字或不合规内容
+    """
+    lines = [line.strip() for line in output.strip().split('\n') if line.strip()]
+    if not lines:
+        raise ValueError("Empty output")
+    last_line = lines[-1].lower()
+    match = re.match(r'frontier\s*(\d+)', last_line)
+    if match:
+        index = int(match.group(1))
+        # reason为最后一行前所有内容合并
+        reason = "\n".join(lines[:-1]).strip()
+        return reason, index
+    else:
+        raise ValueError(f"Could not parse frontier index from: '{last_line}'")
+
+
+
+
+
+
 def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
@@ -857,8 +888,13 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     else:
         pass
 
-
-
+    if len(frontier_imgs) == 1: 
+        idx0 = 0
+        save_base64_to_png(frontier_imgs[0], chosen_frontier_path, step_idx, idx0)
+        # 你可以自定义response，比如直接返回frontier 0
+        response = "frontier 0"
+        reason = "Only one candidate, selected by default."
+        return response, snapshot_id_mapping, reason, len(snapshot_imgs)
 
     sys_prompt, content = format_explore_prompt_frontier(
         question,
@@ -884,7 +920,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     for _ in range(retry_bound):
         # full_response = call_openai_api(sys_prompt, content)
         # full_response = call_openai_api_vote(sys_prompt, content)
-        full_response = call_openai_api_score(sys_prompt, content)
+        full_response = call_openai_api(sys_prompt, content)
         if full_response is None:
             print("call_openai_api (frontier) returns None, retrying")
             continue
@@ -893,24 +929,16 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             full_response = " ".join(full_response)
         full_response = full_response.strip().lower()
 
-        if full_response.startswith("frontier"):
-            tokens = full_response.split()
-            if len(tokens) >= 2 and tokens[1].isdigit():
-                idx = int(tokens[1])
-                if 0 <= idx < len(frontier_imgs):
-                    response = f"{tokens[0]} {tokens[1]}"
-                    reason = " ".join(tokens[2:]).strip()
-                    reason = clean_reason(reason)
-
-                    # save the chosen frontier image if path is provided
-                    save_base64_to_png(frontier_imgs[int(tokens[1])], chosen_frontier_path, step_idx, int(tokens[1]))
-                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
-                else:
-                    print(f"Frontier index out of range: {tokens[1]}")
-                    continue
-        else:
-            print(f"Unrecognized frontier response: {full_response}")
-            continue
+        try:
+            reason, idx0 = parse_frontier_index(full_response)
+            if 0 <= idx0 < len(frontier_imgs):
+                save_base64_to_png(frontier_imgs[idx0], chosen_frontier_path, step_idx, int(idx0))
+                response = f"frontier {idx0}"
+                return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+            else:
+                print(f"Frontier index out of range: {idx0}")
+        except Exception as e:
+            print(f"Unrecognized frontier response: {full_response} | {e}")
 
     # 如果都失败，返回None
     return None, snapshot_id_mapping, None, len(snapshot_imgs)
