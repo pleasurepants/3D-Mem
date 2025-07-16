@@ -607,20 +607,22 @@ def clean_reason(reason):
 
 
 
-def parse_frontier_index(output: str) -> int:
+def parse_frontier_index(output: str):
     """
-    从模型的CoT输出文本中解析出最后一行的frontier index
+    从模型的CoT输出文本中解析出推理reason和最后一行frontier index
+    返回: (reason:str, index:int)
     只支持如 'frontier 2'，不返回非数字或不合规内容
     """
-    # 去除空白并分割为行
     lines = [line.strip() for line in output.strip().split('\n') if line.strip()]
     if not lines:
         raise ValueError("Empty output")
     last_line = lines[-1].lower()
-    # 使用正则匹配 'frontier 数字'
     match = re.match(r'frontier\s*(\d+)', last_line)
     if match:
-        return int(match.group(1))
+        index = int(match.group(1))
+        # reason为最后一行前所有内容合并
+        reason = "\n".join(lines[:-1]).strip()
+        return reason, index
     else:
         raise ValueError(f"Could not parse frontier index from: '{last_line}'")
 
@@ -823,7 +825,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             full_response = " ".join(full_response)
         full_response = full_response.strip().lower()
         try:
-            idx0 = parse_frontier_index(full_response)
+            reason, idx0 = parse_frontier_index(full_response)
             if 0 <= idx0 < len(frontier_imgs_0):
                 break
             else:
@@ -833,6 +835,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     if idx0 is None:
         return None, snapshot_id_mapping, None, len(snapshot_imgs)
     logging.info(f"[Layer0] VLM selected index: {idx0}")
+    logging.info(f"reason for layer0 selection: {reason}")
     for k, v in step['layer0_to_layer1'].items():
         logging.info(f"  Layer0 {k}: {v}")
     # ------- Step 2.2: 在选中的layer0大簇下所有layer1细簇中选 -------
@@ -890,7 +893,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 full_response = " ".join(full_response)
             full_response = full_response.strip().lower()
             try:
-                idx1_in_subgroup = parse_frontier_index(full_response)
+                reason, idx1_in_subgroup = parse_frontier_index(full_response)
                 if 0 <= idx1_in_subgroup < len(frontier_imgs_subgroup):
                     # 可以顺便保留推理部分（比如取出最后一行前的内容，作为reason）
                     # 这里你原来是用 group(2) 取 reason，可以保留
@@ -909,7 +912,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
             response = f"frontier {idx0}"
             final_reason = full_response_layer0
-            return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+            return response, snapshot_id_mapping, full_response_layer0, len(snapshot_imgs)
 
         final_layer1_idx = layer1_indices[idx1_in_subgroup]
         # frontier index = len(self.frontiers_layer0) + final_layer1_idx
@@ -920,5 +923,5 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
         save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
 
-        return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+        return response, snapshot_id_mapping, reason, len(snapshot_imgs)
 
