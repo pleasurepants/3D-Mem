@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=i-h-c-c
+#SBATCH --job-name=i-k-c-cot
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/internvl/hiera-con-cotv2-%j.out 
+#SBATCH --time=23:00:00 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/internvl/kmeans-con-cotv2-%j.out 
 #SBATCH --partition a40
 
 

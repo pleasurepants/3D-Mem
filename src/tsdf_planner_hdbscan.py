@@ -13,7 +13,8 @@ import supervision as sv
 from matplotlib.patches import Wedge
 from matplotlib.patches import FancyArrowPatch
 import matplotlib.patheffects as pe
-
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 from src.geom import *
 from src.habitat import pos_normal_to_habitat, pos_habitat_to_normal
 from src.tsdf_base import TSDFPlannerBase
@@ -193,23 +194,47 @@ class TSDFPlanner(TSDFPlannerBase):
         # =========== 两层hdbscan分层聚类 ===========
 
         # === adaptive min_cluster_size 聚类 ===
-        def adaptive_hdbscan(data, min_cluster_size, min_limit=2):
-            while min_cluster_size >= min_limit:
-                db = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size).fit(data)
-                labels = db.labels_
-                n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-                if n_clusters > 0:
-                    return labels
-                min_cluster_size -= 1
-            return labels  # 最后即使全-1也返回
+        # def adaptive_hdbscan(data, min_cluster_size, min_limit=2):
+        #     while min_cluster_size >= min_limit:
+        #         db = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size).fit(data)
+        #         labels = db.labels_
+        #         n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+        #         if n_clusters > 0:
+        #             return labels
+        #         min_cluster_size -= 1
+        #     return labels  # 最后即使全-1也返回
 
-        labels_coarse = adaptive_hdbscan(frontier_areas, cfg.min_frontier_area_layer0, min_limit=2)
-        labels_fine = adaptive_hdbscan(frontier_areas, cfg.min_frontier_area_layer1, min_limit=2)
-        # db_coarse = hdbscan.HDBSCAN(min_cluster_size=cfg.min_frontier_area_layer0).fit(frontier_areas)
-        # labels_coarse = db_coarse.labels_
+        # labels_coarse = adaptive_hdbscan(frontier_areas, cfg.min_frontier_area_layer0, min_limit=2)
+        # # labels_fine = adaptive_hdbscan(frontier_areas, cfg.min_frontier_area_layer1, min_limit=2)
 
-        # db_fine = hdbscan.HDBSCAN(min_cluster_size=cfg.min_frontier_area_layer1).fit(frontier_areas)
-        # labels_fine = db_fine.labels_
+
+        n_points = len(frontier_areas)
+        if n_points == 0:
+            self.frontiers = []
+            return False
+        if n_points == 1:
+            labels_coarse = np.zeros(1, dtype=int)
+        elif n_points == 2:
+            labels_coarse = np.array([0, 1])  # 直接分成两簇
+        else:
+            best_n_clusters = 2
+            best_score = -1
+            best_labels = None
+            for n_clusters in [2, 3]:
+                if n_points < n_clusters:
+                    continue
+                kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42).fit(frontier_areas)
+                labels = kmeans.labels_
+                # silhouette_score需要每簇至少有2个点，否则会报错
+                try:
+                    score = silhouette_score(frontier_areas, labels)
+                except Exception:
+                    score = -1
+                if score > best_score:
+                    best_score = score
+                    best_n_clusters = n_clusters
+                    best_labels = labels
+            labels_coarse = best_labels
 
         # 1. 粗层Frontier对象生成
         self.frontiers_layer0 = []
@@ -234,56 +259,53 @@ class TSDFPlanner(TSDFPlannerBase):
             frontier.layer0_label = coarse_label
             self.frontiers_layer0.append(frontier)
 
-        # 2. 细层Frontier对象生成+父子映射
-        coarse2fine = defaultdict(list)
-        fine_parent_map = {}  # fine_label -> parent_label
-        for fine_label in np.unique(labels_fine):
-            if fine_label == -1:
-                continue
-            idxs = np.where(labels_fine == fine_label)[0]
-            parent_labels = np.unique(labels_coarse[idxs])
-            valid_parents = [l for l in parent_labels if l != -1]
-            if valid_parents:
-                parent_label = valid_parents[0]  # 多个时取数量最多的
-            else:
-                # 归属最近大簇
-                center = np.mean(frontier_areas[idxs], axis=0)
-                parent_label = min(
-                    coarse_centers.keys(),
-                    key=lambda l: np.linalg.norm(center - coarse_centers[l])
-                )
-            coarse2fine[parent_label].append(fine_label)
-            fine_parent_map[fine_label] = parent_label
-
-        # 2.2 coarse下的细簇编号本地化
-        fine_label_map = dict()  # (coarse, fine) -> 子簇局部编号
-        for coarse_label, fine_labels in coarse2fine.items():
-            for local_id, fine_label in enumerate(sorted(fine_labels)):
-                fine_label_map[(coarse_label, fine_label)] = local_id
-
-        # 2.3 细层Frontier对象及父子局部ID赋值
+        # 2. 粗簇内根据视角均匀三等分为细簇
         self.frontiers_layer1 = []
-        for fine_label in np.unique(labels_fine):
-            if fine_label == -1:
+        for coarse_label in np.unique(labels_coarse):
+            if coarse_label == -1:
                 continue
-            idx = np.where(labels_fine == fine_label)[0]
-            cluster = frontier_areas[idx]
-            if len(cluster) < cfg.min_frontier_area_layer1:
+            idxs = np.where(labels_coarse == coarse_label)[0]
+            cluster = frontier_areas[idxs]
+            if len(cluster) < 3:
+                # 少于3个点直接生成一个细frontier
+                ft_angle = np.mean([
+                    np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
+                ])
+                region = self.get_frontier_region_map(cluster)
+                ft_data = {"angle": ft_angle, "region": region}
+                frontier = self.create_frontier(
+                    ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
+                )
+                frontier.layer1_label = f"{coarse_label}_0"
+                frontier.parent_layer0 = coarse_label
+                self.frontiers_layer1.append(frontier)
                 continue
-            angle_cluster = np.asarray([
-                np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
-            ])
-            ft_angle = np.mean(angle_cluster)
-            region = self.get_frontier_region_map(cluster)
-            parent_label = fine_parent_map[fine_label]
-            local_child = fine_label_map[(parent_label, fine_label)]
-            ft_data = {"angle": ft_angle, "region": region}
-            frontier = self.create_frontier(
-                ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
-            )
-            frontier.layer1_label = f"{parent_label}_{str(len(self.frontiers_layer1))}"  # 父ID_子ID格式
-            frontier.parent_layer0 = parent_label
-            self.frontiers_layer1.append(frontier)
+
+            # kmeans
+            relative_vecs = cluster - cur_point[:2]
+            angles = np.arctan2(relative_vecs[:, 1], relative_vecs[:, 0])
+            angles = (angles + 2 * np.pi) % (2 * np.pi)  # 保证在0~2pi
+            # 把角度映射到单位圆上
+            angle_points = np.stack([np.cos(angles), np.sin(angles)], axis=1)
+            n_clusters = min(3, len(cluster))
+            kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42).fit(angle_points)
+            for i in range(n_clusters):
+                split_idx = np.where(kmeans.labels_ == i)[0]
+                if len(split_idx) == 0:
+                    continue
+                sub_cluster = cluster[split_idx]
+                sub_angles = angles[split_idx]
+                ft_angle = np.mean(sub_angles)
+                region = self.get_frontier_region_map(sub_cluster)
+                ft_data = {"angle": ft_angle, "region": region}
+                frontier = self.create_frontier(
+                    ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
+                )
+                frontier.layer1_label = f"{coarse_label}_{i}"
+                frontier.parent_layer0 = coarse_label
+                self.frontiers_layer1.append(frontier)
+            
+
 
         # 3. 默认细层用于self.frontiers
         self.frontiers = self.frontiers_layer0 + self.frontiers_layer1
