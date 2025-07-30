@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
 #SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/lifelong/minicpm/embedding-lifelong-cotv0-%j.out 
 #SBATCH --partition a40
