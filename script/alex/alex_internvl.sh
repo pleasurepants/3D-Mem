@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=i-k-c-cot
+#SBATCH --job-name=i-e-c-cot
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=23:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/internvl/kmeans-con-cotv2-%j.out 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/lifelong/internvl/embedding-lifelong-cotv0-%j.out
 #SBATCH --partition a40
 
 

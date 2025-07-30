@@ -34,7 +34,7 @@ else
 fi
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
-
+# export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib
 echo "[INFO] Starting vLLM (internvl) server on GPU 0..."
 source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate vllm
 

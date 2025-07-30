@@ -1,79 +1,211 @@
 [
     {
-        "question": "What is the white object on the wall above the TV?",
-        "answer": "Air conditioning unit",
+        "question": "What is the grey item on the bed?",
+        "answer": "A blanket",
         "category": "object recognition",
-        "question_id": "f2e82760-5c3c-41b1-88b6-85921b9e7b32",
-        "episode_history": "00826-BFRyYbPCCPE",
+        "question_id": "48d8aa7f-61cb-469b-9b6d-2549d1210281",
+        "episode_history": "00876-mv2HUxq3B53",
         "position": [
-            -3.2461330890655518,
-            0.17934048175811768,
-            -2.557859182357788
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
         ],
         "rotation": [
-            0.9077942371368408,
+            -0.9870320558547974,
             0.0,
-            0.4194158613681793,
+            0.16052371263504028,
             0.0
         ],
         "object_id": null,
         "class": null
     },
     {
-        "question": "Is there room on the dining table to eat?",
-        "answer": "Yes",
-        "category": "spatial understanding",
-        "question_id": "79344680-6b45-4531-8789-ad0f5ef85b3b",
-        "episode_history": "00826-BFRyYbPCCPE",
-        "position": [
-            -3.2461330890655518,
-            0.17934048175811768,
-            -2.557859182357788
-        ],
-        "rotation": [
-            0.9077942371368408,
-            0.0,
-            0.4194158613681793,
-            0.0
-        ],
-        "object_id": null,
-        "class": null
-    },
-    {
-        "question": "Is the front door open?",
-        "answer": "No",
-        "category": "object state recognition",
-        "question_id": "ecad68d2-a16f-4a3e-b8a1-a70ec1c5cf00",
-        "episode_history": "00826-BFRyYbPCCPE",
-        "position": [
-            -3.2461330890655518,
-            0.17934048175811768,
-            -2.557859182357788
-        ],
-        "rotation": [
-            0.9077942371368408,
-            0.0,
-            0.4194158613681793,
-            0.0
-        ],
-        "object_id": null,
-        "class": null
-    },
-    {
-        "question": "What shape are the door knobs?",
-        "answer": "Round or spherical",
+        "question": "What color is the countertop on the porch?",
+        "answer": "Black",
         "category": "attribute recognition",
-        "question_id": "e816a1f9-af6c-4901-8d54-4ddaa2a60dc3",
-        "episode_history": "00886-TPhiubUHKcP",
+        "question_id": "45a5e082-a9e9-47ca-a036-dfafba92b16c",
+        "episode_history": "00876-mv2HUxq3B53",
         "position": [
-            -4.679103851318359,
-            0.16253697872161865,
-            -4.211667060852051
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
         ],
         "rotation": [
-            -0.07081564515829086,
+            -0.9870320558547974,
             0.0,
-            0.9974894523620605,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "What material are the stools in the kitchen made out of?",
+        "answer": "Leather",
+        "category": "attribute recognition",
+        "question_id": "013bb857-f47d-4b50-add4-023cc4ff414c",
+        "episode_history": "00876-mv2HUxq3B53",
+        "position": [
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
+        ],
+        "rotation": [
+            -0.9870320558547974,
+            0.0,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "Where do I reach for laundry detergent?",
+        "answer": "For the shelf above the washing machine.",
+        "category": "spatial understanding",
+        "question_id": "ba5f1c9b-9a41-4a84-829b-f9b8ccd19b69",
+        "episode_history": "00876-mv2HUxq3B53",
+        "position": [
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
+        ],
+        "rotation": [
+            -0.9870320558547974,
+            0.0,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "Is the toilet seat open or closed?",
+        "answer": "Closed.",
+        "category": "object state recognition",
+        "question_id": "f17869a2-2a4d-4ce4-b262-cb69618e3394",
+        "episode_history": "00876-mv2HUxq3B53",
+        "position": [
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
+        ],
+        "rotation": [
+            -0.9870320558547974,
+            0.0,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "Is the television turned on or off?",
+        "answer": "On",
+        "category": "object state recognition",
+        "question_id": "e0d20472-8fa6-4e8d-880d-22d4eed3fbb8",
+        "episode_history": "00876-mv2HUxq3B53",
+        "position": [
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
+        ],
+        "rotation": [
+            -0.9870320558547974,
+            0.0,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "I want to check my outfit for a dinner party, how can I do this?",
+        "answer": "Using the large mirror outside the first bedroom.",
+        "category": "functional reasoning",
+        "question_id": "fc9d2a18-6197-4c8b-abd8-be0c493e5450",
+        "episode_history": "00876-mv2HUxq3B53",
+        "position": [
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
+        ],
+        "rotation": [
+            -0.9870320558547974,
+            0.0,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "I want to host a dinner party on a summer evening, where should I set the table?",
+        "answer": "On the table on the porch.",
+        "category": "world knowledge",
+        "question_id": "1b36e675-74ff-46ad-8caa-c33da46a5a67",
+        "episode_history": "00876-mv2HUxq3B53",
+        "position": [
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
+        ],
+        "rotation": [
+            -0.9870320558547974,
+            0.0,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "Where is the round mirror?",
+        "answer": "On the wall above the head of the bed in the first bedroom.",
+        "category": "object localization",
+        "question_id": "d3742804-8363-4346-a622-5bcaeffb25e9",
+        "episode_history": "00876-mv2HUxq3B53",
+        "extra_answers": [
+            "above the bed in the first bedroom",
+            "in the first bedroom",
+            "on the wall above the bed in the first bedroom",
+            "on the wall above the pillows on the bed in the first bedroom"
+        ],
+        "position": [
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
+        ],
+        "rotation": [
+            -0.9870320558547974,
+            0.0,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "Where is the ceiling fan?",
+        "answer": "Above the bed in the second bedroom",
+        "category": "object localization",
+        "question_id": "dfdc3b36-d98f-42a7-b2ea-dceb4af1794a",
+        "episode_history": "00876-mv2HUxq3B53",
+        "extra_answers": [
+            "in the bedroom with a patio",
+            "in the bedroom with a twin bed",
+            "above the bed in the second bedroom with the television",
+            "above the bed in the second bedroom"
+        ],
+        "position": [
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
+        ],
+        "rotation": [
+            -0.9870320558547974,
+            0.0,
+            0.16052371263504028,
             0.0
         ],
         "object_id": null,

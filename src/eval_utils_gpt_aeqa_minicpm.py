@@ -9,6 +9,7 @@ from typing import Optional
 import logging
 from src.const import *
 import re
+import json
 
 client = OpenAI(
     base_url=END_POINT,
@@ -248,9 +249,10 @@ def format_explore_prompt_frontier(
     sys_prompt += "Definitions: "
     sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
     sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore. "
-    if context:
-        sys_prompt += "Context: The following summary describes the agent's past exploration and current known status. Use this context to help you make a better choice, but do not treat it as a direct instruction.\n"
+    if "-1" not in context and context is not None:
+        sys_prompt += "Context: The following summary integrates the agent's past exploration and current knowledge, and is intended to provide useful guidance for possible future exploration directions. Use this context as a helpful reference for deciding where or what to explore next, but do not treat it as a strict instruction. Make your own best judgment based on both this context and the current question.\n"
         sys_prompt += f"{context}\n"
+
 
 
 
@@ -630,7 +632,17 @@ def parse_frontier_index(output: str):
 
 def save_base64_to_png(b64_str, save_dir, step_idx, idx):
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"step{step_idx}_frontier{idx}.png")
+    save_path = os.path.join(save_dir, f"{step_idx}-frontier{idx}.png")
+    img_bytes = base64.b64decode(b64_str)
+    img = Image.open(BytesIO(img_bytes))
+    img.save(save_path)
+    return save_path
+
+
+def save_base64_to_png_layer1(b64_str, save_dir, step_idx, idx, idx0):
+    os.makedirs(save_dir, exist_ok=True)
+    idx = idx%3
+    save_path = os.path.join(save_dir, f"{step_idx}-frontier{idx0}_{idx}.png")
     img_bytes = base64.b64decode(b64_str)
     img = Image.open(BytesIO(img_bytes))
     img.save(save_path)
@@ -648,9 +660,9 @@ def frontier_context(
     else:
         def extract_step_idx(f):
             name = os.path.splitext(f)[0]
-            parts = name.split('_')
-            step = int(parts[0].replace('step',''))
-            fidx = int(parts[1].replace('frontier',''))
+            parts = name.split('-')
+            step = int(parts[0])
+            fidx = '-'.join(parts[1:])  # 保留为字符串
             return (step, fidx)
         files = sorted(files, key=extract_step_idx, reverse=True)[:max_num]
         files = sorted(files, key=extract_step_idx)
@@ -709,7 +721,22 @@ def frontier_context(
 
 
 
-def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None, lifelong_context=None):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
     (
@@ -723,6 +750,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         snapshot_classes,
         snapshot_id_mapping,
     ) = get_step_info(step, verbose)
+
+
+
 
     # ==== Step 1: snapshot prompt ====
     sys_prompt, content = format_explore_prompt_snapshot(
@@ -783,15 +813,15 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
 
     context = ''
-    if not os.path.exists(chosen_frontier_path):
-        os.makedirs(chosen_frontier_path, exist_ok=True)
+    # if not os.path.exists(chosen_frontier_path):
+    #     os.makedirs(chosen_frontier_path, exist_ok=True)
 
-    png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
-    if len(png_files) > 0:
-        sys_prompt, content = frontier_context(chosen_frontier_path)
-        context = call_openai_api(sys_prompt, content)
-    else:
-        pass
+    # png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
+    # if len(png_files) > 0:
+    #     sys_prompt, content = frontier_context(chosen_frontier_path)
+    #     context = call_openai_api(sys_prompt, content)
+    # else:
+    #     pass
 
 
     sys_prompt, content = format_explore_prompt_frontier(
@@ -803,7 +833,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         egocentric_view=step.get("use_egocentric_views", False),
         use_snapshot_class=True,
         image_goal=image_goal,
-        context=context,
+        context=lifelong_context,
     )
     if verbose:
         logging.info(f"Input prompt (frontier layer0):")
@@ -865,7 +895,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             egocentric_view=step.get("use_egocentric_views", False),
             use_snapshot_class=True,
             image_goal=image_goal,
-            context=context,
+            context=lifelong_context,
         )
         if verbose:
             logging.info(f"Input prompt (frontier layer1):")
@@ -921,7 +951,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
         logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx} (global index: {global_frontier_idx})")
 
-        save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
+        save_base64_to_png_layer1(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx, idx0)
 
         return response, snapshot_id_mapping, reason, len(snapshot_imgs)
 

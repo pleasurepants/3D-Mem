@@ -8,6 +8,23 @@ os.environ["HABITAT_SIM_LOG"] = (
 os.environ["MAGNUM_LOG"] = "quiet"
 
 
+import openai
+from openai import OpenAI
+from PIL import Image
+import base64
+from io import BytesIO
+import time
+from typing import Optional
+import logging
+from src.const import *
+import re
+import json
+from sentence_transformers import SentenceTransformer, util
+import numpy as np
+client = OpenAI(
+    base_url=END_POINT,
+    api_key=OPENAI_KEY,
+)
 
 
 
@@ -33,6 +50,266 @@ from src.utils import resize_image, get_pts_angle_aeqa
 from src.query_vlm_aeqa_qwen import query_vlm_for_response
 from src.logger_aeqa import Logger
 from src.const import *
+
+
+def question_room(folder_path, questions_list_path):
+    # 1. 提取question_id
+    question_id = os.path.basename(folder_path.rstrip('/'))
+
+    # 2. 读取json
+    with open(questions_list_path, 'r') as f:
+        questions = json.load(f)
+
+    # 3. 查找question_id对应的episode_history
+    episode_history = None
+    for q in questions:
+        if q.get('question_id') == question_id:
+            episode_history = q.get('episode_history')
+            break
+
+    # 4. 统计所有episode_history对应的question_id
+    ep_history_to_question_ids = {}
+    for q in questions:
+        ep_history = q.get('episode_history')
+        if ep_history not in ep_history_to_question_ids:
+            ep_history_to_question_ids[ep_history] = []
+        ep_history_to_question_ids[ep_history].append(q.get('question_id'))
+
+    # 返回该question_id对应的episode_history，以及这个episode_history下的所有question_id列表
+    if episode_history is not None:
+        return episode_history, ep_history_to_question_ids[episode_history]
+    else:
+        return None, []
+
+
+
+def check_lifelong_memory(lifelong_json_path, lifelong_memory, cfg, question):
+    """
+    用于检索所有历史memory snapshot能否直接回答问题。
+    - 若API能回答，返回 full_response（如"Snapshot 0 XXX"）
+    - 若所有memory都不能回答，返回 "Snapshot -1 No Snapshot is available"
+    """
+
+    def format_content(contents):
+        formated_content = []
+        for c in contents:
+            formated_content.append({"type": "text", "text": c[0]})
+            if len(c) == 2:
+                formated_content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{c[1]}",
+                            "detail": "high",
+                        },
+                    }
+                )
+        return formated_content
+
+    def call_openai_api(sys_prompt, contents) -> Optional[str]:
+        max_tries = 5
+        retry_count = 0
+        formated_content = format_content(contents)
+        message_text = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": formated_content},
+        ]
+        while retry_count < max_tries:
+            try:
+                completion = client.chat.completions.create(
+                    model="qwen",  # gpt-4o-qwen-minicpm-qwen
+                    messages=message_text,
+                    temperature=0.7,
+                    max_tokens=4096, # 4096 for gpt-4o
+                    top_p=0.95,
+                    frequency_penalty=0,
+                    presence_penalty=0,
+                )
+                return completion.choices[0].message.content
+            except openai.RateLimitError as e:
+                print("Rate limit error, waiting for 60s")
+                time.sleep(30)
+                retry_count += 1
+                continue
+            except Exception as e:
+                print("Error: ", e)
+                time.sleep(60)
+                retry_count += 1
+                continue
+
+        return None
+
+
+
+    def build_lifelong_context_prompt(
+        question,
+        img_info_list,    # List[(img_path, obj_list)]
+        cfg
+    ):
+        sys_prompt = ""
+        sys_prompt += "Task: You are an agent exploring an indoor environment to answer a specific question.\n"
+        sys_prompt += "You are given several past observations, each with an image and a list of detected objects.\n"
+        sys_prompt += "Your goal is to combine all the provided information and reason about the best next action for exploration, or whether any area already contains enough information to answer the question.\n"
+        sys_prompt += "You may suggest to focus on an area that already looks promising, or point out what is still missing and where to explore next.\n"
+        sys_prompt += "Do NOT refer to the images by their order or index (do not say 'first/second/third image').\n"
+        sys_prompt += "Follow a step-by-step reasoning (chain-of-thought) process as described below, but your final output should be a single, coherent paragraph summarizing your suggestion.\n"
+        sys_prompt += "\n"
+        sys_prompt += "Chain-of-thought reasoning steps:\n"
+        sys_prompt += "Step 1: Review all object lists observed so far. Consider what these clues reveal about the environment.\n"
+        sys_prompt += "Step 2: Reflect on the question and determine whether any area already looks promising for answering the question, or what is still missing (key clues, objects, or room types).\n"
+        sys_prompt += "Step 3: Synthesize your reasoning to suggest the most effective next action—this may be to further explore certain areas, or to focus on a specific location that already looks suitable for answering the question. Clearly explain your reasoning, combining all observations.\n"
+        sys_prompt += "DO NOT refer to images by order or index. Your final output must be a single, well-formed paragraph targeting the question, providing clear and actionable guidance for what to do next.\n"
+
+        content = []
+        content += [(f"Question: {question}",)]
+        content += [("Here are your current memory observations (object lists):",)]
+
+        for i, (img_path, obj_list, _) in enumerate(img_info_list):
+            abs_img_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, img_path)
+            if not os.path.exists(abs_img_path):
+                print(f"Warning: image file {abs_img_path} does not exist!")
+                continue
+            with open(abs_img_path, "rb") as f:
+                img_base64 = base64.b64encode(f.read()).decode("utf-8")
+            content += [(f"Snapshot {i+1}", img_base64)]
+            text = ", ".join(obj_list)
+            content += [(text,)]
+            content += [(" ",)]
+
+        content += [(
+            "Please use the above object lists and reasoning steps, but only output your final conclusion as a single paragraph. "
+            "You must NOT refer to any image or observation by order, number, or index (do not say 'first', 'second', 'third', or similar words). "
+            "Your answer should always be forward-looking and actionable, based on the combined clues: "
+            "If any area or observed set of objects appears promising for answering the question, you may recommend focusing future exploration or further verification on that area. "
+            "If none of the current areas or object combinations seem relevant, you should suggest which type of area, room, or object may be worth exploring or searching for. "
+            "Do NOT declare the task complete or say that no further action is needed. "
+            "Your answer must give a clear direction or focus for exploration—such as which area to prioritize, or what room or object to look for—without implying a step-by-step plan."
+        ,)]
+
+
+        return sys_prompt, content
+
+    def select_topk_snapshots_by_clip(
+        lifelong_json_path,
+        available_history,
+        question,
+        top_k=3,
+        max_objects=8,
+        model_name='/anvme/workspace/v100dd12-3dmem/model/clip-ViT-B-32'
+    ):
+
+        def obj_list_to_caption(obj_list):
+            """
+            将object list转成简洁的英文场景描述，用于CLIP文本embedding。
+            """
+            if not obj_list:
+                return "This image does not contain any recognizable objects."
+            # 你可以扩展更复杂的模板（比如按物品类别判断房间类型）
+            return "This image contains: " + ", ".join(obj_list) + "."
+        """
+        输入:
+            lifelong_json_path: str, json路径
+            available_history: list, 要筛选的question_id列表
+            question: str, 当前问题
+            top_k: int, 选出top-k
+            max_objects: int, 每张图片保留最多几个物品
+            model_name: str, sentence-transformers模型路径或名称
+        输出:
+            List[Tuple[snapshot_path, obj_list]]
+            snapshot_path: "question_id/snapshot/img.png"
+        """
+        # 加载json
+        with open(lifelong_json_path, 'r') as f:
+            lifelong_json = json.load(f)
+
+        all_img_keys = []
+        all_obj_lists = []
+        all_obj_texts = []
+
+        for qid in available_history:
+            if qid not in lifelong_json:
+                continue
+            img2objs = lifelong_json[qid]
+            for img_name, obj_list in img2objs.items():
+                obj_list_trunc = obj_list[:max_objects]
+                # 用自然语言模板描述物品
+                obj_text = obj_list_to_caption(obj_list_trunc)
+                # 路径按你的格式拼接
+                snapshot_path = f"{qid}/snapshot/{img_name}"
+                all_img_keys.append(snapshot_path)
+                all_obj_lists.append(obj_list_trunc)
+                all_obj_texts.append(obj_text)
+
+        if len(all_img_keys) == 0:
+            print("No available snapshots!")
+            return []
+
+        # 做embedding
+        model = SentenceTransformer(model_name)
+        snapshot_embs = model.encode(all_obj_texts, convert_to_tensor=True)
+        question_emb = model.encode([question], convert_to_tensor=True)
+        sims = util.cos_sim(question_emb, snapshot_embs)[0]  # shape: (n_snapshots,)
+
+        # 取top-k
+        topk_idx = np.array(sims.cpu()).argsort()[-top_k:][::-1]
+        results = []
+        for i in topk_idx:
+            results.append((all_img_keys[i], all_obj_lists[i], all_obj_texts[i]))
+            logging.info((f"{all_img_keys[i]}  -->  {all_obj_lists[i]}"))
+        return results
+
+
+
+
+
+
+    # 1. 取当前question_id
+    with open(cfg.questions_list_path, 'r') as f:
+        import json
+        questions_list = json.load(f)
+    question_id = None
+    for q in questions_list:
+        if q["question"] == question:
+            question_id = q["question_id"]
+            break
+    if question_id is None:
+        raise ValueError(f"Question not found: {question}")
+
+    # 2. 读取lifelong_json
+    os.makedirs(os.path.dirname(lifelong_json_path), exist_ok=True)
+
+    if not os.path.exists(lifelong_json_path):
+        # 如果文件不存在，直接返回没有可用的历史记忆
+        return "Snapshot -1 No Snapshot is available(No lifelong memory available)"
+    
+    with open(lifelong_json_path, 'r') as f:
+        lifelong_json = json.load(f)
+
+    # ---- 这里检查有没有真正可用的历史记忆 ----
+    available_history = [
+        other_qid for other_qid in lifelong_memory
+        if other_qid != question_id and other_qid in lifelong_json
+    ]
+    if len(available_history) == 0:
+        return "Snapshot -1 No Snapshot is available(No lifelong memory available)"
+
+    
+    # 3. 获取top-k相关的snapshot图片路径和物品列表
+    top3 = select_topk_snapshots_by_clip(
+        lifelong_json_path, available_history, question, top_k=3
+    )
+
+    sys_prompt, content = build_lifelong_context_prompt(question, top3, cfg)
+    full_response = call_openai_api(sys_prompt, content)
+
+    if full_response is not None:
+        return full_response
+
+    return "Snapshot -1 No Snapshot is available"
+
+
+
+
 
 
 def main(cfg, start_ratio=0.0, end_ratio=1.0):
@@ -139,6 +416,15 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
         # run steps
         task_success = False
         cnt_step = -1
+
+
+        # starting lifelong-memory
+        lifelong_memory = question_room(episode_dir, cfg.questions_list_path)
+        lifelong_json_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, "lifelong_storage.json")
+        lifelong_memory = lifelong_memory[1]
+        lifelong_context = check_lifelong_memory(lifelong_json_path, lifelong_memory, cfg, question)
+
+
 
         gpt_answer = None
         n_filtered_snapshots = 0
@@ -266,6 +552,9 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
             chosen_frontier_path = os.path.join(episode_dir, 'chosen_frontier')
 
 
+            
+
+
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                 # query the VLM for the next navigation point, and the reason for the choice
                 vlm_response = query_vlm_for_response(
@@ -277,6 +566,9 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     verbose=True,
                     chosen_frontier_path=chosen_frontier_path,
                     step_idx=cnt_step,
+                    question_id=question_id,
+                    lifelong_json_path=lifelong_json_path,
+                    lifelong_context=lifelong_context,
                 )
                 if vlm_response is None:
                     logging.info(

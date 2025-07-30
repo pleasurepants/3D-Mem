@@ -4,6 +4,46 @@ from typing import Tuple, Optional, Union
 from src.eval_utils_gpt_aeqa_qwen import explore_step
 from src.tsdf_planner_hdbscan import TSDFPlanner, SnapShot, Frontier
 from src.scene_aeqa import Scene
+import json
+import os
+
+def save_snapshot_objects_with_names(
+    question_id: str,
+    snapshot_objects: dict,
+    object_id_to_name: dict,
+    json_path: str,
+):
+    """
+    将当前step_dict['snapshot_objects']中object id转换为名称，并保存到json，支持增量更新。
+    json_path就是最终的json文件路径。
+    """
+    # 保证路径上的目录存在
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    
+    # 加载历史数据（如果文件已存在）
+    if os.path.exists(json_path):
+        with open(json_path, 'r') as f:
+            all_data = json.load(f)
+    else:
+        all_data = {}
+
+    # 构建本次数据（把object id转为名称）
+    obj_name_dict = {}
+    for snap_img, obj_ids in snapshot_objects.items():
+        obj_name_dict[snap_img] = [
+            object_id_to_name.get(str(obj_id), object_id_to_name.get(int(obj_id), str(obj_id)))
+            for obj_id in obj_ids
+        ]
+
+    # 写入/更新该question_id的数据
+    all_data[question_id] = obj_name_dict
+
+    # 保存回json文件
+    with open(json_path, 'w') as f:
+        json.dump(all_data, f, indent=2, ensure_ascii=False)
+
+    print(f"保存成功：{json_path}")
+
 
 
 def query_vlm_for_response(
@@ -15,6 +55,9 @@ def query_vlm_for_response(
     verbose: bool = False,
     chosen_frontier_path: str = None,
     step_idx: int = 0,
+    question_id: Optional[str] = None,
+    lifelong_json_path: Optional[str] = None,
+    lifelong_context: Optional[str] = None,
 ) -> Optional[Tuple[Union[SnapShot, Frontier], str, int]]:
     # prepare input for vlm
     step_dict = {}
@@ -54,9 +97,23 @@ def query_vlm_for_response(
     # prepare question
     step_dict["question"] = question
 
+
+
+    # save snapshot objects with names for lifelong
+    save_snapshot_objects_with_names(
+        question_id=question_id,
+        snapshot_objects=step_dict["snapshot_objects"],
+        object_id_to_name=object_id_to_name,
+        json_path=lifelong_json_path,
+    )
+
+
+
+
+
     # query vlm
     outputs, snapshot_id_mapping, reason, n_filtered_snapshots = explore_step(
-        step_dict, cfg, verbose=verbose, chosen_frontier_path=chosen_frontier_path, step_idx=step_idx
+        step_dict, cfg, verbose=verbose, chosen_frontier_path=chosen_frontier_path, step_idx=step_idx, lifelong_context=lifelong_context
     )
     if outputs is None:
         logging.error(f"explore_step failed and returned None")
