@@ -183,7 +183,7 @@ def format_explore_prompt(
     text = f"Question: {question}"
     if image_goal is not None:
         content.append((text, image_goal))
-        content.append((" ",))
+        
     else:
         content.append((text + " ",))
 
@@ -196,7 +196,7 @@ def format_explore_prompt(
             "The following is the egocentric view of the agent in forward direction: "
         )
         content.append((text, egocentric_imgs[-1]))
-        content.append((" ",))
+        
 
     # 3 here is the snapshot images
     text = "The followings are all the snapshots that you can choose (followed with contained object classes) "
@@ -211,7 +211,7 @@ def format_explore_prompt(
             if use_snapshot_class:
                 text = ", ".join(snapshot_classes[i])
                 content.append((text,))
-            content.append((" ",))
+            
 
     # 4 here is the frontier images
     text = "The followings are all the Frontiers that you can explore:  "
@@ -221,7 +221,7 @@ def format_explore_prompt(
     else:
         for i in range(len(frontier_imgs)):
             content.append((f"Frontier {i} ", frontier_imgs[i]))
-            content.append((" ",))
+            
 
     # 5 here is the format of the answer
     text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'Frontier i [Reason]', where i is the index of the snapshot or frontier you choose. "
@@ -261,7 +261,7 @@ def format_explore_prompt_frontier(
     text = f"Question: {question}"
     if image_goal is not None:
         content.append((text, image_goal))
-        content.append((" ",))
+        
     else:
         content.append((text + " ",))
 
@@ -356,15 +356,13 @@ def format_explore_prompt_snapshot(
     sys_prompt += "Snapshot: A focused observation of several objects. Choosing a Snapshot means that this snapshot image contains enough information for you to answer the question. "
     sys_prompt += "You should always try to select a Snapshot and answer the question directly based on the information it provides. "
     sys_prompt += "Only if you are absolutely sure that none of the Snapshots contain enough information should you reply with 'No Snapshot is available'."
-    # sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
-    # sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore. "
 
     content = []
     # 1 first is the question
     text = f"Question: {question}"
     if image_goal is not None:
         content.append((text, image_goal))
-        content.append((" ",))
+        
     else:
         content.append((text + " ",))
 
@@ -377,11 +375,11 @@ def format_explore_prompt_snapshot(
             "The following is the egocentric view of the agent in forward direction: "
         )
         content.append((text, egocentric_imgs[-1]))
-        content.append((" ",))
+        
 
     # 3 here is the snapshot images
     text = "The followings are all the snapshots that you can choose (followed with contained object classes) "
-    text += "Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model. "
+    text += "Please note that the contained classes may not be accurate (wrong classes/missing classes) due to the limitation of the object detection model."
     text += "So you still need to utilize the images to make decisions. "
     content.append((text,))
     if len(snapshot_imgs) == 0:
@@ -392,59 +390,44 @@ def format_explore_prompt_snapshot(
             if use_snapshot_class:
                 text = ", ".join(snapshot_classes[i])
                 content.append((text,))
-            content.append((" ",))
 
+    # ---- 枚举所有可用index
+    if len(snapshot_imgs) > 0:
+        indices_list = ", ".join([str(i) for i in range(len(snapshot_imgs))])
+        # 组合所有可选格式
+        example_str = "', '".join([f"Snapshot {i}" for i in range(len(snapshot_imgs))])
+        indices_hint = f"The only available Snapshot indices are: {indices_list}.\n"
+        indices_example = f"You can answer using only '{example_str}', but never use an index not in this list.\n"
+    else:
+        indices_hint = ""
+        indices_example = ""
 
-    # 5 here is the format of the answer
-    # text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
-    # text += (
-    #     "You should always select one of the provided Snapshots and answer the question as directly and specifically as possible, using all available visual and object information from the Snapshot. "
-    #     "Only if you are absolutely certain that NONE of the Snapshots contains enough information to even make a reasonable guess, may you reply with 'No Snapshot is available'. "
-    # )
-    # text += (
-    #     "When answering, do NOT just describe the image. Instead, write your answer as if you are telling someone the real answer to the question, in a complete sentence. "
-    #     "For example, instead of 'Snapshot 0 A bowl is visible', you should write 'Snapshot 0 The fruit bowl is on the kitchen counter.' "
-    # )
-    # text += (
-    #     "If, and only if, none of the Snapshots is sufficient, you can return: 'No Snapshot is available.' "
-    # )
-    # text += (
-    #     "Note that if you choose a Snapshot to answer the question: "
-    #     "(1) You must provide a clear and direct answer to the question that can be understood without referring to the image. "
-    #     "Do not mention words like 'snapshot', 'on the left of the image', etc. "
-    #     "You must only choose from the provided Snapshot indices. Do not make up an index that is not listed above. "
-    # )
-    # text += (
-    #     "(2) You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot. "
-    #     "Again, only choose from the provided Snapshot indices and do not create any indices that are not listed above. "
-    # )
-
-    # 2
-    # text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
-    # text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
-    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Use simple and direct sentences, avoid vague or descriptive language. Do not mention words like 'snapshot', 'on the left of the image', etc. "
-    # text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
-    # text += "or if you choose the second snapshot, you can return 'Snapshot 1 Next to the fireplace'. "
-    # text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
-    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. Only output the complete answer as a direct response, without any extra words, explanation, or reasoning."
-
+    # ---- 插入提示到回答说明
+    text = ""
+    text += indices_hint
+    text += indices_example
     text += "Please answer in exactly one of the following two formats:\n"
     text += "1. Snapshot i [Your complete answer as a full sentence.]\n"
     text += "2. No Snapshot is available.\n"
+    text += (
+        "If you select a Snapshot, you MUST always provide a complete, direct answer to the question in a full sentence. "
+        "Never leave the answer blank or incomplete. Answers like 'Snapshot 2' alone are not allowed and will be considered invalid. "
+        "Warning: If you output only 'Snapshot i' without a complete answer, your answer will be rejected and not considered valid.\n"
+    )
     text += "The two formats are mutually exclusive. Never combine 'No Snapshot is available' with any Snapshot index.\n"
-    text += "If you select a Snapshot, you must provide a clear and direct answer in a complete sentence.\n"
     text += "Only output your answer in one of the two formats above, with no extra words, explanation, or reasoning.\n"
     text += "Examples:\n"
     text += "Snapshot 0 The fruit bowl is on the kitchen counter.\n"
-    text += "Snapshot 1 Next to the fireplace.\n"
+    if len(snapshot_imgs) > 1:
+        text += f"Snapshot 1 Next to the fireplace.\n"
     text += "No Snapshot is available.\n"
-    text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
-    text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. Only output the complete answer as a direct response, without any extra words, explanation, or reasoning."
-
+    text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot.\n"
+    text += "Only use the provided Snapshot indices, and DO NOT make up any index that is not listed above. Only output the complete answer as a direct response, without any extra words, explanation, or reasoning."
 
     content.append((text,))
 
     return sys_prompt, content
+
 
 
 
@@ -531,7 +514,7 @@ def format_prefiltering_prompt(question, class_list, top_k=10, image_goal=None):
     prompt += f"Question: {question}"
     if image_goal is not None:
         content.append((prompt, image_goal))
-        content.append((" ",))
+        
     else:
         content.append((prompt + " ",))
     prompt = (
@@ -619,7 +602,7 @@ def parse_frontier_index(output: str):
     if not lines:
         raise ValueError("Empty output")
     last_line = lines[-1].lower()
-    match = re.match(r'frontier\s*(\d+)', last_line)
+    match = match = re.match(r'(?:answer:\s*)?frontier\s*(\d+)', last_line)
     if match:
         index = int(match.group(1))
         # reason为最后一行前所有内容合并
@@ -709,7 +692,7 @@ def frontier_context(
         text = ""
         text += f"Step {i+1}: chosen direction ({fname}). "
         content.append((text, img_b64))
-        content.append((" ",))
+        
 
     # 4. 明确只输出context summary，不要建议
     text = ""
@@ -775,36 +758,45 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 message += f"[{c[1][:10]}...]"
         logging.info(message)
 
-    retry_bound = 3
-    for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
-        if full_response is None:
-            print("call_openai_api (snapshot) returns None, retrying")
-            continue
+    if len(snapshot_imgs) == 0:
+        print("No snapshot images available, directly entering frontier exploration.")
+        
+    else:
+        print(f"Snapshot images available: {len(snapshot_imgs)}")
+        retry_bound = 3
+        for _ in range(retry_bound):
+            full_response = call_openai_api(sys_prompt, content)
+            if full_response is None:
+                print("call_openai_api (snapshot) returns None, retrying")
+                continue
 
-        if isinstance(full_response, list):
-            full_response = " ".join(full_response)
-        full_response = full_response.strip().lower()
+            if isinstance(full_response, list):
+                full_response = " ".join(full_response)
+            full_response = full_response.strip().lower()
 
-        # snapshot合规判定
-        if full_response.startswith("snapshot"):
-            tokens = full_response.split()
-            if len(tokens) >= 2 and tokens[1].isdigit():
-                idx = int(tokens[1])
-                if 0 <= idx < len(snapshot_imgs):
-                    response = f"{tokens[0]} {tokens[1]}"
-                    reason = " ".join(tokens[2:]).strip()
-                    reason = clean_reason(reason)  
-                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
-                else:
-                    print(f"Snapshot index out of range: {tokens[1]}")
-                    continue
-        elif "no snapshot is available" in full_response:
-            # 明确拒绝，直接进入frontier
-            break
-        else:
-            print(f"Unrecognized snapshot response: {full_response}")
-            continue
+            # snapshot合规判定
+            if full_response.startswith("snapshot"):
+                tokens = full_response.split()
+                if len(tokens) >= 2 and tokens[1].isdigit():
+                    idx = int(tokens[1])
+                    reason = clean_reason(" ".join(tokens[2:]).strip()) 
+                    if 0 <= idx < len(snapshot_imgs) and reason != "":
+                        response = f"{tokens[0]} {tokens[1]}"
+                        # reason = " ".join(tokens[2:]).strip()
+                        # reason = clean_reason(reason)  
+                        return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+                    elif 0 <= idx < len(snapshot_imgs) and reason == "":
+                        print(f"Snapshot index {tokens[1]} has no reason.")
+                        continue
+                    else:
+                        print(f"Snapshot index out of range: {tokens[1]}")
+                        continue
+            elif "no snapshot is available" in full_response:
+                # 明确拒绝，直接进入frontier
+                break
+            else:
+                print(f"Unrecognized snapshot response: {full_response}")
+                continue
 
     # ==== Step 2: two-stage frontier prompt ====
     retry_bound = 3
