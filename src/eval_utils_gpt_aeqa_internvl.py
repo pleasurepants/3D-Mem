@@ -594,22 +594,19 @@ def clean_reason(reason):
 
 def parse_frontier_index(output: str):
     """
-    从模型的CoT输出文本中解析出推理reason和最后一行frontier index
-    返回: (reason:str, index:int)
-    只支持如 'frontier 2'，不返回非数字或不合规内容
+    解析输出文本，返回(reason, index)
+    支持全文任意位置的frontier index格式
     """
-    lines = [line.strip() for line in output.strip().split('\n') if line.strip()]
-    if not lines:
-        raise ValueError("Empty output")
-    last_line = lines[-1].lower()
-    match = match = re.match(r'(?:answer:\s*)?frontier\s*(\d+)', last_line)
-    if match:
-        index = int(match.group(1))
-        # reason为最后一行前所有内容合并
-        reason = "\n".join(lines[:-1]).strip()
+    matches = list(re.finditer(r'frontier\s*(\d+)', output, re.IGNORECASE))
+    if matches:
+        last_match = matches[-1]
+        index = int(last_match.group(1))
+        reason = output[:last_match.start()].strip()
         return reason, index
     else:
-        raise ValueError(f"Could not parse frontier index from: '{last_line}'")
+        raise ValueError(f"Could not parse frontier index from: '{output}'")
+
+
 
 
 
@@ -858,7 +855,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     if idx0 is None:
         idx_random = random.randint(0, len(frontier_imgs_0) - 1)
         response = f'frontier {idx_random}'
-        return response, snapshot_id_mapping, None, len(snapshot_imgs)
+        reason = "no valid index found, randomly selected one."
+        return response, snapshot_id_mapping, reason, len(snapshot_imgs)
     logging.info(f"[Layer0] VLM selected index: {idx0}")
     logging.info(f"reason for layer0 selection: {reason}")
     for k, v in step['layer0_to_layer1'].items():
@@ -931,7 +929,10 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 else:
                     print(f"Layer1 index out of range: {idx1_in_subgroup}")
             except Exception as e:
-                print(f"Layer1 format error: {full_response} | {e}")
+                idx_random = random.randint(0, len(frontier_imgs_subgroup) - 1)
+                response = f'frontier {idx_random}'
+                reason = "no valid index found, randomly selected one." + str(e)
+                return response, snapshot_id_mapping, reason, len(snapshot_imgs)
 
         if idx1_in_subgroup is None or idx1_in_subgroup >= len(layer1_indices):
             logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")

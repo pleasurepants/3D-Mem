@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=i-e-c-cot
+#SBATCH --job-name=i-replay
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=4:00:00 
+#SBATCH --time=24:00:00 
 #SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/lifelong/internvl/embedding-lifelong-cotv1-%j.out
 #SBATCH --partition a100
 
