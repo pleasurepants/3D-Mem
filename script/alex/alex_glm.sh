@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=m-e-c-cot
+#SBATCH --job-name=g-replay
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=4:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/lifelong/minicpm/embedding-lifelong-cotv1-%j.out 
+#SBATCH --time=24:00:00 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/glm/kmeans-froncon-cotv1-%j.out 
 #SBATCH --partition a100
 
 
@@ -34,33 +34,32 @@ else
     echo "[INFO] CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 fi
 
-export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/atuin/v100dd/v100dd12/software/private/conda/envs/3dmem/lib:$LD_LIBRARY_PATH
 
-echo "[INFO] Starting vLLM (minicpm) server on GPU 0..."
+echo "[INFO] Starting vLLM (glm) server on GPU 0..."
 source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate vllm
 
 CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 
-vllm serve /anvme/workspace/v100dd12-3dmem/model/MiniCPM-V-2_6 \
-    --served-model-name minicpm \
+vllm serve /anvme/workspace/v100dd12-3dmem/model/GLM-4.1V-9B-Thinking \
+    --served-model-name glm \
     --port 8000 \
-    --limit-mm-per-prompt image=20 \
     --trust-remote-code &
 
 
 VLLM_PID=$!
 
 
-echo "[INFO] Waiting for vLLM (minicpm) server to be ready..."
+echo "[INFO] Waiting for vLLM (glm) server to be ready..."
 for i in {1..300}; do
     if curl -s http://localhost:8000/v1/models > /dev/null; then
-        echo "[INFO] ✅ minicpm API is ready!"
+        echo "[INFO] ✅ glm API is ready!"
         break
     fi
     echo "  ... waiting ($((i*10))s)"
     sleep 10
     if [ $i -eq 300 ]; then
-        echo "[ERROR] ❌ Timeout: minicpm server failed to start."
+        echo "[ERROR] ❌ Timeout: glm server failed to start."
         if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
             kill "$VLLM_PID"
         fi
@@ -73,10 +72,10 @@ echo "[INFO] Starting AEQA evaluation on GPU 1 (3dmem env)..."
 source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate 3dmem
 source .env
 # export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
-CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_minicpm.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/minicpm_only.yaml
+CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_glm.py \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/glm_only.yaml
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

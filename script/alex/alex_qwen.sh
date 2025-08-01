@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=q-k-e-cot
+#SBATCH --job-name=q-replay
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
@@ -47,7 +47,7 @@ CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 #     --limit-mm-per-prompt image=20 \
 #     --trust-remote-code &
 
-vllm serve /anvme/workspace/v100dd12-3dmem/model/Qwen2.5-VL-3B-Instruct \
+vllm serve /anvme/workspace/v100dd12-3dmem/model/Qwen2.5-VL-7B-Instruct \
     --served-model-name qwen \
     --port 8000 \
     --limit-mm-per-prompt image=20 &
