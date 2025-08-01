@@ -49,7 +49,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="qwen",  # gpt-4o-internvl-minicpm-qwen
+                model="qwen",  # gpt-4o-internvl-glm-qwen
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
@@ -607,6 +607,26 @@ def clean_reason(reason):
 
 
 
+def glm_answer(text):
+    """
+    提取<answer>标签后的内容。如果有闭合</answer>标签，提取两者之间的内容；
+    如果没有闭合标签，则提取<answer>之后到行尾或字符串末尾的内容。
+    不区分大小写。
+    """
+    # 先尝试标准闭合标签
+    match = re.search(r"<answer>(.*?)</answer>", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    # 没有闭合标签，则找<answer>到结尾
+    match = re.search(r"<answer>\s*(.*)", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    # 都没有返回空
+    return ""
+
+
+
+
 def parse_frontier_index(output: str):
     """
     从模型的CoT输出文本中解析出推理reason和最后一行frontier index
@@ -617,7 +637,7 @@ def parse_frontier_index(output: str):
     if not lines:
         raise ValueError("Empty output")
     last_line = lines[-1].lower()
-    match = re.match(r'frontier\s*(\d+)', last_line)
+    match = match = re.match(r'(?:answer:\s*)?frontier\s*(\d+)', last_line)
     if match:
         index = int(match.group(1))
         # reason为最后一行前所有内容合并
@@ -625,6 +645,7 @@ def parse_frontier_index(output: str):
         return reason, index
     else:
         raise ValueError(f"Could not parse frontier index from: '{last_line}'")
+
 
 
 
@@ -745,36 +766,47 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 message += f"[{c[1][:10]}...]"
         logging.info(message)
 
-    retry_bound = 3
-    for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
-        if full_response is None:
-            print("call_openai_api (snapshot) returns None, retrying")
-            continue
+    if len(snapshot_imgs) == 0:
+        print("No snapshot images available, directly entering frontier exploration.")
+        
+    else:
+        print(f"Snapshot images available: {len(snapshot_imgs)}")
+        retry_bound = 3
+        for _ in range(retry_bound):
+            full_response = call_openai_api(sys_prompt, content)
+            # full_response = glm_answer(full_response)  # 处理glm的输出格式
+            if full_response is None:
+                print("call_openai_api (snapshot) returns None, retrying")
+                continue
 
-        if isinstance(full_response, list):
-            full_response = " ".join(full_response)
-        full_response = full_response.strip().lower()
+            if isinstance(full_response, list):
+                full_response = " ".join(full_response)
+            full_response = full_response.strip().lower()
 
-        # snapshot合规判定
-        if full_response.startswith("snapshot"):
-            tokens = full_response.split()
-            if len(tokens) >= 2 and tokens[1].isdigit():
-                idx = int(tokens[1])
-                if 0 <= idx < len(snapshot_imgs):
-                    response = f"{tokens[0]} {tokens[1]}"
-                    reason = " ".join(tokens[2:]).strip()
-                    reason = clean_reason(reason)  
-                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
-                else:
-                    print(f"Snapshot index out of range: {tokens[1]}")
-                    continue
-        elif "no snapshot is available" in full_response:
-            # 明确拒绝，直接进入frontier
-            break
-        else:
-            print(f"Unrecognized snapshot response: {full_response}")
-            continue
+            # snapshot合规判定
+            if full_response.startswith("snapshot"):
+                tokens = full_response.split()
+                if len(tokens) >= 2 and tokens[1].isdigit():
+                    idx = int(tokens[1])
+                    reason = clean_reason(" ".join(tokens[2:]).strip()) 
+                    if 0 <= idx < len(snapshot_imgs) and reason != "":
+                        response = f"{tokens[0]} {tokens[1]}"
+                        # reason = " ".join(tokens[2:]).strip()
+                        # reason = clean_reason(reason)  
+                        return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+                    elif 0 <= idx < len(snapshot_imgs) and reason == "":
+                        print(f"Snapshot index {tokens[1]} has no reason.")
+                        continue
+                    else:
+                        print(f"Snapshot index out of range: {tokens[1]}")
+                        continue
+            elif "no snapshot is available" in full_response:
+                # 明确拒绝，直接进入frontier
+                break
+            else:
+                print(f"Unrecognized snapshot response: {full_response}")
+                continue
+
 
     # ==== Step 2: two-stage frontier prompt ====
     retry_bound = 3
@@ -783,15 +815,15 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
 
     context = ''
-    if not os.path.exists(chosen_frontier_path):
-        os.makedirs(chosen_frontier_path, exist_ok=True)
+    # if not os.path.exists(chosen_frontier_path):
+    #     os.makedirs(chosen_frontier_path, exist_ok=True)
 
-    png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
-    if len(png_files) > 0:
-        sys_prompt, content = frontier_context(chosen_frontier_path)
-        context = call_openai_api(sys_prompt, content)
-    else:
-        pass
+    # png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
+    # if len(png_files) > 0:
+    #     sys_prompt, content = frontier_context(chosen_frontier_path)
+    #     context = call_openai_api(sys_prompt, content)
+    # else:
+    #     pass
 
 
     sys_prompt, content = format_explore_prompt_frontier(

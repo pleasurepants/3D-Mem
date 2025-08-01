@@ -248,7 +248,7 @@ def format_explore_prompt_frontier(
     sys_prompt += "Definitions: "
     sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
     sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore. "
-    if context:
+    if context != '':
         sys_prompt += "Context: The following summary describes the agent's past exploration and current known status. Use this context to help you make a better choice, but do not treat it as a direct instruction.\n"
         sys_prompt += f"{context}\n"
 

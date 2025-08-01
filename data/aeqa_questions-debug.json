@@ -1,79 +1,277 @@
 [
     {
-        "question": "What is the white object on the wall above the TV?",
-        "answer": "Air conditioning unit",
-        "category": "object recognition",
-        "question_id": "f2e82760-5c3c-41b1-88b6-85921b9e7b32",
-        "episode_history": "00826-BFRyYbPCCPE",
-        "position": [
-            -3.2461330890655518,
-            0.17934048175811768,
-            -2.557859182357788
-        ],
-        "rotation": [
-            0.9077942371368408,
-            0.0,
-            0.4194158613681793,
-            0.0
-        ],
-        "object_id": null,
-        "class": null
-    },
-    {
-        "question": "Is there room on the dining table to eat?",
-        "answer": "Yes",
-        "category": "spatial understanding",
-        "question_id": "79344680-6b45-4531-8789-ad0f5ef85b3b",
-        "episode_history": "00826-BFRyYbPCCPE",
-        "position": [
-            -3.2461330890655518,
-            0.17934048175811768,
-            -2.557859182357788
-        ],
-        "rotation": [
-            0.9077942371368408,
-            0.0,
-            0.4194158613681793,
-            0.0
-        ],
-        "object_id": null,
-        "class": null
-    },
-    {
-        "question": "Is the front door open?",
-        "answer": "No",
-        "category": "object state recognition",
-        "question_id": "ecad68d2-a16f-4a3e-b8a1-a70ec1c5cf00",
-        "episode_history": "00826-BFRyYbPCCPE",
-        "position": [
-            -3.2461330890655518,
-            0.17934048175811768,
-            -2.557859182357788
-        ],
-        "rotation": [
-            0.9077942371368408,
-            0.0,
-            0.4194158613681793,
-            0.0
-        ],
-        "object_id": null,
-        "class": null
-    },
-    {
-        "question": "What shape are the door knobs?",
-        "answer": "Round or spherical",
+        "question": "What material are the stools in the kitchen made out of?",
+        "answer": "Leather",
         "category": "attribute recognition",
-        "question_id": "e816a1f9-af6c-4901-8d54-4ddaa2a60dc3",
-        "episode_history": "00886-TPhiubUHKcP",
+        "question_id": "013bb857-f47d-4b50-add4-023cc4ff414c",
+        "episode_history": "00876-mv2HUxq3B53",
         "position": [
-            -4.679103851318359,
-            0.16253697872161865,
-            -4.211667060852051
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
         ],
         "rotation": [
-            -0.07081564515829086,
+            -0.9870320558547974,
             0.0,
-            0.9974894523620605,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "What type of numbers are on the clock?",
+        "answer": "Roman numerals",
+        "category": "attribute recognition",
+        "question_id": "0df60236-15ad-4166-a31a-a98d14214fdb",
+        "episode_history": "00848-ziup5kvtCCR",
+        "position": [
+            0.26384106278419495,
+            0.021223172545433044,
+            7.149479389190674
+        ],
+        "rotation": [
+            0.9547726511955261,
+            0.0,
+            0.29733675718307495,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "What color is the front door?",
+        "answer": "Brown",
+        "category": "attribute recognition",
+        "question_id": "30dc765d-80c3-4901-9c69-65e6b48e254a",
+        "episode_history": "00824-Dd4bFSTQ8gi",
+        "position": [
+            6.892691135406494,
+            0.06882420182228088,
+            1.4872137308120728
+        ],
+        "rotation": [
+            0.37141478061676025,
+            0.0,
+            0.9284670948982239,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "What color are the pillows in the kitchen?",
+        "answer": "Blue",
+        "category": "attribute recognition",
+        "question_id": "3a5be057-47d2-4f78-98a9-729ef19b3d8b",
+        "episode_history": "00824-Dd4bFSTQ8gi",
+        "position": [
+            6.892691135406494,
+            0.06882420182228088,
+            1.4872137308120728
+        ],
+        "rotation": [
+            0.37141478061676025,
+            0.0,
+            0.9284670948982239,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "What color is the countertop on the porch?",
+        "answer": "Black",
+        "category": "attribute recognition",
+        "question_id": "45a5e082-a9e9-47ca-a036-dfafba92b16c",
+        "episode_history": "00876-mv2HUxq3B53",
+        "position": [
+            -8.009016036987305,
+            0.05035419762134552,
+            8.276389122009277
+        ],
+        "rotation": [
+            -0.9870320558547974,
+            0.0,
+            0.16052371263504028,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "Where can I warm up?",
+        "answer": "Next to the fireplace",
+        "category": "functional reasoning",
+        "question_id": "6d132959-fd48-4fef-a736-4e5853849547",
+        "episode_history": "00824-Dd4bFSTQ8gi",
+        "position": [
+            6.892691135406494,
+            0.06882420182228088,
+            1.4872137308120728
+        ],
+        "rotation": [
+            0.37141478061676025,
+            0.0,
+            0.9284670948982239,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "Is the light above the sink turned on?",
+        "answer": "Yes",
+        "category": "object state recognition",
+        "question_id": "4dbd213e-56cd-481a-8ff5-ed9a8d636dbc",
+        "episode_history": "00824-Dd4bFSTQ8gi",
+        "position": [
+            6.892691135406494,
+            0.06882420182228088,
+            1.4872137308120728
+        ],
+        "rotation": [
+            0.37141478061676025,
+            0.0,
+            0.9284670948982239,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "Where is the microwave?",
+        "answer": "Above the stovetop",
+        "category": "object localization",
+        "question_id": "7ebac357-a338-4ce0-975a-62141e90a3c3",
+        "episode_history": "00824-Dd4bFSTQ8gi",
+        "extra_answers": [
+            "Over the stove.",
+            "Over the open cookbook.",
+            "above the stove top",
+            "above the book right next to the stove"
+        ],
+        "position": [
+            6.892691135406494,
+            0.06882420182228088,
+            1.4872137308120728
+        ],
+        "rotation": [
+            0.37141478061676025,
+            0.0,
+            0.9284670948982239,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "where is the clock?",
+        "answer": "in the living room hallway next to the television",
+        "category": "object localization",
+        "question_id": "90ab6389-d85e-42ad-b44a-af4849da2631",
+        "episode_history": "00880-Nfvxx8J5NCo",
+        "extra_answers": [
+            "on the wall across from the kitchen",
+            "on the wall across from the fridge",
+            "hallway before the living room",
+            "the wall cross the kitchen"
+        ],
+        "position": [
+            -9.55214786529541,
+            0.18085697293281555,
+            -0.3554811477661133
+        ],
+        "rotation": [
+            0.10294225811958313,
+            0.0,
+            0.9946873188018799,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "What can be seen through the window in the living room?",
+        "answer": "Trees and hills",
+        "category": "object recognition",
+        "question_id": "911693d9-2d28-4ff2-83a9-c67b83753831",
+        "episode_history": "00835-q3zU7Yy5E5s",
+        "position": [
+            -0.4913436472415924,
+            0.03521956503391266,
+            -0.4102398455142975
+        ],
+        "rotation": [
+            0.661293089389801,
+            0.0,
+            0.7501276135444641,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "Where is the fireplace?",
+        "answer": "In the living room, to the right of the radiator and window",
+        "category": "object localization",
+        "question_id": "9b2d06e5-ca78-4519-a9ca-75c06209b770",
+        "episode_history": "00835-q3zU7Yy5E5s",
+        "extra_answers": [
+            "In the corner of the living room.",
+            "Next to the blue couch.",
+            "in the living room ",
+            "in the living room right next to the window"
+        ],
+        "position": [
+            -0.4913436472415924,
+            0.03521956503391266,
+            -0.4102398455142975
+        ],
+        "rotation": [
+            0.661293089389801,
+            0.0,
+            0.7501276135444641,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "how can I clean my hands?",
+        "answer": "there is a sink in the kitchen",
+        "category": "world knowledge",
+        "question_id": "d4c10718-fd57-4db0-93c1-b54deb4b1b25",
+        "episode_history": "00880-Nfvxx8J5NCo",
+        "position": [
+            -9.55214786529541,
+            0.18085697293281555,
+            -0.3554811477661133
+        ],
+        "rotation": [
+            0.10294225811958313,
+            0.0,
+            0.9946873188018799,
+            0.0
+        ],
+        "object_id": null,
+        "class": null
+    },
+    {
+        "question": "where can I keep a new knife I got?",
+        "answer": "there is a knife holder in the kitchen counter next to the gas stove.",
+        "category": "world knowledge",
+        "question_id": "1dcdd225-eba2-4ba1-97b6-c4cdc7ca4e9b",
+        "episode_history": "00880-Nfvxx8J5NCo",
+        "position": [
+            -9.55214786529541,
+            0.18085697293281555,
+            -0.3554811477661133
+        ],
+        "rotation": [
+            0.10294225811958313,
+            0.0,
+            0.9946873188018799,
             0.0
         ],
         "object_id": null,
