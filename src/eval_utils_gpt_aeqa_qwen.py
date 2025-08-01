@@ -604,7 +604,7 @@ def parse_frontier_index(output: str):
         reason = output[:last_match.start()].strip()
         return reason, index
     else:
-        raise ValueError(f"Could not parse frontier index from: '{output}'")
+        raise ValueError(f"Could not parse frontier index")
 
 
 def save_base64_to_png(b64_str, save_dir, step_idx, idx):
@@ -850,9 +850,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             print(f"Layer0 format error: {full_response} | {e}")
     if idx0 is None:
 
-        idx0 = random.randint(0, len(frontier_imgs_0) - 1)
+        idx0 = random.choice(frontier_imgs_0)
         response = f'frontier {idx0}'
-        reason = "Fallback to random selection due to format error." + str(e)
+        reason = "no valid index found, randomly selected one"
         return response, snapshot_id_mapping, reason, len(snapshot_imgs)
     
 
@@ -929,12 +929,15 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                     print(f"Layer1 index out of range: {idx1_in_subgroup}")
             except Exception as e:
                 print(f"Layer1 format error: {full_response} | {e}")
-                idx_random = random.randint(0, len(frontier_imgs_subgroup) - 1)
-                response = f'frontier {idx_random}'
-                reason = "Fallback to random selection due to format error." + str(e)
-                return response, snapshot_id_mapping, reason, len(snapshot_imgs)
 
-        if idx1_in_subgroup is None or idx1_in_subgroup >= len(layer1_indices):
+
+        if idx1_in_subgroup is None:
+            idx_random = random.choice(frontier_imgs_subgroup)
+            response = f'frontier {idx_random}'
+            reason = f"Randomly selected index {idx_random} due to parsing failure."
+            return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+        
+        elif idx1_in_subgroup >= len(layer1_indices):
             logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
             response = f"frontier {idx0}"
             final_reason = full_response_layer0
