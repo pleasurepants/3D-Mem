@@ -50,7 +50,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="minicpm",  # gpt-4o-internvl-minicpm-qwen
+                model="glm",  # gpt-4o-internvl-glm-qwen
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
@@ -709,7 +709,22 @@ def frontier_context(
 
 
 
-
+def glm_answer(text):
+    """
+    提取<answer>标签后的内容。如果有闭合</answer>标签，提取两者之间的内容；
+    如果没有闭合标签，则提取<answer>之后到行尾或字符串末尾的内容。
+    不区分大小写。
+    """
+    # 先尝试标准闭合标签
+    match = re.search(r"<answer>(.*?)</answer>", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    # 没有闭合标签，则找<answer>到结尾
+    match = re.search(r"<answer>\s*(.*)", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    # 都没有返回空
+    return ""
 
 
 
@@ -772,6 +787,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
             if isinstance(full_response, list):
                 full_response = " ".join(full_response)
+
+            full_response = glm_answer(full_response)  # 提取<answer>标签内容
             full_response = full_response.strip().lower()
 
             # snapshot合规判定
@@ -840,6 +857,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     for _ in range(retry_bound):
         # full_response = call_openai_api_vote(sys_prompt, content)
         full_response = call_openai_api(sys_prompt, content)
+
+        full_response = glm_answer(full_response)  # 提取<answer>标签内容
         if full_response is None:
             print("call_openai_api (frontier layer0) returns None, retrying")
             continue
@@ -855,7 +874,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         except Exception as e:
             print(f"Layer0 format error: {full_response} | {e}")
     if idx0 is None:
-        return None, snapshot_id_mapping, None, len(snapshot_imgs)
+        idx0 = random.randint(0, len(frontier_imgs_0) - 1)
+        response = f'frontier {idx0}'
+        return response, snapshot_id_mapping, None, len(snapshot_imgs)
     logging.info(f"[Layer0] VLM selected index: {idx0}")
     logging.info(f"reason for layer0 selection: {reason}")
     for k, v in step['layer0_to_layer1'].items():
@@ -907,7 +928,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         for _ in range(retry_bound):
             full_response = call_openai_api(sys_prompt, content)
             # full_response = call_openai_api_vote(sys_prompt, content)
-            
+            full_response = glm_answer(full_response)  # 提取<answer>标签内容
             if full_response is None:
                 print("call_openai_api (frontier layer1) returns None, retrying")
                 continue
@@ -929,6 +950,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                     print(f"Layer1 index out of range: {idx1_in_subgroup}")
             except Exception as e:
                 print(f"Layer1 format error: {full_response} | {e}")
+                idx_random = random.randint(0, len(frontier_imgs_0) - 1)
+                response = f'frontier {idx_random}'
+                return response, snapshot_id_mapping, None, len(snapshot_imgs)
 
         if idx1_in_subgroup is None or idx1_in_subgroup >= len(layer1_indices):
             logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")

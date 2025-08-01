@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=4:00:00 
+#SBATCH --time=24:00:00 
 #SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/lifelong/qwen/embedding-lifelong-cotv1-%j.out
 #SBATCH --partition a100
 
@@ -50,7 +50,7 @@ CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 vllm serve /anvme/workspace/v100dd12-3dmem/model/Qwen2.5-VL-7B-Instruct \
     --served-model-name qwen \
     --port 8000 \
-    --limit-mm-per-prompt image=20 &
+    --limit-mm-per-prompt '{"image": 20}' &
 VLLM_PID=$!
 
 
