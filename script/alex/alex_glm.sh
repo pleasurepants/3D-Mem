@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=g-k-c-cot
+#SBATCH --job-name=g-kmeans-nocon
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/glm/kmeans-froncon-cotv1-%j.out 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/glm/kmeans-nocon-cotv1-%j.out 
 #SBATCH --partition a100
 
 

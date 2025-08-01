@@ -832,8 +832,16 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 print(f"Layer0 index out of range: {idx0}")
         except Exception as e:
             print(f"Layer0 format error: {full_response} | {e}")
+            idx_random = random.randint(0, len(frontier_imgs_0) - 1)
+            response = f'frontier {idx_random}'
+            reason = f"Randomly selected index {idx_random} due to parsing failure."
+            return response, snapshot_id_mapping, reason, len(snapshot_imgs)
     if idx0 is None:
-        return None, snapshot_id_mapping, None, len(snapshot_imgs)
+        # return None, snapshot_id_mapping, None, len(snapshot_imgs)
+        idx_random = random.randint(0, len(frontier_imgs_0) - 1)
+        response = f'frontier {idx_random}'
+        reason = f"Randomly selected index {idx_random} due to parsing failure."
+        return response, snapshot_id_mapping, reason, len(snapshot_imgs)
     logging.info(f"[Layer0] VLM selected index: {idx0}")
     logging.info(f"reason for layer0 selection: {reason}")
     for k, v in step['layer0_to_layer1'].items():
@@ -907,7 +915,10 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                     print(f"Layer1 index out of range: {idx1_in_subgroup}")
             except Exception as e:
                 print(f"Layer1 format error: {full_response} | {e}")
-
+                idx_random = random.randint(0, len(frontier_imgs_0) - 1)
+                response = f'frontier {idx_random}'
+                reason = f"Randomly selected index {idx_random} due to parsing failure."
+                return response, snapshot_id_mapping, reason, len(snapshot_imgs)
         if idx1_in_subgroup is None or idx1_in_subgroup >= len(layer1_indices):
             logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
             response = f"frontier {idx0}"
