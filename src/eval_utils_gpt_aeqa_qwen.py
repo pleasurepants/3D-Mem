@@ -629,23 +629,17 @@ def glm_answer(text):
 
 def parse_frontier_index(output: str):
     """
-    从模型的CoT输出文本中解析出推理reason和最后一行frontier index
-    返回: (reason:str, index:int)
-    只支持如 'frontier 2'，不返回非数字或不合规内容
+    解析输出文本，返回(reason, index)
+    支持全文任意位置的frontier index格式
     """
-    lines = [line.strip() for line in output.strip().split('\n') if line.strip()]
-    if not lines:
-        raise ValueError("Empty output")
-    last_line = lines[-1].lower()
-    match = match = re.match(r'(?:answer:\s*)?frontier\s*(\d+)', last_line)
-    if match:
-        index = int(match.group(1))
-        # reason为最后一行前所有内容合并
-        reason = "\n".join(lines[:-1]).strip()
+    matches = list(re.finditer(r'frontier\s*(\d+)', output, re.IGNORECASE))
+    if matches:
+        last_match = matches[-1]
+        index = int(last_match.group(1))
+        reason = output[:last_match.start()].strip()
         return reason, index
     else:
-        raise ValueError(f"Could not parse frontier index from: '{last_line}'")
-
+        raise ValueError(f"Could not parse frontier index")
 
 
 
@@ -814,7 +808,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
 
 
-    context = ''
+    context = None
     # if not os.path.exists(chosen_frontier_path):
     #     os.makedirs(chosen_frontier_path, exist_ok=True)
 
@@ -864,9 +858,11 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 print(f"Layer0 index out of range: {idx0}")
         except Exception as e:
             print(f"Layer0 format error: {full_response} | {e}")
+    # 如果idx0仍然是None，说明解析失败
+
     if idx0 is None:
         # return None, snapshot_id_mapping, None, len(snapshot_imgs)
-        idx_random = random.randint(0, len(frontier_imgs_0) - 1)
+        idx_random = random.choice(frontier_imgs_0)
         response = f'frontier {idx_random}'
         reason = f"Randomly selected index {idx_random} due to parsing failure."
         return response, snapshot_id_mapping, reason, len(snapshot_imgs)
@@ -945,8 +941,15 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                     print(f"Layer1 index out of range: {idx1_in_subgroup}")
             except Exception as e:
                 print(f"Layer1 format error: {full_response} | {e}")
+                
 
-        if idx1_in_subgroup is None or idx1_in_subgroup >= len(layer1_indices):
+        if idx1_in_subgroup is None:
+            idx_random = random.choice(frontier_imgs_subgroup)
+            response = f'frontier {idx_random}'
+            reason = f"Randomly selected index {idx_random} due to parsing failure."
+            return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+        
+        elif idx1_in_subgroup >= len(layer1_indices):
             logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
             response = f"frontier {idx0}"
             final_reason = full_response_layer0
