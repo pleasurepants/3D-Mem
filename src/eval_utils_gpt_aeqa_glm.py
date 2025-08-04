@@ -418,26 +418,26 @@ def format_explore_prompt_snapshot(
     # )
 
     # 2
-    # text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
-    # text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
-    # text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Use simple and direct sentences, avoid vague or descriptive language. Do not mention words like 'snapshot', 'on the left of the image', etc. "
-    # text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
-    # text += "or if you choose the second snapshot, you can return 'Snapshot 1 Next to the fireplace'. "
-    # text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
-    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. Only output the complete answer as a direct response, without any extra words, explanation, or reasoning."
-
-    text += "Please answer in exactly one of the following two formats:\n"
-    text += "1. Snapshot i [Your complete answer as a full sentence.]\n"
-    text += "2. No Snapshot is available.\n"
-    text += "The two formats are mutually exclusive. Never combine 'No Snapshot is available' with any Snapshot index.\n"
-    text += "If you select a Snapshot, you must provide a clear and direct answer in a complete sentence.\n"
-    text += "Only output your answer in one of the two formats above, with no extra words, explanation, or reasoning.\n"
-    text += "Examples:\n"
-    text += "Snapshot 0 The fruit bowl is on the kitchen counter.\n"
-    text += "Snapshot 1 Next to the fireplace.\n"
-    text += "No Snapshot is available.\n"
+    text = "Please provide your answer in the following format: 'Snapshot i [Answer]' or 'No Snapshot is available', where i is the index of the snapshot you choose. "
+    text += "You should select one of the provided Snapshots and give a clear and direct answer to the question. Only reply 'No Snapshot is available' if it is truly impossible to answer from any Snapshot. "
+    text += "Write your answer as a complete sentence that directly responds to the question, not just a description of the image. Use simple and direct sentences, avoid vague or descriptive language. Do not mention words like 'snapshot', 'on the left of the image', etc. "
+    text += "For example, if you choose the first snapshot, you can return 'Snapshot 0 The fruit bowl is on the kitchen counter.'. "
+    text += "or if you choose the second snapshot, you can return 'Snapshot 1 Next to the fireplace'. "
     text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
     text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. Only output the complete answer as a direct response, without any extra words, explanation, or reasoning."
+
+    # text += "Please answer in exactly one of the following two formats:\n"
+    # text += "1. Snapshot i [Your complete answer as a full sentence.]\n"
+    # text += "2. No Snapshot is available.\n"
+    # text += "The two formats are mutually exclusive. Never combine 'No Snapshot is available' with any Snapshot index.\n"
+    # text += "If you select a Snapshot, you must provide a clear and direct answer in a complete sentence.\n"
+    # text += "Only output your answer in one of the two formats above, with no extra words, explanation, or reasoning.\n"
+    # text += "Examples:\n"
+    # text += "Snapshot 0 The fruit bowl is on the kitchen counter.\n"
+    # text += "Snapshot 1 Next to the fireplace.\n"
+    # text += "No Snapshot is available.\n"
+    # text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot."
+    # text += "Note: Do not mention words like 'snapshot', 'in the image', or image positions. Only use the provided Snapshot indices, and do not make up any index that is not listed above. Only output the complete answer as a direct response, without any extra words, explanation, or reasoning."
 
 
     content.append((text,))
@@ -723,6 +723,23 @@ def frontier_context(
     return sys_prompt, content
 
 
+def extract_frontier_context(text):
+    """
+    从输入文本中提取<answer>后面的内容，或从'The agent has'开始的部分
+    返回提取到的answer字符串，如果都没有则返回空字符串
+    """
+    # 1. 优先用 <answer> 标签提取
+    match = re.search(r"<answer>(.+)", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    # 2. 没有<answer>，就找 "The agent has" 或类似模式
+    match = re.search(r"(The agent has.+)", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    # 3. 其它情况，返回空
+    return ""
+
+
 
 def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
     step["use_prefiltering"] = cfg.prefiltering
@@ -809,15 +826,20 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
 
     context = None
-    # if not os.path.exists(chosen_frontier_path):
-    #     os.makedirs(chosen_frontier_path, exist_ok=True)
 
-    # png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
-    # if len(png_files) > 0:
-    #     sys_prompt, content = frontier_context(chosen_frontier_path)
-    #     context = call_openai_api(sys_prompt, content)
-    # else:
-    #     pass
+    if "froncon" in cfg.exp_name:
+        if not os.path.exists(chosen_frontier_path):
+            os.makedirs(chosen_frontier_path, exist_ok=True)
+
+        png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
+        if len(png_files) > 0:
+            sys_prompt, content = frontier_context(chosen_frontier_path)
+            context = call_openai_api(sys_prompt, content)
+            context = extract_frontier_context(context)
+            logging.info(f"Froncon label: {context}")
+
+        else:
+            pass
 
 
     sys_prompt, content = format_explore_prompt_frontier(

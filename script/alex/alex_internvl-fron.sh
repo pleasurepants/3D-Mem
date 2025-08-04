@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=i-nocon-225
+#SBATCH --job-name=i-froncon-225
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1225
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/internvl/nocon-225-%j.out 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/internvl/froncon-225-%j.out 
 #SBATCH --partition a100
 
 
@@ -84,7 +84,7 @@ source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_internvl.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/internvl-nocon.yaml
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/internvl-froncon.yaml
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

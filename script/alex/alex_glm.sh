@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=g-kmeans-nocon
+#SBATCH --job-name=g-nocon-11
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/glm/kmeans-nocon-cotv1-%j.out 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/glm/nocon-11-%j.out 
 #SBATCH --partition a100
 
 
@@ -75,7 +75,7 @@ source .env
 # export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_glm.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/glm_only.yaml
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/glm-nocon.yaml
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
