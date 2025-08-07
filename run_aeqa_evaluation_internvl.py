@@ -309,6 +309,73 @@ def check_lifelong_memory(lifelong_json_path, lifelong_memory, cfg, question):
 
 
 
+def tuple_step_save(
+    tuple_save_path,
+    question_id,
+    question,
+    cnt_step,
+    cfg,
+    lifelong_json_path,
+    final_reward: Optional[str] = None  # 可选字段：'pass' 或 'fail'
+    ):
+    # 初始化或加载已有结果
+    if os.path.exists(tuple_save_path):
+        with open(tuple_save_path, 'r') as f:
+            saved_result = json.load(f)
+    else:
+        saved_result = {}
+
+    if question_id not in saved_result:
+        saved_result[question_id] = {"question": question, "steps": {}}
+
+    step_key = f"step_{cnt_step}"
+    saved_result[question_id]["steps"][step_key] = {}
+
+    ## --- frontier ---
+    frontier_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name, question_id, 'frontier')
+    chosen_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name, question_id, 'chosen_frontier')
+
+    def collect_matching_pngs(folder, cnt_step):
+        files = []
+        if not os.path.exists(folder):
+            return files
+        prefix = f"{cnt_step}-"
+        for fname in os.listdir(folder):
+            if fname.startswith(prefix) and fname.endswith(".png"):
+                files.append(os.path.join(folder, fname))
+        return sorted(files)
+
+    all_frontiers = collect_matching_pngs(frontier_dir, cnt_step)
+    chosen_frontiers = collect_matching_pngs(chosen_dir, cnt_step)
+
+    saved_result[question_id]["steps"][step_key]["frontier"] = {
+        "all_frontiers": all_frontiers,
+        "chosen_frontiers": chosen_frontiers
+    }
+
+    ## --- memory_snapshots ---
+    memory_snapshots = {}
+    if os.path.exists(lifelong_json_path):
+        with open(lifelong_json_path, 'r') as f:
+            lifelong_data = json.load(f)
+        if question_id in lifelong_data:
+            img2objs = lifelong_data[question_id]
+            for img_name, obj_list in img2objs.items():
+                if img_name.startswith(f"{cnt_step}-"):
+                    memory_snapshots[img_name] = obj_list
+
+    saved_result[question_id]["steps"][step_key]["memory_snapshots"] = memory_snapshots
+
+    ## --- final_reward ---
+    if "final_reward" not in saved_result[question_id]:
+        saved_result[question_id]["final_reward"] = "fail"  # 默认写入 fail
+
+    if final_reward is not None:
+        saved_result[question_id]["final_reward"] = final_reward  # 覆盖写入
+
+    # 写入文件
+    with open(tuple_save_path, 'w') as f:
+        json.dump(saved_result, f, indent=2)
 
 
 
@@ -575,8 +642,25 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                         f"Question id {question_id} invalid: query_vlm_for_response failed!"
                     )
                     break
+                
+                
 
                 max_point_choice, gpt_answer, n_filtered_snapshots = vlm_response
+
+
+                # tuple save
+                tuple_save_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'lifelong_step_info.json')
+                tuple_step_save(
+                    tuple_save_path=tuple_save_path,
+                    question_id=question_id,
+                    question=question,
+                    cnt_step=cnt_step,
+                    cfg=cfg,
+                    lifelong_json_path=lifelong_json_path
+                )
+
+
+
 
                 # set the vlm choice as the navigation target
                 update_success = tsdf_planner.set_next_navigation_point(
@@ -632,6 +716,19 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
 
             # (6) Check if the agent has arrived at the target to finish the question
             if type(max_point_choice) == SnapShot and target_arrived:
+
+
+                #set final reward as succcess
+                tuple_step_save(
+                    tuple_save_path=tuple_save_path,
+                    question_id=question_id,
+                    question=question,
+                    cnt_step=cnt_step,
+                    cfg=cfg,
+                    lifelong_json_path=lifelong_json_path,
+                    final_reward="pass"
+                )
+
                 # when the target is a snapshot, and the agent arrives at the target
                 # we consider the question is finished and save the chosen target snapshot
                 snapshot_filename = max_point_choice.image.split(".")[0]

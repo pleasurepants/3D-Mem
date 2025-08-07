@@ -175,3 +175,6 @@ def query_vlm_for_response(
         pred_target_frontier = tsdf_planner.frontiers[target_index]
 
         return pred_target_frontier, reason, n_filtered_snapshots
+    
+
+    

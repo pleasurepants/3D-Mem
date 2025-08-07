@@ -49,7 +49,7 @@ CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 vllm serve /anvme/workspace/v100dd12-3dmem/model/InternVL3-8B \
     --served-model-name internvl \
     --port 8000 \
-    --limit-mm-per-prompt image=20 \
+    --limit-mm-per-prompt '{"image": 20}' \
     --trust-remote-code &
 
 # vllm serve /anvme/workspace/v100dd12-3dmem/model/Qwen2.5-VL-3B-Instruct \
