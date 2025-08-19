@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=g-replay
+#SBATCH --job-name=g-traj-v2-307
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a100:2
+#SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/lifelong/glm/embedding-lifelong-cot-seed66-%j.out
-#SBATCH --partition a100
+#SBATCH --time=6:00:00 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/traj-v2/glm/seed307-%j.out
+#SBATCH --partition a40
 
 
 

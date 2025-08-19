@@ -10,11 +10,16 @@ import logging
 from src.const import *
 import re
 import json
-
+import random
+from src.context_generator import FrontierSimilaritySearcher
+from src.context_generator import run_layer0_recall_and_aggregate, run_layer1_recall_and_aggregate_for_subgroup
 client = OpenAI(
     base_url=END_POINT,
     api_key=OPENAI_KEY,
 )
+
+
+
 
 
 def format_content(contents):
@@ -52,7 +57,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
             completion = client.chat.completions.create(
                 model="internvl",  # gpt-4o-internvl-minicpm-qwen
                 messages=message_text,
-                temperature=0.7,
+                temperature=0.2,
                 max_tokens=4096, # 4096 for gpt-4o
                 top_p=0.95,
                 frequency_penalty=0,
@@ -245,84 +250,72 @@ def format_explore_prompt_frontier(
     image_goal=None,
     context=None,
 ):
-    sys_prompt = "Task: You are an agent in an indoor scene tasked with answering questions by observing the surroundings and exploring the environment. To answer the question, you are required to choose a Frontier to further explore. "
-    sys_prompt += "Definitions: "
-    sys_prompt += "Frontier: An observation of an unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction. "
-    sys_prompt += "If you choose a Frontier, you need to explain why you would like to choose that direction to explore. "
-    if "-1" not in context and context is not None:
-        sys_prompt += "Context: The following summary integrates the agent's past exploration and current knowledge, and is intended to provide useful guidance for possible future exploration directions. Use this context as a helpful reference for deciding where or what to explore next, but do not treat it as a strict instruction. Make your own best judgment based on both this context and the current question.\n"
-        sys_prompt += f"{context}\n"
-
-
-
+    # ========= System: Inputs/Outputs contract + natural recall usage =========
+    sys_prompt = (
+        "Role: You are an agent that explores indoor scenes to answer a question by choosing exactly one Frontier.\n"
+        "You WILL BE GIVEN (as user content, in this order when available):\n"
+        "1) An optional recall context (a short natural-language recap of earlier exploration in similar scenes).\n"
+        "2) The current question (and possibly a goal image).\n"
+        "3) The current egocentric view (optional).\n"
+        "4) The list of Frontier candidate images, each with an index like 'Frontier 0', 'Frontier 1', ...\n"
+        "Your TASK: choose the single Frontier most helpful to make progress toward answering the current question.\n"
+        "Strict rules:\n"
+        "- Use ONLY the provided candidates; never invent images or indices.\n"
+        "- Refer to candidates ONLY by their indices (e.g., 'frontier 0'). Do NOT use titles, captions, or any labels from the recall context.\n"
+        "- If a recall context is provided, treat it as background experience to be woven naturally into your reasoning; always prioritize the current question and visible evidence.\n"
+        "Your OUTPUT MUST include the following sections in order:\n"
+        "Step 0: List exactly the candidate indices you received (format 'Candidate indices: frontier 0, frontier 1, ...').\n"
+        "Step 1: For EACH candidate, describe what you see (objects, layout, cues relevant to the question). Only discuss candidates listed in Step 0.\n"
+        "Step 2: Compare candidates strictly from Step 0 for their relevance to the question.\n"
+        "        If a recall context is provided, include WITHIN Step 2 a short natural paragraph (2–3 sentences) that:\n"
+        "        (a) briefly states what the earlier question pursued and why that exploration helped back then;\n"
+        "        (b) states what the present question requires (e.g., needs close planar views for color/material; needs doorway/outdoor cues for location/existence);\n"
+        "        (c) explains which current candidates (refer ONLY as 'frontier i') best align with that transferable rationale, based on visible features.\n"
+        "Step 3: Select the single most relevant candidate and justify your choice concisely. If recall was provided, naturally mention whether your choice aligns with that experience or deviates for good current reasons.\n"
+        "FINAL: On a NEW line, output ONLY 'frontier i' (the chosen index) with nothing else.\n"
+    )
 
     content = []
-    # 1 first is the question
-    text = f"Question: {question}"
+
+    # ===== Recall context as user content (only if present; boosts usage) =====
+    has_context = bool(context and isinstance(context, str) and context.strip())
+    if has_context:
+        content.append(("Recall context:\n" + context.strip(),))
+
+    # ===== Question (with optional goal image) =====
+    q_text = f"Question: {question}"
     if image_goal is not None:
-        content.append((text, image_goal))
-        
+        content.append((q_text, image_goal))
     else:
-        content.append((text + " ",))
+        content.append((q_text + " ",))
 
-    text = "Select the Frontier that would help find the answer of the question. "
-    content.append((text,))
+    content.append(("Select the Frontier that would help find the answer of the question. ",))
 
-    # 2 add egocentric view
-    if egocentric_view:
-        text = (
-            "The following is the egocentric view of the agent in forward direction: "
-        )
-        content.append((text, egocentric_imgs[-1]))
+    # ===== Egocentric (guarded) =====
+    if egocentric_view and egocentric_imgs and len(egocentric_imgs) > 0:
+        content.append(("The following is the egocentric view of the agent in forward direction: ", egocentric_imgs[-1]))
 
-
-    # 4 here is the frontier images
-    text = "The followings are all the Frontiers that you can explore:  "
-    content.append((text,))
+    # ===== Frontier candidates =====
+    content.append(("The following are all the Frontiers that you can explore:  ",))
     if len(frontier_imgs) == 0:
         content.append(("No Frontier is available",))
     else:
         for i in range(len(frontier_imgs)):
             content.append((f"Frontier {i} ", frontier_imgs[i]))
 
-
-    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
-    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
-    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
-    # text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
-    # text += "For example, if you choose the second frontier, you can return: 'Frontier 1 There is a door that may lead to the kitchen, which is likely to have the answer.' "
-    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
-    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question."
-    # text += "Only use the provided indices. Do NOT make up new indices."
-
-    # cot
-    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
-    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
-    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
-    # text += "Your reasoning should clearly connect the question with what you observe or infer from the frontier images, focusing on which direction is most promising for finding the needed information. "
-    # text += "**Think step by step.**"
-    # text += "For example, if you choose the second frontier, you can return: 'Frontier 1 First, the question asks about the kitchen. Frontier 1 shows a door which may lead to the kitchen, so I choose it.' "
-    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
-    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question."
-    # text += "Only use the provided indices. Do NOT make up new indices."
-
-    # cot-v1
-    # text = "Please provide your answer in the following format: 'Frontier i [Reason]', where i is the index of the frontier you choose. "
-    # text += "You MUST select one and only one of the provided Frontier indices. You are NOT allowed to say that none is suitable or refuse to choose. "
-    # text += "Choose the frontier that is MOST likely to help you answer the question, based on visible clues, semantic hints, or where the target object is likely to be found. "
-    # text += "Explain your reasoning step by step: First, state what the question is asking for. Then, briefly analyze the clues shown in each frontier image and their relevance to the question. Finally, state clearly why you select your chosen frontier."
-    # text += "For example, you can answer: 'Frontier 2 The question asks about finding the refrigerator, which is commonly in the kitchen. Among the frontiers, Frontier 2 shows a doorway and a tiled floor, which are clues for a kitchen. The other frontiers look like living or bedroom spaces. Therefore, I choose Frontier 2 as it is most likely to lead to the kitchen and the answer.' "
-    # text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. Do not mention words like 'frontier', directions, or image positions. Only use the provided Frontier indices; do not make up an index that is not listed above. "
-    # text += "You may also use information from other frontiers and egocentric views to help your decision, but always select the single most relevant frontier for making progress toward answering the question."
-    # text += "Only use the provided indices. Do NOT make up new indices."
-
-    # cot-v2
-    text = "You are required to reason step by step and only output your final choice at the end. Please follow the instructions below carefully. "
+    # ===== CoT skeleton (kept compatible with your parser) =====
+    text = ""
+    text += "You are required to reason step by step and only output your final choice at the end. Please follow the instructions below carefully. "
     text += "Step 0: List all candidate images you are given and their indices in the following format: 'Candidate indices: frontier 0, frontier 1, ...' (listing only the actual indices provided below; do NOT add, omit, or change any index)."
     text += "You must ONLY discuss and compare the images whose indices are listed in Step 0. You are STRICTLY FORBIDDEN to invent, mention, analyze, or refer to any images or indices that are not explicitly listed in Step 0."
     text += "Step 1: For each provided Frontier image, describe in detail what you see. Focus on visible objects, scene layout, and any clues relevant to the question. ONLY describe the images with the indices listed in Step 0. Start your answer with 'Step 1:' and describe each candidate separately."
     text += "Step 2: Analyze what the question is asking for. Then, compare ONLY the frontiers listed in Step 0, by analyzing the clues shown in each image and their relevance to the question. Do NOT mention, analyze, or imagine any other indices. Start this section with 'Step 2:'."
+    if has_context:
+        # ——自然融入“经验迁移”的短段，覆盖 过去→为何有效→现在需要→候选映射 —— 
+        text += " Within Step 2, include a short natural paragraph (2–3 sentences) reflecting on the recall: briefly what was asked then and why that exploration helped; what the present question requires; and which current candidates (refer ONLY as 'frontier i') best align with that transferable rationale based on visible features."
     text += "Step 3: Based on your analysis above, select the single most relevant frontier for making progress toward answering the question. Clearly state your reasoning and why you select this one, but ONLY from the indices listed in Step 0. Begin this section with 'Step 3:'."
+    if has_context:
+        text += " Write your justification as natural prose that either links your choice to the recalled experience (shared visual features/strategy) or explains a principled deviation due to the current evidence."
     text += "After completing Step 3, output your final answer on a new line in the format: 'frontier i' (where i is one of the indices listed in Step 0). Do not include any other words, indices, or explanations on that line."
     text += "You MUST select one and only one of the provided Frontier indices listed in Step 0. You are NOT allowed to say that none is suitable or refuse to choose."
     text += "Choose the frontier that is MOST likely to help you answer the question, based ONLY on the visible clues, semantic hints, or where the target object is likely to be found in the images listed above."
@@ -330,13 +323,9 @@ def format_explore_prompt_frontier(
     text += "Do NOT mention words like 'frontier', directions, or image positions in your reasoning except when referring to the candidate indices listed in Step 0. Only use the provided Frontier indices; do NOT make up or analyze any index that is not listed above."
     text += "Only use the indices listed in Step 0. Any mention, analysis, or invention of other indices will be considered an error. Do NOT refer to images/frontiers not listed above."
 
-
-
-
     content.append((text,))
 
     return sys_prompt, content
-
 
 
 
@@ -431,58 +420,6 @@ def format_explore_prompt_snapshot(
 
 
 
-
-from collections import Counter
-import random
-import re
-import logging
-
-def call_openai_api_vote(sys_prompt, content, num_trials=5, max_tiebreak_rounds=5):
-    """
-    Only for 'frontier' voting. Returns the most voted 'frontier <idx> ...' response.
-    Minimal logging: only frontier index count and final chosen index.
-    """
-    tiebreak_round = 0
-    candidate_indices = None
-    while True:
-        responses = []
-        raw_indices = []
-        for _ in range(num_trials):
-            resp = call_openai_api(sys_prompt, content)
-            if resp is not None:
-                resp = resp.strip()
-                m = re.match(r"frontier\s+(\d+)", resp.lower())
-                if m:
-                    idx = int(m.group(1))
-                    if candidate_indices is None or idx in candidate_indices:
-                        responses.append(resp)
-                        raw_indices.append(idx)
-        if not responses:
-            logging.warning("[Frontier Voting] All responses are None. Return None.")
-            return None
-        # 只看 index 计数
-        index_counter = Counter(raw_indices)
-        log_str = " | ".join([f"frontier {idx}: {count}" for idx, count in index_counter.items()])
-        logging.info(f"[Frontier Voting][Round {tiebreak_round+1}] {log_str}")
-        max_count = max(index_counter.values())
-        winners = [idx for idx, count in index_counter.items() if count == max_count]
-        if len(winners) == 1:
-            logging.info(f"[Frontier Voting] Selected: frontier {winners[0]}")
-            # 找到第一个对应index的完整响应返回
-            for resp in responses:
-                m = re.match(r"frontier\s+(\d+)", resp.lower())
-                if m and int(m.group(1)) == winners[0]:
-                    return resp
-        else:
-            candidate_indices = winners
-            tiebreak_round += 1
-            if tiebreak_round >= max_tiebreak_rounds:
-                chosen = random.choice(winners)
-                logging.info(f"[Frontier Voting] Max tie-break rounds reached. Randomly selected: frontier {chosen}")
-                for resp in responses:
-                    m = re.match(r"frontier\s+(\d+)", resp.lower())
-                    if m and int(m.group(1)) == chosen:
-                        return resp
 
 
 
@@ -609,6 +546,16 @@ def parse_frontier_index(output: str):
 
 
 
+def _shorten(text: str, max_len: int = 400) -> str:
+    if not text:
+        return ""
+    t = text.strip()
+    return (t[:max_len] + " ...") if len(t) > max_len else t
+
+
+
+
+
 
 def save_base64_to_png(b64_str, save_dir, step_idx, idx):
     os.makedirs(save_dir, exist_ok=True)
@@ -707,16 +654,7 @@ def frontier_context(
 
 
 
-
-
-
-
-
-
-
-
-
-def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None, lifelong_context=None):
+def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
     (
@@ -798,21 +736,18 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     # ==== Step 2: two-stage frontier prompt ====
     retry_bound = 3
 
+    # ==== (NEW) Layer-0 回忆与聚合（只对初始方向层做） ====
+    run_layer0_recall_and_aggregate(
+        step=step,
+        cfg=cfg,
+        frontier_imgs_0=frontier_imgs_0,
+        chosen_frontier_path=chosen_frontier_path,
+    )
+
+    layer0_con = None
+    layer0_con = step["replay_layer0_aggregated_context"]
+
     # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
-
-
-    context = ''
-    # if not os.path.exists(chosen_frontier_path):
-    #     os.makedirs(chosen_frontier_path, exist_ok=True)
-
-    # png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
-    # if len(png_files) > 0:
-    #     sys_prompt, content = frontier_context(chosen_frontier_path)
-    #     context = call_openai_api(sys_prompt, content)
-    # else:
-    #     pass
-
-
     sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
@@ -822,7 +757,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         egocentric_view=step.get("use_egocentric_views", False),
         use_snapshot_class=True,
         image_goal=image_goal,
-        context=lifelong_context,
+        context=layer0_con,
     )
     if verbose:
         logging.info(f"Input prompt (frontier layer0):")
@@ -835,7 +770,6 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
     idx0 = None
     for _ in range(retry_bound):
-        # full_response = call_openai_api_vote(sys_prompt, content)
         full_response = call_openai_api(sys_prompt, content)
         if full_response is None:
             print("call_openai_api (frontier layer0) returns None, retrying")
@@ -879,6 +813,23 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             logging.info(f"[Layer1] Only one candidate ({global_frontier_idx}), selected by default.")
             save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
             return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+
+
+
+
+
+
+
+        # ==== (NEW) 对该方向的更近处子集做回忆与聚合 ====
+        layer1_context_text = run_layer1_recall_and_aggregate_for_subgroup(
+            step=step,
+            cfg=cfg,
+            frontier_imgs_1=frontier_imgs_1,
+            layer1_indices=layer1_indices,
+            chosen_frontier_path=chosen_frontier_path,
+        )
+
+
         sys_prompt, content = format_explore_prompt_frontier(
             question,
             egocentric_imgs,
@@ -888,7 +839,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             egocentric_view=step.get("use_egocentric_views", False),
             use_snapshot_class=True,
             image_goal=image_goal,
-            context=lifelong_context,
+            context=layer1_context_text,
         )
         if verbose:
             logging.info(f"Input prompt (frontier layer1):")
@@ -907,7 +858,6 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         final_reason = ""
         for _ in range(retry_bound):
             full_response = call_openai_api(sys_prompt, content)
-            # full_response = call_openai_api_vote(sys_prompt, content)
             
             if full_response is None:
                 print("call_openai_api (frontier layer1) returns None, retrying")

@@ -1,5 +1,6 @@
-import os
-
+import os, json, re
+from typing import Optional, Dict, List
+import uuid
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # disable warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["HABITAT_SIM_LOG"] = (
@@ -17,8 +18,6 @@ import time
 from typing import Optional
 import logging
 from src.const import *
-import re
-import json
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 client = OpenAI(
@@ -35,7 +34,6 @@ import random
 import numpy as np
 import torch
 import time
-import json
 import logging
 import matplotlib.pyplot as plt
 
@@ -310,7 +308,168 @@ def check_lifelong_memory(lifelong_json_path, lifelong_memory, cfg, question):
 
 
 
+def tuple_step_save(
+    tuple_save_path: str,
+    question_id: str,
+    question: str,
+    cnt_step: int,
+    cfg,
+    lifelong_json_path: str,
+    question_data: Optional[dict] = None,   # may carry {"episode_history": "..."}
+    episode_history_id: Optional[str] = None,  # explicit episode id, if known
+    final_reward: Optional[str] = None  # 'pass' or 'fail'
+):
+    # ---------- load or init ----------
+    if os.path.exists(tuple_save_path):
+        with open(tuple_save_path, 'r', encoding='utf-8') as f:
+            saved_result = json.load(f)
+    else:
+        saved_result = {}
 
+    def is_new_schema(data: dict) -> bool:
+        # Heuristic: new schema has top-level episodes (strings) each mapping to dicts of question_ids
+        # Old schema had top-level question_ids mapping to {"question":..., "steps":...}
+        if not data:
+            return True
+        # If any top-level value is a dict whose keys look like "step_*" or has "question" -> likely old
+        for k, v in data.items():
+            if isinstance(v, dict) and ("steps" in v or "question" in v):
+                return False
+        return True
+
+    def migrate_old_schema_if_needed(data: dict) -> dict:
+        if not data:
+            return data
+        if is_new_schema(data):
+            return data
+        # Move all top-level question_ids under a new generated episode
+        new_episode = f"episode-{uuid.uuid4().hex[:8]}"
+        migrated = {new_episode: {}}
+        for qid, qcontent in data.items():
+            migrated[new_episode][qid] = qcontent
+            # drop any leftover "episode_history" key if present
+            if isinstance(qcontent, dict) and "episode_history" in qcontent:
+                qcontent.pop("episode_history", None)
+        return migrated
+
+    saved_result = migrate_old_schema_if_needed(saved_result)
+
+    # ---------- resolve episode_id for this question ----------
+    def find_existing_episode_for_question(data: dict, qid: str) -> Optional[str]:
+        for ep_id, ep_bucket in data.items():
+            if isinstance(ep_bucket, dict) and qid in ep_bucket:
+                return ep_id
+        return None
+
+    existing_ep = find_existing_episode_for_question(saved_result, question_id)
+
+    # priority: existing > explicit param > question_data > auto-generate
+    ep_id = (
+        existing_ep
+        or episode_history_id
+        or (question_data.get("episode_history") if question_data else None)
+        or f"episode-{uuid.uuid4().hex[:8]}"
+    )
+
+    if ep_id not in saved_result:
+        saved_result[ep_id] = {}
+
+    # init question bucket under this episode
+    if question_id not in saved_result[ep_id]:
+        saved_result[ep_id][question_id] = {"question": question, "steps": {}}
+    else:
+        # keep existing question text if already stored; otherwise set it
+        saved_result[ep_id][question_id].setdefault("question", question)
+        saved_result[ep_id][question_id].setdefault("steps", {})
+
+    step_key = f"step_{cnt_step}"
+    saved_result[ep_id][question_id]["steps"][step_key] = {}
+
+    # --- dirs ---
+    q_root = os.path.join(cfg.output_parent_dir, cfg.exp_name, question_id)
+    frontier_dir = os.path.join(q_root, 'frontier')
+    chosen_dir = os.path.join(q_root, 'chosen_frontier')
+
+    def rel_frontier_path(fname: str) -> str:
+        return f"frontier/{fname}"
+
+    # -------- frontier (two layers) -> flattened mapping --------
+    layer0_prefix = f"{cnt_step}-layer0-"
+    layer1_prefix = f"{cnt_step}-layer1-"
+
+    layer0_files: List[str] = []
+    layer1_files: List[str] = []
+
+    if os.path.exists(frontier_dir):
+        for fn in os.listdir(frontier_dir):
+            if fn.endswith(".png"):
+                if fn.startswith(layer0_prefix):
+                    layer0_files.append(fn)
+                elif fn.startswith(layer1_prefix):
+                    layer1_files.append(fn)
+
+    layer0_files.sort()
+    layer1_files.sort()
+
+    layer0_map: Dict[str, List[str]] = {}
+    for l0 in layer0_files:
+        m = re.match(rf"^{cnt_step}-layer0-(\d+)\.png$", l0)
+        if not m:
+            continue
+        x = m.group(1)
+        children = [
+            rel_frontier_path(fn)
+            for fn in layer1_files
+            if fn.startswith(f"{cnt_step}-layer1-{x}_")
+        ]
+        layer0_map[l0] = children
+
+    saved_result[ep_id][question_id]["steps"][step_key]["frontier"] = layer0_map
+
+    # -------- chosen_frontier (parse -> frontier paths) --------
+    chosen_l0_path = None
+    chosen_l1_path = None
+    if os.path.exists(chosen_dir):
+        chosen_candidates = sorted(
+            [fn for fn in os.listdir(chosen_dir) if fn.startswith(f"{cnt_step}-frontier") and fn.endswith(".png")]
+        )
+        if chosen_candidates:
+            last_fn = chosen_candidates[-1]
+            m = re.match(rf"^{cnt_step}-frontier(\d+)_(\d+)\.png$", last_fn)
+            if m:
+                l0_idx, l1_idx = m.group(1), m.group(2)
+                chosen_l0_path = rel_frontier_path(f"{cnt_step}-layer0-{l0_idx}.png")
+                chosen_l1_path = rel_frontier_path(f"{cnt_step}-layer1-{l0_idx}_{l1_idx}.png")
+
+    saved_result[ep_id][question_id]["steps"][step_key]["chosen_frontier"] = {
+        "layer0": chosen_l0_path,
+        "layer1": chosen_l1_path
+    }
+
+    # -------- memory_snapshots --------
+    memory_snapshots = {}
+    if os.path.exists(lifelong_json_path):
+        with open(lifelong_json_path, 'r', encoding='utf-8') as f:
+            lifelong_data = json.load(f)
+        # lifelong_data expected: {question_id: {img_name: obj_list, ...}, ...}
+        if question_id in lifelong_data:
+            img2objs = lifelong_data[question_id]
+            for img_name, obj_list in img2objs.items():
+                if img_name.startswith(f"{cnt_step}-"):
+                    memory_snapshots[img_name] = obj_list
+
+    saved_result[ep_id][question_id]["steps"][step_key]["memory_snapshots"] = memory_snapshots
+
+    # -------- final_reward (per question) --------
+    q_bucket = saved_result[ep_id][question_id]
+    if "final_reward" not in q_bucket:
+        q_bucket["final_reward"] = "fail"
+    if final_reward is not None:
+        q_bucket["final_reward"] = final_reward
+
+    # -------- write back --------
+    with open(tuple_save_path, 'w', encoding='utf-8') as f:
+        json.dump(saved_result, f, indent=2, ensure_ascii=False)
 
 def main(cfg, start_ratio=0.0, end_ratio=1.0):
     # load the default concept graph config
@@ -422,7 +581,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
         lifelong_memory = question_room(episode_dir, cfg.questions_list_path)
         lifelong_json_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, "lifelong_storage.json")
         lifelong_memory = lifelong_memory[1]
-        lifelong_context = check_lifelong_memory(lifelong_json_path, lifelong_memory, cfg, question)
+        # lifelong_context = check_lifelong_memory(lifelong_json_path, lifelong_memory, cfg, question)
 
 
 
@@ -568,15 +727,33 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     step_idx=cnt_step,
                     question_id=question_id,
                     lifelong_json_path=lifelong_json_path,
-                    lifelong_context=lifelong_context,
+                    # lifelong_context=lifelong_context,
                 )
                 if vlm_response is None:
                     logging.info(
                         f"Question id {question_id} invalid: query_vlm_for_response failed!"
                     )
                     break
+                
+                
 
                 max_point_choice, gpt_answer, n_filtered_snapshots = vlm_response
+
+
+                # tuple save
+                tuple_save_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
+                tuple_step_save(
+                    tuple_save_path=tuple_save_path,
+                    question_id=question_id,
+                    question=question,
+                    cnt_step=cnt_step,
+                    cfg=cfg,
+                    lifelong_json_path=lifelong_json_path,
+                    question_data=question_data,
+                )
+
+
+
 
                 # set the vlm choice as the navigation target
                 update_success = tsdf_planner.set_next_navigation_point(
@@ -632,6 +809,20 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
 
             # (6) Check if the agent has arrived at the target to finish the question
             if type(max_point_choice) == SnapShot and target_arrived:
+
+
+                #set final reward as succcess
+                tuple_step_save(
+                    tuple_save_path=tuple_save_path,
+                    question_id=question_id,
+                    question=question,
+                    cnt_step=cnt_step,
+                    cfg=cfg,
+                    lifelong_json_path=lifelong_json_path,
+                    question_data=question_data,
+                    final_reward="pass"
+                )
+
                 # when the target is a snapshot, and the agent arrives at the target
                 # we consider the question is finished and save the chosen target snapshot
                 snapshot_filename = max_point_choice.image.split(".")[0]

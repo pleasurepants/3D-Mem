@@ -1,7 +1,7 @@
 # General
-seed: 66
-exp_name: "embedding-cot-seed66"
-output_parent_dir: "/anvme/workspace/v100dd12-3dmem/lifelong/replay/internvl"
+seed: 42
+exp_name: "seed42-temp02"
+output_parent_dir: "/home/atuin/v100dd/v100dd12/openeqa/traj-v2/internvl"
 scene_dataset_config_path: "/home/hpc/v100dd/v100dd12/code/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/anvme/workspace/v100dd12-3dmem/hm3d/data/3dmem"
 questions_list_path: 'data/aeqa_questions-41.json'

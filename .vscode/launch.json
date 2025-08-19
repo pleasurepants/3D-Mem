@@ -17,7 +17,7 @@
             "type": "debugpy",
             "request": "attach",
             "connect": {
-                "host": "a0224.nhr.fau.de",
+                "host": "a0129.nhr.fau.de",
                 "port": 8798
             },
             "pathMappings": [

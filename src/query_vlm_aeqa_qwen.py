@@ -57,7 +57,7 @@ def query_vlm_for_response(
     step_idx: int = 0,
     question_id: Optional[str] = None,
     lifelong_json_path: Optional[str] = None,
-    lifelong_context: Optional[str] = None,
+    # lifelong_context: Optional[str] = None,
 ) -> Optional[Tuple[Union[SnapShot, Frontier], str, int]]:
     # prepare input for vlm
     step_dict = {}
@@ -113,7 +113,7 @@ def query_vlm_for_response(
 
     # query vlm
     outputs, snapshot_id_mapping, reason, n_filtered_snapshots = explore_step(
-        step_dict, cfg, verbose=verbose, chosen_frontier_path=chosen_frontier_path, step_idx=step_idx, lifelong_context=lifelong_context
+        step_dict, cfg, verbose=verbose, chosen_frontier_path=chosen_frontier_path, step_idx=step_idx
     )
     if outputs is None:
         logging.error(f"explore_step failed and returned None")
