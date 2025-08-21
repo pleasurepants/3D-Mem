@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=q-traj-v2-82-02
+#SBATCH --job-name=q-traj-v3-82-07
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/traj-v2/qwen/seed82-temp02-%j.out
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/traj-v3/qwen/seed82-temp07-%j.out
 #SBATCH --partition a40
 
 

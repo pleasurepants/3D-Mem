@@ -250,11 +250,11 @@ def format_explore_prompt_frontier(
     image_goal=None,
     context=None,
 ):
-    # ========= System: Inputs/Outputs contract + natural recall usage =========
+    # ========= System: Inputs/Outputs contract + recall consumption =========
     sys_prompt = (
         "Role: You are an agent that explores indoor scenes to answer a question by choosing exactly one Frontier.\n"
         "You WILL BE GIVEN (as user content, in this order when available):\n"
-        "1) An optional recall context (a short natural-language recap of earlier exploration in similar scenes).\n"
+        "1) An optional recall context (a short natural-language recap of earlier exploration in similar scenes; it may include a TRANSFER summary of reusable visual cues).\n"
         "2) The current question (and possibly a goal image).\n"
         "3) The current egocentric view (optional).\n"
         "4) The list of Frontier candidate images, each with an index like 'Frontier 0', 'Frontier 1', ...\n"
@@ -262,16 +262,18 @@ def format_explore_prompt_frontier(
         "Strict rules:\n"
         "- Use ONLY the provided candidates; never invent images or indices.\n"
         "- Refer to candidates ONLY by their indices (e.g., 'frontier 0'). Do NOT use titles, captions, or any labels from the recall context.\n"
-        "- If a recall context is provided, treat it as background experience to be woven naturally into your reasoning; always prioritize the current question and visible evidence.\n"
+        "- If a recall context is provided, treat it as background experience and naturally weave it into your reasoning; always prioritize the current question and visible evidence.\n"
         "Your OUTPUT MUST include the following sections in order:\n"
         "Step 0: List exactly the candidate indices you received (format 'Candidate indices: frontier 0, frontier 1, ...').\n"
         "Step 1: For EACH candidate, describe what you see (objects, layout, cues relevant to the question). Only discuss candidates listed in Step 0.\n"
         "Step 2: Compare candidates strictly from Step 0 for their relevance to the question.\n"
-        "        If a recall context is provided, include WITHIN Step 2 a short natural paragraph (2–3 sentences) that:\n"
-        "        (a) briefly states what the earlier question pursued and why that exploration helped back then;\n"
-        "        (b) states what the present question requires (e.g., needs close planar views for color/material; needs doorway/outdoor cues for location/existence);\n"
-        "        (c) explains which current candidates (refer ONLY as 'frontier i') best align with that transferable rationale, based on visible features.\n"
-        "Step 3: Select the single most relevant candidate and justify your choice concisely. If recall was provided, naturally mention whether your choice aligns with that experience or deviates for good current reasons.\n"
+        "        If a recall context is provided, EXTRACT 1–2 transferable visual cues from the recall (prefer cues named in its TRANSFER summary if present),\n"
+        "        and APPLY them to the current candidates by stating which ones (refer ONLY as 'frontier i') match or conflict with those cues, citing concrete visible features\n"
+        "        (e.g., doorway/threshold/outdoor light for entrances; close, well-lit planar surfaces for color/material; readable faces for text/symbols; sink–cabinet–countertop grouping for kitchen).\n"
+        "        Within Step 2, write a short natural paragraph (2–3 sentences) that: (a) says what the earlier question pursued and why the exploration helped then; (b) states what the present question requires; (c) explains which current candidates best align with that transferable rationale, naming the actual features you see. Avoid vague statements like 'similar to earlier'.\n"
+        "        If you cannot identify any transferable cue from the recall, briefly state why and proceed using only current visual evidence.\n"
+        "Step 3: Select the single most relevant candidate and justify your choice concisely. Your justification MUST tie back to the extracted cue(s)\n"
+        "        and the specific visual evidence in the chosen candidate; if you deviate from a cue, name it and explain why the current evidence overrides it.\n"
         "FINAL: On a NEW line, output ONLY 'frontier i' (the chosen index) with nothing else.\n"
     )
 
@@ -308,20 +310,31 @@ def format_explore_prompt_frontier(
     text += "You are required to reason step by step and only output your final choice at the end. Please follow the instructions below carefully. "
     text += "Step 0: List all candidate images you are given and their indices in the following format: 'Candidate indices: frontier 0, frontier 1, ...' (listing only the actual indices provided below; do NOT add, omit, or change any index)."
     text += "You must ONLY discuss and compare the images whose indices are listed in Step 0. You are STRICTLY FORBIDDEN to invent, mention, analyze, or refer to any images or indices that are not explicitly listed in Step 0."
+
+    # Step 1 — natural mention of transferable cues in visual terms (only if recall exists)
     text += "Step 1: For each provided Frontier image, describe in detail what you see. Focus on visible objects, scene layout, and any clues relevant to the question. ONLY describe the images with the indices listed in Step 0. Start your answer with 'Step 1:' and describe each candidate separately."
+    if has_context:
+        text += " When relevant, naturally note resemblance or contrast with the recall using visual features only (do not use any titles or indices from the recall)."
+
+    # Step 2 — extract 1–2 cues + apply + 2–3-sentence migration paragraph + failure branch
     text += "Step 2: Analyze what the question is asking for. Then, compare ONLY the frontiers listed in Step 0, by analyzing the clues shown in each image and their relevance to the question. Do NOT mention, analyze, or imagine any other indices. Start this section with 'Step 2:'."
     if has_context:
-        # ——自然融入“经验迁移”的短段，覆盖 过去→为何有效→现在需要→候选映射 —— 
-        text += " Within Step 2, include a short natural paragraph (2–3 sentences) reflecting on the recall: briefly what was asked then and why that exploration helped; what the present question requires; and which current candidates (refer ONLY as 'frontier i') best align with that transferable rationale based on visible features."
+        text += " Within Step 2, extract 1–2 transferable visual cues from the recall (prefer cues named in its TRANSFER summary if present) and apply them explicitly to the current candidates by naming which 'frontier i' match or conflict with those cues and why, citing concrete visible features. "
+        text += "Write a short natural paragraph (2–3 sentences) that covers: what the earlier question pursued and why that exploration helped; what the present question requires; and which candidates best align with the transferable rationale. Avoid generic statements; name the features. "
+        text += "If you cannot identify any transferable cue from the recall, briefly state why and proceed using only current visual evidence."
+
+    # Step 3 — justify with cues; allow principled deviation
     text += "Step 3: Based on your analysis above, select the single most relevant frontier for making progress toward answering the question. Clearly state your reasoning and why you select this one, but ONLY from the indices listed in Step 0. Begin this section with 'Step 3:'."
     if has_context:
-        text += " Write your justification as natural prose that either links your choice to the recalled experience (shared visual features/strategy) or explains a principled deviation due to the current evidence."
-    text += "After completing Step 3, output your final answer on a new line in the format: 'frontier i' (where i is one of the indices listed in Step 0). Do not include any other words, indices, or explanations on that line."
-    text += "You MUST select one and only one of the provided Frontier indices listed in Step 0. You are NOT allowed to say that none is suitable or refuse to choose."
-    text += "Choose the frontier that is MOST likely to help you answer the question, based ONLY on the visible clues, semantic hints, or where the target object is likely to be found in the images listed above."
-    text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question."
-    text += "Do NOT mention words like 'frontier', directions, or image positions in your reasoning except when referring to the candidate indices listed in Step 0. Only use the provided Frontier indices; do NOT make up or analyze any index that is not listed above."
-    text += "Only use the indices listed in Step 0. Any mention, analysis, or invention of other indices will be considered an error. Do NOT refer to images/frontiers not listed above."
+        text += " Your justification must tie back to the extracted cue(s) and the observed features; if you deviate from a cue, name it and justify the deviation using current evidence."
+
+    # Final constraints
+    text += " After completing Step 3, output your final answer on a new line in the format: 'frontier i' (where i is one of the indices listed in Step 0). Do not include any other words, indices, or explanations on that line."
+    text += " You MUST select one and only one of the provided Frontier indices listed in Step 0. You are NOT allowed to say that none is suitable or refuse to choose."
+    text += " Choose the frontier that is MOST likely to help you answer the question, based ONLY on the visible clues, semantic hints, or where the target object is likely to be found in the images listed above."
+    text += " If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question."
+    text += " Do NOT mention words like 'frontier', directions, or image positions in your reasoning except when referring to the candidate indices listed in Step 0. Only use the provided Frontier indices; do NOT make up or analyze any index that is not listed above."
+    text += " Only use the indices listed in Step 0. Any mention, analysis, or invention of other indices will be considered an error. Do NOT refer to images/frontiers not listed above."
 
     content.append((text,))
 

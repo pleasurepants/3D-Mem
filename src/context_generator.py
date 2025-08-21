@@ -273,6 +273,175 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     return None
 
 
+# v2
+# def generate_step_replay_prompt(
+#     best: dict,
+#     cfg,
+#     replay_json_path: str,
+#     current_layer: str,
+#     current_idx: int,
+#     current_frontier_b64: str,
+# ):
+#     """
+#     Produce ONE reusable paragraph (5–7 sentences) that explicitly encodes the two-stage choice structure in the past replay:
+#       - Stage 1: there were N initial directions (describe each by distinctive visual features), and the agent chose ONE of them.
+#       - Stage 2: under that chosen direction there were M closer views (describe each by visual features), and the agent focused on ONE.
+#       - If and only if EpisodeOutcome == PASS, end with a sentence that these choices set up the later successful answer (never claim it was answered here).
+
+#     Rules for the paragraph:
+#       - Pure text only; rely on attached visuals and factual records; no speculation.
+#       - Do NOT mention or invent any image titles/captions, indices, or words like 'image/photo/picture/frontier X'.
+#       - Do NOT quote labels such as 'Chosen direction' or 'Chosen closer look'.
+#       - Express the total counts (N and M) as part of the narrative, but DO NOT enumerate with indices or ordinals (no 'first/second', no '1), 2) ...').
+#       - Describe the chosen items deterministically by their visual features (treat them as fixed facts; do not hedge with 'one of'/'for example').
+#     """
+#     try:
+#         import os, json, base64, logging
+
+#         if not best:
+#             return None
+#         if not os.path.exists(replay_json_path):
+#             logging.info(f"[ReplayCtx] replay_json not found: {replay_json_path}")
+#             return None
+
+#         with open(replay_json_path, "r", encoding="utf-8") as f:
+#             replay_data = json.load(f)
+
+#         episode_id = best.get("episode_id")
+#         question_id = best.get("question_id")
+#         step_key    = best.get("step_key")
+#         matched_rel = best.get("filename_rel")
+#         matched_lvl = best.get("level")
+#         if not (episode_id and question_id and step_key and matched_rel and matched_lvl):
+#             logging.info("[ReplayCtx] match lacks keys.")
+#             return None
+
+#         epi = replay_data.get(episode_id, {})
+#         qinfo = epi.get(question_id)
+#         if not qinfo:
+#             return None
+
+#         steps = qinfo.get("steps", {})
+#         step_info = steps.get(step_key)
+#         if not step_info:
+#             return None
+
+#         frontier = step_info.get("frontier", {})          # { '0-layer0-1.png': ['frontier/0-layer1-1_0.png', ...], ... }
+#         chosen   = step_info.get("chosen_frontier", {})   # { 'layer0': 'frontier/..', 'layer1': 'frontier/..' }
+
+#         question_text = (qinfo.get("question", "") or "").strip()
+#         if len(question_text) > 200:
+#             question_text = question_text[:200] + "..."
+
+#         final_reward  = (qinfo.get("final_reward", None) or "").strip().lower()
+
+#         # --- collect keys / chosen items ---
+#         initial_keys = list(frontier.keys())  # layer0 keys
+#         initial_rels = [os.path.join("frontier", k) for k in initial_keys]
+
+#         chosen_initial = chosen.get("layer0")  # 'frontier/...'
+#         chosen_detail  = chosen.get("layer1")  # 'frontier/...'
+
+#         if not chosen_initial and matched_lvl == "layer1":
+#             # infer layer0 key from a layer1 filename (e.g., 0-layer1-1_2.png -> 0-layer0-1.png)
+#             try:
+#                 base = os.path.basename(matched_rel)
+#                 a, b = base.split("-layer1-")
+#                 initial_key_guess = f"{a}-layer0-{b.split('_')[0]}.png"
+#                 chosen_initial = f"frontier/{initial_key_guess}"
+#             except Exception:
+#                 pass
+
+#         # details only for the chosen direction
+#         initial_key_for_details = None
+#         if chosen_initial and chosen_initial.startswith("frontier/"):
+#             initial_key_for_details = chosen_initial.split("/", 1)[1]
+#         detail_rels = frontier.get(initial_key_for_details, []) if initial_key_for_details else []
+
+#         # counts for stage-1 and stage-2 (used as factual records, NOT indices)
+#         n_initial = len(initial_rels)
+#         n_detail  = len(detail_rels) if detail_rels else 0
+
+#         # ========= sys_prompt (make counts explicit; forbid titles/indices) =========
+#         has_stage2 = n_detail > 0 and (chosen_detail in detail_rels if chosen_detail else False)
+
+#         stage2_line = (
+#             f"• Under that direction, state that {n_detail} closer views were considered and briefly characterize them by their visual features; then say the agent focused on ONE closer view and describe it by its features.\n"
+#             if has_stage2
+#             else
+#             "• Under that direction, describe the closer views considered in that area and say the agent focused on ONE closer view, described by its visual features.\n"
+#         )
+
+#         sys_prompt = (
+#             "You are given a current frontier view and records from a past exploration, with visuals attached.\n"
+#             "Write EXACTLY ONE compact paragraph of 5–7 sentences, past tense, smooth narration, that makes the two-stage decision structure explicit:\n"
+#             "• Start by stating that this scene was explored earlier and explicitly name the question from that time (quote it).\n"
+#             f"• State that the agent initially observed {n_initial} distinct directions in that scene and briefly characterize each direction by its visual features (no numbering, no labels, no indices).\n"
+#             "• Then say the agent chose ONE of those directions and describe the chosen direction by its visual features (do not mention images or titles).\n"
+#             + stage2_line +
+#             "• If and only if the EpisodeOutcome is PASS, end by stating that these choices positioned the agent for a successful answer later in the episode. Do NOT claim the question was answered at this step.\n"
+#             "Rules:\n"
+#             "- Rely only on attached visuals and provided facts; no speculation.\n"
+#             "- Do NOT mention any image titles/captions, numeric indices for items, or words like 'image/photo/picture/frontier X'.\n"
+#             "- Do NOT quote labels such as 'Chosen direction' or 'Chosen closer look'.\n"
+#             "- Do NOT enumerate with 'first/second' or '(1)/(2)'; instead, write compact clauses separated by commas or semicolons to characterize each option.\n"
+#             "- Treat the previously selected items as FIXED facts; do not hedge with 'one of'/'for example'.\n"
+#         )
+
+
+#         # ========= content (facts + neutral visuals, deterministic order) =========
+#         content = []
+
+#         # (0) current candidate (empty title to avoid echo)
+#         if current_frontier_b64:
+#             content.append(("", current_frontier_b64))
+
+#         # (1) factual records, including counts (to prevent hallucinated numbers)
+#         fact_lines = []
+#         fact_lines.append(f"Episode: {episode_id}")
+#         if question_text:
+#             fact_lines.append(f"Question: {question_text}")
+#         if final_reward in {"pass", "fail"}:
+#             outcome = "PASS" if final_reward == "pass" else "FAIL"
+#             fact_lines.append(f"EpisodeOutcome: {outcome}")
+#         fact_lines.append(f"InitialDirectionCount: {n_initial}")
+#         if n_detail > 0:
+#             fact_lines.append(f"CloserViewCount: {n_detail}")
+
+#         content.append(("Factual records (use only these facts and visuals):",))
+#         content.append(("\n".join(fact_lines),))
+
+#         # helper: attach an image with an empty title (prevents label echo)
+#         def _add_img(rel_path: str):
+#             abs_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, episode_id, rel_path)
+#             if os.path.exists(abs_path):
+#                 with open(abs_path, "rb") as f:
+#                     b64 = base64.b64encode(f.read()).decode("utf-8")
+#                 content.append(("", b64))
+
+#         # (2) REQUIRED deterministic grounding (not to be mentioned in text):
+#         #     immediately after factual records -> chosen direction -> chosen closer view (if any)
+#         if chosen_initial:
+#             _add_img(chosen_initial)
+#         if has_stage2 and chosen_detail:
+#             _add_img(chosen_detail)
+
+#         # (3) all first-stage options (neutral)
+#         for rel in initial_rels:
+#             _add_img(rel)
+
+#         # (4) all second-stage options under the chosen direction (neutral)
+#         for rel in detail_rels:
+#             _add_img(rel)
+
+#         return sys_prompt, content
+
+#     except Exception as e:
+#         logging.warning(f"[ReplayCtx] generate prompt failed: {e}")
+#         return None
+
+
+# v3
 def generate_step_replay_prompt(
     best: dict,
     cfg,
@@ -282,17 +451,25 @@ def generate_step_replay_prompt(
     current_frontier_b64: str,
 ):
     """
-    Produce ONE reusable paragraph (5–7 sentences) that explicitly encodes the two-stage choice structure in the past replay:
-      - Stage 1: there were N initial directions (describe each by distinctive visual features), and the agent chose ONE of them.
-      - Stage 2: under that chosen direction there were M closer views (describe each by visual features), and the agent focused on ONE.
-      - If and only if EpisodeOutcome == PASS, end with a sentence that these choices set up the later successful answer (never claim it was answered here).
+    Produce ONE reusable paragraph (6–10 sentences) that encodes the two-stage choice structure
+    in a past replay AND ends with a transferable observation segment (2–3 sentences).
 
-    Rules for the paragraph:
+    Narrative must cover:
+      - Stage 1: there were N initial directions (describe each by distinctive visual features), and the agent chose ONE.
+      - Stage 2: under that chosen direction there were M closer views (describe each by visual features), and the agent focused on ONE.
+      - TRANSFER segment (MANDATORY, 2–3 sentences): generalize why those choices were informative in visual terms and how such cues
+        can guide future choices even when the question differs. If and only if EpisodeOutcome == PASS, also state (within the same
+        segment) that these choices set up the later successful answer. Never claim the answer was completed at that step.
+
+    Rules:
       - Pure text only; rely on attached visuals and factual records; no speculation.
       - Do NOT mention or invent any image titles/captions, indices, or words like 'image/photo/picture/frontier X'.
       - Do NOT quote labels such as 'Chosen direction' or 'Chosen closer look'.
       - Express the total counts (N and M) as part of the narrative, but DO NOT enumerate with indices or ordinals (no 'first/second', no '1), 2) ...').
       - Describe the chosen items deterministically by their visual features (treat them as fixed facts; do not hedge with 'one of'/'for example').
+      - Avoid vague phrases like 'similar to earlier'; explicitly name the visual properties that transfer (e.g., doorway, threshold, outdoor light,
+        railings, sink–cabinet–countertop grouping, close planar surfaces, readable clock face).
+      - Keep past tense and smooth, compact narration.
     """
     try:
         import os, json, base64, logging
@@ -335,19 +512,21 @@ def generate_step_replay_prompt(
         final_reward  = (qinfo.get("final_reward", None) or "").strip().lower()
 
         # --- collect keys / chosen items ---
-        initial_keys = list(frontier.keys())  # layer0 keys
+        initial_keys = list(frontier.keys())  # layer0 keys (e.g., "0-layer0-1.png")
         initial_rels = [os.path.join("frontier", k) for k in initial_keys]
 
         chosen_initial = chosen.get("layer0")  # 'frontier/...'
         chosen_detail  = chosen.get("layer1")  # 'frontier/...'
 
-        if not chosen_initial and matched_lvl == "layer1":
-            # infer layer0 key from a layer1 filename (e.g., 0-layer1-1_2.png -> 0-layer0-1.png)
+        # If only a layer1 match is known, infer the layer0 key it came from.
+        if not chosen_initial and matched_lvl == "layer1" and matched_rel:
             try:
-                base = os.path.basename(matched_rel)
+                base = os.path.basename(matched_rel)  # e.g., "0-layer1-1_2.png"
                 a, b = base.split("-layer1-")
                 initial_key_guess = f"{a}-layer0-{b.split('_')[0]}.png"
-                chosen_initial = f"frontier/{initial_key_guess}"
+                guessed = f"frontier/{initial_key_guess}"
+                if os.path.basename(guessed.replace("frontier/", "")) in initial_keys:
+                    chosen_initial = guessed
             except Exception:
                 pass
 
@@ -361,9 +540,9 @@ def generate_step_replay_prompt(
         n_initial = len(initial_rels)
         n_detail  = len(detail_rels) if detail_rels else 0
 
-        # ========= sys_prompt (make counts explicit; forbid titles/indices) =========
         has_stage2 = n_detail > 0 and (chosen_detail in detail_rels if chosen_detail else False)
 
+        # ========= sys_prompt (explicit structure + longer TRANSFER segment) =========
         stage2_line = (
             f"• Under that direction, state that {n_detail} closer views were considered and briefly characterize them by their visual features; then say the agent focused on ONE closer view and describe it by its features.\n"
             if has_stage2
@@ -371,27 +550,36 @@ def generate_step_replay_prompt(
             "• Under that direction, describe the closer views considered in that area and say the agent focused on ONE closer view, described by its visual features.\n"
         )
 
+        transfer_block = (
+            "• Conclude with a short TRANSFER segment of 2–3 sentences that generalizes why those choices were informative in visual terms "
+            "and how such cues can guide future choices even when the question is different. "
+            "Name 1–2 cue types (e.g., door thresholds and outdoor light for entrances/location; close, well-lit planar surfaces for color/material; "
+            "readable faces for text/symbols; co-occurring anchors like sink/cabinet/countertop). "
+            "If and only if EpisodeOutcome is PASS, append in the same segment that these choices set up the later successful answer; "
+            "never claim the answer was completed at that step.\n"
+        )
+
         sys_prompt = (
             "You are given a current frontier view and records from a past exploration, with visuals attached.\n"
-            "Write EXACTLY ONE compact paragraph of 5–7 sentences, past tense, smooth narration, that makes the two-stage decision structure explicit:\n"
+            "Write ONE compact paragraph of 6–10 sentences, past tense, smooth narration, that makes the two-stage decision structure explicit:\n"
             "• Start by stating that this scene was explored earlier and explicitly name the question from that time (quote it).\n"
             f"• State that the agent initially observed {n_initial} distinct directions in that scene and briefly characterize each direction by its visual features (no numbering, no labels, no indices).\n"
             "• Then say the agent chose ONE of those directions and describe the chosen direction by its visual features (do not mention images or titles).\n"
             + stage2_line +
-            "• If and only if the EpisodeOutcome is PASS, end by stating that these choices positioned the agent for a successful answer later in the episode. Do NOT claim the question was answered at this step.\n"
+            transfer_block +
             "Rules:\n"
             "- Rely only on attached visuals and provided facts; no speculation.\n"
             "- Do NOT mention any image titles/captions, numeric indices for items, or words like 'image/photo/picture/frontier X'.\n"
             "- Do NOT quote labels such as 'Chosen direction' or 'Chosen closer look'.\n"
             "- Do NOT enumerate with 'first/second' or '(1)/(2)'; instead, write compact clauses separated by commas or semicolons to characterize each option.\n"
             "- Treat the previously selected items as FIXED facts; do not hedge with 'one of'/'for example'.\n"
+            "- Avoid vague phrases like 'similar to earlier'; explicitly name the visual properties that transfer (e.g., doorway, threshold, outdoor light, railings, sink–cabinet–countertop grouping, close planar surfaces, readable clock face).\n"
         )
-
 
         # ========= content (facts + neutral visuals, deterministic order) =========
         content = []
 
-        # (0) current candidate (empty title to avoid echo)
+        # (0) current candidate under consideration (empty title prevents label echo)
         if current_frontier_b64:
             content.append(("", current_frontier_b64))
 
@@ -410,7 +598,7 @@ def generate_step_replay_prompt(
         content.append(("Factual records (use only these facts and visuals):",))
         content.append(("\n".join(fact_lines),))
 
-        # helper: attach an image with an empty title (prevents label echo)
+        # helper: attach an image with an empty title (prevents the model from echoing labels)
         def _add_img(rel_path: str):
             abs_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, episode_id, rel_path)
             if os.path.exists(abs_path):
@@ -418,18 +606,16 @@ def generate_step_replay_prompt(
                     b64 = base64.b64encode(f.read()).decode("utf-8")
                 content.append(("", b64))
 
-        # (2) REQUIRED deterministic grounding (not to be mentioned in text):
-        #     immediately after factual records -> chosen direction -> chosen closer view (if any)
+        # (2) deterministic grounding order:
+        #     chosen direction -> chosen closer view (if any) -> all L0 options -> all L1 options (under the chosen L0)
         if chosen_initial:
             _add_img(chosen_initial)
         if has_stage2 and chosen_detail:
             _add_img(chosen_detail)
 
-        # (3) all first-stage options (neutral)
         for rel in initial_rels:
             _add_img(rel)
 
-        # (4) all second-stage options under the chosen direction (neutral)
         for rel in detail_rels:
             _add_img(rel)
 
