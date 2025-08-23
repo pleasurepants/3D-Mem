@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=i-traj-v3-13-07
+#SBATCH --job-name=i-envepi_v0-19
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/traj-v3/internvl/seed13-temp07-%j.out
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/env_epi_v0/internvl/seed19-%j.out
 #SBATCH --partition a40
 
 
