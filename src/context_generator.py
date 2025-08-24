@@ -5,6 +5,7 @@ import json
 import base64
 import logging
 import time
+import random
 
 
 from typing import List, Dict, Optional
@@ -166,10 +167,11 @@ class FrontierSimilaritySearcher:
         target_b64_list: List[str],
         episode_id: str,
         exclude_question_id: Optional[str] = None,
-    ) -> Optional[Dict]:
+        top_k: int = 1,
+    ) -> List[Dict]:
         self._ensure_replay_loaded()
         if self._replay_missing:
-            return None
+            return []
 
         # build target descriptors once
         target_descs = []
@@ -178,18 +180,82 @@ class FrontierSimilaritySearcher:
             if bits is not None:
                 target_descs.append(bits)
         if not target_descs:
-            return None
+            return []
 
-        best = None
+        candidates = []
         for cand_abs, meta in self._candidate_iter(episode_id, exclude_qid=exclude_question_id):
             cand_bits = self._image_bits_ahash_from_path(cand_abs)
             if cand_bits is None:
                 continue
             sim = float(max(self._similarity_from_bits(cand_bits, t) for t in target_descs))
-            if (best is None) or (sim > best["similarity"]):
-                best = {"similarity": sim, "candidate_abs": cand_abs, **meta}
-        return best
+            candidates.append({"similarity": sim, "candidate_abs": cand_abs, **meta})
+        
+        # 按相似度排序并返回前 top_k 个
+        candidates.sort(key=lambda x: x["similarity"], reverse=True)
+        return candidates[:top_k]
 
+    def search_random_match(
+        self,
+        target_b64_list: List[str],
+        episode_id: str,
+        exclude_question_id: Optional[str] = None,
+        top_k: int = 1,
+    ) -> List[Dict]:
+        """
+        随机选择 top_k 个候选，而不是基于相似度选择最佳匹配
+        """
+        self._ensure_replay_loaded()
+        if self._replay_missing:
+            return []
+
+        # 收集所有候选
+        candidates = []
+        for cand_abs, meta in self._candidate_iter(episode_id, exclude_qid=exclude_question_id):
+            candidates.append((cand_abs, meta))
+        
+        if not candidates:
+            return []
+        
+        # 随机选择 top_k 个候选（如果候选数量少于 top_k，则返回所有候选）
+        k = min(top_k, len(candidates))
+        chosen_candidates = random.sample(candidates, k)
+        
+        # 计算相似度（用于记录，但不用于选择）
+        target_descs = []
+        for b64 in target_b64_list:
+            bits = self._image_bits_ahash_from_b64(b64)
+            if bits is not None:
+                target_descs.append(bits)
+        
+        results = []
+        for chosen_cand_abs, chosen_meta in chosen_candidates:
+            sim = 0.0
+            if target_descs:
+                cand_bits = self._image_bits_ahash_from_path(chosen_cand_abs)
+                if cand_bits is not None:
+                    sim = float(max(self._similarity_from_bits(cand_bits, t) for t in target_descs))
+            results.append({"similarity": sim, "candidate_abs": chosen_cand_abs, **chosen_meta})
+        
+        return results
+
+    def search_with_strategy(
+        self,
+        target_b64_list: List[str],
+        episode_id: str,
+        exclude_question_id: Optional[str] = None,
+        strategy: str = "best",  # "best" 或 "random"
+        top_k: int = 1
+    ) -> List[Dict]:
+        """
+        根据策略选择匹配方法
+        strategy: "best" - 选择相似度最高的前 top_k 个
+                 "random" - 随机选择 top_k 个
+        top_k: 返回的候选数量
+        """
+        if strategy == "random":
+            return self.search_random_match(target_b64_list, episode_id, exclude_question_id, top_k)
+        else:  # default to "best"
+            return self.search_best_match(target_b64_list, episode_id, exclude_question_id, top_k)
 
     # ---------- utils ----------
     @staticmethod
@@ -205,21 +271,23 @@ class FrontierSimilaritySearcher:
         self,
         target_b64_list: List[str],
         chosen_frontier_path: str,
-    ) -> Optional[Dict]:
+        top_k: int = 1,
+    ) -> List[Dict]:
         current_qid = self.parse_question_id_from_path(chosen_frontier_path)
         if not current_qid:
             logging.warning("[ReplaySim] Cannot parse question_id from chosen_frontier_path.")
-            return None
+            return []
 
         episode_id = self.resolve_episode_id(current_qid)
         if not episode_id:
             logging.warning(f"[ReplaySim] Cannot resolve episode for question_id={current_qid}.")
-            return None
+            return []
 
         return self.search_best_match(
             target_b64_list=target_b64_list,
             episode_id=episode_id,
-            exclude_question_id=current_qid
+            exclude_question_id=current_qid,
+            top_k=top_k
         )
 
 def format_content(contents):
@@ -698,23 +766,30 @@ def _process_candidate_one(
     cfg,
     replay_json_path: str,
     layer_tag: str,
-    idx: int
+    idx: int,
+    strategy: str = "best",  # "best" 或 "random"
+    top_k: int = 1
 ):
     """
     For one candidate:
-      1) find best match in same episode
+      1) find best match in same episode (or random match based on strategy)
       2) build narrative prompt (sys, content)
       3) call VLM -> get short recall context text
     Return (best, ctx_text | None).
     """
-    best = searcher.search_best_match(
+    candidates = searcher.search_with_strategy(
         target_b64_list=[b64_str],
         episode_id=episode_id,
-        exclude_question_id=exclude_qid
+        exclude_question_id=exclude_qid,
+        strategy=strategy,
+        top_k=top_k
     )
-    if not best:
+    if not candidates:
         return None, None
 
+    # 使用第一个候选（最相似或随机选择的第一个）
+    best = candidates[0]
+    
     prompt_pack = generate_step_replay_prompt(
         best=best,
         cfg=cfg,
@@ -734,7 +809,9 @@ def run_layer0_recall_and_aggregate(
     step: dict,
     cfg,
     frontier_imgs_0: list,
-    chosen_frontier_path: str
+    chosen_frontier_path: str,
+    strategy: str = "best",  # "best" 或 "random"
+    top_k: int = 1
 ):
     """
     Do recall only for initial directions (layer0).
@@ -773,7 +850,9 @@ def run_layer0_recall_and_aggregate(
                 cfg=cfg,
                 replay_json_path=replay_json_path,
                 layer_tag="layer0",
-                idx=i
+                idx=i,
+                strategy=strategy,
+                top_k=top_k
             )
             step["replay_match_per_frontier"]["layer0"][i] = best
             step["replay_context_prompt_per_frontier"]["layer0"][i] = {"sys": "<hidden>", "content_len": -1} if best else None
@@ -793,7 +872,9 @@ def run_layer1_recall_and_aggregate_for_subgroup(
     cfg,
     frontier_imgs_1: list,
     layer1_indices: list,
-    chosen_frontier_path: str
+    chosen_frontier_path: str,
+    strategy: str = "best",  # "best" 或 "random"
+    top_k: int = 1
 ) -> Optional[str]:
 
     """
@@ -835,7 +916,9 @@ def run_layer1_recall_and_aggregate_for_subgroup(
                 cfg=cfg,
                 replay_json_path=replay_json_path,
                 layer_tag="layer1",
-                idx=gidx
+                idx=gidx,
+                strategy=strategy,
+                top_k=top_k
             )
             step["replay_match_per_frontier"]["layer1"][gidx] = best
             step["replay_context_prompt_per_frontier"]["layer1"][gidx] = {"sys": "<hidden>", "content_len": -1} if best else None
@@ -851,3 +934,46 @@ def run_layer1_recall_and_aggregate_for_subgroup(
         indices=layer1_indices,
         max_len=None
     )
+
+# ========= 使用示例 =========
+def example_usage():
+    """
+    展示如何使用新的 top_k 和 strategy 参数
+    """
+    # 假设你已经有了配置和搜索器
+    # cfg = your_config
+    # searcher = FrontierSimilaritySearcher(cfg, replay_json_path)
+    
+    # 示例 1: 获取前3个最相似的候选
+    # best_candidates = searcher.search_best_match(
+    #     target_b64_list=[your_b64_image],
+    #     episode_id="episode_123",
+    #     top_k=3
+    # )
+    
+    # 示例 2: 随机选择2个候选
+    # random_candidates = searcher.search_random_match(
+    #     target_b64_list=[your_b64_image],
+    #     episode_id="episode_123",
+    #     top_k=2
+    # )
+    
+    # 示例 3: 使用策略选择前5个候选
+    # candidates = searcher.search_with_strategy(
+    #     target_b64_list=[your_b64_image],
+    #     episode_id="episode_123",
+    #     strategy="best",  # 或 "random"
+    #     top_k=5
+    # )
+    
+    # 示例 4: 在 layer0 回忆中使用新参数
+    # run_layer0_recall_and_aggregate(
+    #     step=your_step,
+    #     cfg=your_cfg,
+    #     frontier_imgs_0=your_images,
+    #     chosen_frontier_path=your_path,
+    #     strategy="random",
+    #     top_k=3
+    # )
+    
+    pass
