@@ -243,18 +243,25 @@ class FrontierSimilaritySearcher:
         target_b64_list: List[str],
         episode_id: str,
         exclude_question_id: Optional[str] = None,
-        strategy: str = "best",  # "best" 或 "random"
+        strategy: str = "sim",  # "sim" 或 "random"
         top_k: int = 1
     ) -> List[Dict]:
         """
         根据策略选择匹配方法
-        strategy: "best" - 选择相似度最高的前 top_k 个
+        strategy: "sim" - 选择相似度最高的前 top_k 个
                  "random" - 随机选择 top_k 个
         top_k: 返回的候选数量
         """
+        valid_strategies = {"sim", "random"}
+        if strategy not in valid_strategies:
+            logging.warning(f"[ReplaySim] Invalid strategy '{strategy}', fallback to 'sim'. Valid: {valid_strategies}")
+            strategy = "sim"
+
+        logging.info(f"[ReplaySim] Using strategy={strategy}, top_k={top_k}")
+
         if strategy == "random":
             return self.search_random_match(target_b64_list, episode_id, exclude_question_id, top_k)
-        else:  # default to "best"
+        else:  # strategy == "sim"
             return self.search_best_match(target_b64_list, episode_id, exclude_question_id, top_k)
 
     # ---------- utils ----------
@@ -517,6 +524,7 @@ def generate_step_replay_prompt(
     current_layer: str,
     current_idx: int,
     current_frontier_b64: str,
+    compact: bool = False,
 ):
     """
     Produce ONE reusable paragraph (6–10 sentences) that encodes the two-stage choice structure
@@ -675,17 +683,19 @@ def generate_step_replay_prompt(
                 content.append(("", b64))
 
         # (2) deterministic grounding order:
-        #     chosen direction -> chosen closer view (if any) -> all L0 options -> all L1 options (under the chosen L0)
+        #     chosen direction -> chosen closer view (if any)
+        #     when not in compact mode: also attach all L0 options and L1 options (under chosen L0)
         if chosen_initial:
             _add_img(chosen_initial)
         if has_stage2 and chosen_detail:
             _add_img(chosen_detail)
 
-        for rel in initial_rels:
-            _add_img(rel)
+        if not compact:
+            for rel in initial_rels:
+                _add_img(rel)
 
-        for rel in detail_rels:
-            _add_img(rel)
+            for rel in detail_rels:
+                _add_img(rel)
 
         return sys_prompt, content
 
@@ -767,16 +777,20 @@ def _process_candidate_one(
     replay_json_path: str,
     layer_tag: str,
     idx: int,
-    strategy: str = "best",  # "best" 或 "random"
+    strategy: str = "sim",  # "sim" 或 "random"
     top_k: int = 1
 ):
     """
-    For one candidate:
-      1) find best match in same episode (or random match based on strategy)
-      2) build narrative prompt (sys, content)
-      3) call VLM -> get short recall context text
-    Return (best, ctx_text | None).
+    For one frontier image candidate:
+      1) retrieve up to top_k matches using the given strategy ("sim" or "random")
+      2) for each match, build a narrative prompt and call the VLM to get a short recall text
+      3) concatenate texts: first prefixed with "Most similar previously: " and the rest with "Additionally similar: "
+    Return (best_of_list, combined_ctx_text | None).
     """
+    # 当 top_k <= 0 时，明确不进行任何回放回忆，直接返回 None
+    if top_k <= 0:
+        return None, None
+
     candidates = searcher.search_with_strategy(
         target_b64_list=[b64_str],
         episode_id=episode_id,
@@ -786,37 +800,59 @@ def _process_candidate_one(
     )
     if not candidates:
         return None, None
+    try:
+        logging.info(f"[ReplayCtx] {layer_tag}[{idx}] candidates: {len(candidates)} (top_k={top_k}, strategy={strategy})")
+    except Exception:
+        pass
 
-    # 使用第一个候选（最相似或随机选择的第一个）
-    best = candidates[0]
-    
-    prompt_pack = generate_step_replay_prompt(
-        best=best,
-        cfg=cfg,
-        replay_json_path=replay_json_path,
-        current_layer=layer_tag,
-        current_idx=idx,
-        current_frontier_b64=b64_str,
-    )
-    if not prompt_pack:
-        return best, None
+    # 逐个候选生成回忆，并合并
+    selected = candidates[: max(1, top_k)]
+    texts = []
+    for j, cand in enumerate(selected):
+        prompt_pack = generate_step_replay_prompt(
+            best=cand,
+            cfg=cfg,
+            replay_json_path=replay_json_path,
+            current_layer=layer_tag,
+            current_idx=idx,
+            current_frontier_b64=b64_str,
+            compact=(top_k > 1),
+        )
+        if not prompt_pack:
+            continue
+        sys_p, cont = prompt_pack
+        t = call_openai_api(sys_p, cont)
+        if not t:
+            continue
+        prefix = "Most similar previously: " if j == 0 else "Additionally similar: "
+        texts.append(prefix + t.strip())
 
-    sys_p, cont = prompt_pack
-    ctx_text = call_openai_api(sys_p, cont)
-    return best, ctx_text
+    # 使用段落分隔，保证每个候选保留与之前相同的篇幅；总体约为 k 倍
+    combined = "\n\n".join(texts) if texts else None
+    best = selected[0] if selected else None
+    try:
+        logging.info(f"[ReplayCtx] {layer_tag}[{idx}] texts_generated: {len(texts)} / {len(selected)}")
+    except Exception:
+        pass
+    return best, combined
 
 def run_layer0_recall_and_aggregate(
     step: dict,
     cfg,
     frontier_imgs_0: list,
     chosen_frontier_path: str,
-    strategy: str = "best",  # "best" 或 "random"
+    strategy: str = "sim",  # "sim" 或 "random"
     top_k: int = 1
 ):
     """
     Do recall only for initial directions (layer0).
     Side effects: fill step["replay_*"] for layer0, and set step["replay_layer0_aggregated_context"].
     """
+    # 当 top_k 为 0 时，跳过 layer0 回忆与聚合，并显式清空聚合上下文
+    if top_k <= 0:
+        step["replay_layer0_aggregated_context"] = None
+        logging.info("[ReplaySim] top_k=0; skip layer0 recall and env context.")
+        return
     replay_json_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
 
     # init containers
@@ -831,6 +867,7 @@ def run_layer0_recall_and_aggregate(
     searcher = _build_searcher_if_ready(cfg, replay_json_path)
     if searcher is None:
         step["replay_layer0_aggregated_context"] = None
+        logging.info("[ReplaySim] Searcher unavailable; skip layer0 recall.")
         return
 
     episode_id, exclude_qid = _resolve_episode_id(searcher, cfg, chosen_frontier_path, step)
@@ -866,6 +903,7 @@ def run_layer0_recall_and_aggregate(
         contexts=step["replay_context_text_per_frontier"]["layer0"],
         max_len=None
     )
+    logging.info(f"[ReplayCtx] layer0 aggregated context ready: {bool(step['replay_layer0_aggregated_context'])}")
 
 def run_layer1_recall_and_aggregate_for_subgroup(
     step: dict,
@@ -873,7 +911,7 @@ def run_layer1_recall_and_aggregate_for_subgroup(
     frontier_imgs_1: list,
     layer1_indices: list,
     chosen_frontier_path: str,
-    strategy: str = "best",  # "best" 或 "random"
+    strategy: str = "sim",  # "sim" 或 "random"
     top_k: int = 1
 ) -> Optional[str]:
 
@@ -882,6 +920,10 @@ def run_layer1_recall_and_aggregate_for_subgroup(
     Side effects: fill step["replay_*"]["layer1"] for the global indices used.
     Return aggregated context text for this subgroup.
     """
+    # 当 top_k 为 0 时，跳过 layer1 子集回忆与聚合
+    if top_k <= 0:
+        logging.info("[ReplaySim] top_k=0; skip layer1 subgroup recall and env context.")
+        return None
     replay_json_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
 
     # ensure containers
@@ -897,6 +939,7 @@ def run_layer1_recall_and_aggregate_for_subgroup(
 
     searcher = _build_searcher_if_ready(cfg, replay_json_path)
     if searcher is None:
+        logging.info("[ReplaySim] Searcher unavailable; skip layer1 subgroup recall.")
         return None
 
     episode_id, exclude_qid = _resolve_episode_id(searcher, cfg, chosen_frontier_path, step)

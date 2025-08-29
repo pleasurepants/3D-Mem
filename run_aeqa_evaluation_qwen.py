@@ -471,6 +471,69 @@ def tuple_step_save(
     with open(tuple_save_path, 'w', encoding='utf-8') as f:
         json.dump(saved_result, f, indent=2, ensure_ascii=False)
 
+
+def _to_serializable_list(x):
+    try:
+        # numpy arrays / tensors
+        if hasattr(x, 'tolist'):
+            return x.tolist()
+    except Exception:
+        pass
+    # tuples -> lists
+    if isinstance(x, tuple):
+        return list(x)
+    return x
+
+
+def append_step_coords_json(
+    output_root_dir: str,
+    question_id: str,
+    step_index: int,
+    agent_position,
+    agent_position_voxel,
+    angle,
+    target_position=None,
+):
+    """
+    将所有问题的坐标统一增量写入实验根目录的 coords_all.json：
+      {
+        "<question_id>": {
+          "step_0": {"agent_position": [x,y,z], "agent_position_voxel": [i,j], "angle": a, "target_position": [x,y,z] | null},
+          "step_1": { ... }
+        },
+        ...
+      }
+    """
+    os.makedirs(output_root_dir, exist_ok=True)
+    save_path = os.path.join(output_root_dir, 'coords_all.json')
+
+    if os.path.exists(save_path):
+        try:
+            with open(save_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+    else:
+        data = {}
+
+    q_bucket = data.get(question_id) or {}
+    key = f"step_{step_index}"
+    prev = q_bucket.get(key) or {}
+    record = {
+        "agent_position": _to_serializable_list(agent_position),
+        "agent_position_voxel": _to_serializable_list(agent_position_voxel),
+        "angle": float(angle) if isinstance(angle, (int, float)) or hasattr(angle, "__float__") else _to_serializable_list(angle),
+        "target_position": _to_serializable_list(target_position) if target_position is not None else None,
+    }
+    # 若本次未提供 target_position，则保留已存在的非空 target_position，避免被覆盖为 null
+    if record["target_position"] is None and isinstance(prev, dict) and prev.get("target_position") is not None:
+        record["target_position"] = prev.get("target_position")
+    q_bucket[key] = record
+    data[question_id] = q_bucket
+
+    with open(save_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
 def main(cfg, start_ratio=0.0, end_ratio=1.0):
     # load the default concept graph config
     cfg_cg = OmegaConf.load(cfg.concept_graph_config_path)
@@ -715,6 +778,21 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
 
 
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
+                # ensure replay_step_info.json exists before VLM query (for context recall)
+                tuple_save_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
+                try:
+                    tuple_step_save(
+                        tuple_save_path=tuple_save_path,
+                        question_id=question_id,
+                        question=question,
+                        cnt_step=cnt_step,
+                        cfg=cfg,
+                        lifelong_json_path=lifelong_json_path,
+                        question_data=question_data,
+                    )
+                except Exception as e:
+                    logging.info(f"[ReplaySim] Pre-create replay json failed: {e}")
+
                 # query the VLM for the next navigation point, and the reason for the choice
                 vlm_response = query_vlm_for_response(
                     question=question,
@@ -736,7 +814,6 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     break
                 
                 
-
                 max_point_choice, gpt_answer, n_filtered_snapshots = vlm_response
 
 
@@ -770,6 +847,26 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     )
                     break
 
+                # 记录选择后的目标坐标（frontier 的世界坐标）到 coords_all.json（统一文件）
+                try:
+                    target_pos = None
+                    try:
+                        # Frontier 类型有 position 属性
+                        target_pos = getattr(max_point_choice, 'position', None)
+                    except Exception:
+                        target_pos = None
+                    append_step_coords_json(
+                        output_root_dir=cfg.output_dir,
+                        question_id=question_id,
+                        step_index=cnt_step,
+                        agent_position=pts,
+                        agent_position_voxel=tsdf_planner.habitat2voxel(pts)[:2],
+                        angle=angle,
+                        target_position=target_pos,
+                    )
+                except Exception as e:
+                    logging.info(f"[Coords] Failed to append target position: {e}")
+
             # (5) Agent navigate to the target point for one step
             return_values = tsdf_planner.agent_step(
                 pts=pts,
@@ -789,6 +886,20 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
             pts, angle, pts_voxel, fig, _, target_arrived = return_values
             logger.log_step(pts_voxel=pts_voxel)
             logging.info(f"Current position: {pts}, {logger.explore_dist:.3f}")
+
+            # 追加写入当前step后的 agent 位姿（无 target 变化）到 coords_all.json（统一文件）
+            try:
+                append_step_coords_json(
+                    output_root_dir=cfg.output_dir,
+                    question_id=question_id,
+                    step_index=cnt_step,
+                    agent_position=pts,
+                    agent_position_voxel=pts_voxel[:2] if hasattr(pts_voxel, '__len__') else pts_voxel,
+                    angle=angle,
+                    target_position=None,
+                )
+            except Exception as e:
+                logging.info(f"[Coords] Failed to append agent pose after step: {e}")
 
             # sanity check about objects, scene graph, snapshots, ...
             scene.sanity_check(cfg=cfg)
@@ -872,9 +983,14 @@ if __name__ == "__main__":
     parser.add_argument("-cf", "--cfg_file", help="cfg file path", default="", type=str)
     parser.add_argument("--start_ratio", help="start ratio", default=0.0, type=float)
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
+    parser.add_argument("--replay_mode", help="replay selection mode: sim or random", default="sim", type=str)
+    parser.add_argument("--replay_top", help="top-k for replay candidates", default=1, type=int)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
+    # CLI overrides for replay recall behavior
+    cfg.replay_mode = args.replay_mode
+    cfg.replay_top = args.replay_top
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)

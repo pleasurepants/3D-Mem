@@ -259,6 +259,47 @@ class TSDFPlanner(TSDFPlannerBase):
             frontier.layer0_label = coarse_label
             self.frontiers_layer0.append(frontier)
 
+        # 如果由于阈值过滤导致没有任何 layer0 粗簇：
+        # 回退为“按角度做 KMeans 的 2-3 个方向”与 layer1 相同策略，避免空集合
+        if len(self.frontiers_layer0) == 0:
+            n_points_all = len(frontier_areas)
+            if n_points_all == 0:
+                self.frontiers = []
+                return False
+            if n_points_all == 1:
+                clusters = [frontier_areas]
+            else:
+                relative_vecs_all = frontier_areas - cur_point[:2]
+                angles_all = np.arctan2(relative_vecs_all[:, 1], relative_vecs_all[:, 0])
+                angles_all = (angles_all + 2 * np.pi) % (2 * np.pi)
+                angle_pts_all = np.stack([np.cos(angles_all), np.sin(angles_all)], axis=1)
+                n_clusters_all = min(3, n_points_all)
+                kmeans_all = KMeans(n_clusters=n_clusters_all, n_init=10, random_state=42).fit(angle_pts_all)
+                clusters = []
+                for i in range(n_clusters_all):
+                    sel = np.where(kmeans_all.labels_ == i)[0]
+                    if len(sel) > 0:
+                        clusters.append(frontier_areas[sel])
+
+            self.frontiers_layer0 = []
+            for i, cluster in enumerate(clusters):
+                if len(cluster) == 0:
+                    continue
+                angle_cluster = np.asarray([
+                    np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
+                ])
+                ft_angle = float(np.mean(angle_cluster)) if angle_cluster.size > 0 else 0.0
+                region = self.get_frontier_region_map(cluster)
+                ft_data = {"angle": ft_angle, "region": region}
+                frontier = self.create_frontier(
+                    ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
+                )
+                frontier.layer0_label = i
+                self.frontiers_layer0.append(frontier)
+            if len(self.frontiers_layer0) == 0:
+                self.frontiers = []
+                return False
+
         # 2. 粗簇内根据视角均匀三等分为细簇
         self.frontiers_layer1 = []
         for coarse_label in np.unique(labels_coarse):
@@ -375,13 +416,21 @@ class TSDFPlanner(TSDFPlannerBase):
             # 如果parent_label丢失，归类到最近的大簇
             if parent_label not in layer0_label2idx:
                 # 归到最近的coarse
+                if len(layer0_label2idx) == 0:
+                    # 无粗簇时直接放弃该细簇的映射，继续
+                    logging.warning("layer0_label2idx is empty; skip reassign for orphan layer1 frontier")
+                    continue
                 pos = frontier.position
-                nearest_label = min(
-                    layer0_label2idx.keys(),
-                    key=lambda l: np.linalg.norm(pos - self.frontiers_layer0[layer0_label2idx[l]].position)
-                )
-                logging.warning(f"parent_label {parent_label} not in layer0_label2idx, reassign to nearest {nearest_label}")
-                parent_label = nearest_label
+                try:
+                    nearest_label = min(
+                        layer0_label2idx.keys(),
+                        key=lambda l: np.linalg.norm(pos - self.frontiers_layer0[layer0_label2idx[l]].position)
+                    )
+                    logging.warning(f"parent_label {parent_label} not in layer0_label2idx, reassign to nearest {nearest_label}")
+                    parent_label = nearest_label
+                except Exception:
+                    # 意外情况下仍可能为空集合，安全跳过
+                    continue
             parent_idx = layer0_label2idx[parent_label]
             self.layer1_to_layer0.append(parent_idx)
         layer0_to_layer1 = defaultdict(list)

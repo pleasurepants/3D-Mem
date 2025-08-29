@@ -795,12 +795,20 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     retry_bound = 3
 
     # ==== (NEW) Layer-0 回忆与聚合（只对初始方向层做） ====
-    run_layer0_recall_and_aggregate(
-        step=step,
-        cfg=cfg,
-        frontier_imgs_0=frontier_imgs_0,
-        chosen_frontier_path=chosen_frontier_path,
-    )
+    _replay_top = int(getattr(cfg, "replay_top", 1))
+    if _replay_top > 0:
+        run_layer0_recall_and_aggregate(
+            step=step,
+            cfg=cfg,
+            frontier_imgs_0=frontier_imgs_0,
+            chosen_frontier_path=chosen_frontier_path,
+            strategy=("random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"),
+            top_k=_replay_top,
+        )
+    else:
+        # 明确禁用 env 回放上下文
+        step["replay_layer0_aggregated_context"] = None
+        logging.info("[ReplayCtx] replay_top=0; skip layer0 recall and env context injection.")
 
 
     episodic_con = None
@@ -818,8 +826,11 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
 
 
-    layer0_con = None
-    layer0_con = step["replay_layer0_aggregated_context"]
+    layer0_con = step.get("replay_layer0_aggregated_context") if _replay_top > 0 else None
+    try:
+        logging.info(f"[ReplayCtx] layer0 aggregated context len: {len(layer0_con) if isinstance(layer0_con, str) else 'None'}")
+    except Exception:
+        pass
 
     # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
     sys_prompt, content = format_explore_prompt_frontier(
@@ -831,9 +842,15 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         egocentric_view=step.get("use_egocentric_views", False),
         use_snapshot_class=True,
         image_goal=image_goal,
-        context=layer0_con,
+        context=(layer0_con if _replay_top > 0 else None),
         episodic_con=episodic_con,
     )
+    if verbose:
+        try:
+            has_context = bool(layer0_con and isinstance(layer0_con, str) and layer0_con.strip())
+            logging.info(f"[PromptDebug] frontier layer0 has_context={has_context}")
+        except Exception:
+            pass
     if verbose:
         logging.info(f"Input prompt (frontier layer0):")
         message = sys_prompt
@@ -905,13 +922,19 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
 
         # ==== (NEW) 对该方向的更近处子集做回忆与聚合 ====
-        layer1_context_text = run_layer1_recall_and_aggregate_for_subgroup(
-            step=step,
-            cfg=cfg,
-            frontier_imgs_1=frontier_imgs_1,
-            layer1_indices=layer1_indices,
-            chosen_frontier_path=chosen_frontier_path,
-        )
+        if _replay_top > 0:
+            layer1_context_text = run_layer1_recall_and_aggregate_for_subgroup(
+                step=step,
+                cfg=cfg,
+                frontier_imgs_1=frontier_imgs_1,
+                layer1_indices=layer1_indices,
+                chosen_frontier_path=chosen_frontier_path,
+                strategy=("random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"),
+                top_k=_replay_top,
+            )
+        else:
+            layer1_context_text = None
+            logging.info("[ReplayCtx] replay_top=0; skip layer1 subgroup recall and env context injection.")
 
 
         sys_prompt, content = format_explore_prompt_frontier(
@@ -923,9 +946,15 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             egocentric_view=step.get("use_egocentric_views", False),
             use_snapshot_class=True,
             image_goal=image_goal,
-            context=layer1_context_text,
+            context=(layer1_context_text if _replay_top > 0 else None),
             episodic_con=episodic_con,
         )
+        if verbose:
+            try:
+                has_context_l1 = bool(layer1_context_text and isinstance(layer1_context_text, str) and layer1_context_text.strip())
+                logging.info(f"[PromptDebug] frontier layer1 has_context={has_context_l1}")
+            except Exception:
+                pass
         if verbose:
             logging.info(f"Input prompt (frontier layer1):")
             message = sys_prompt
