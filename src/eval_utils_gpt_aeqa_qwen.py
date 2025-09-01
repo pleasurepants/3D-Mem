@@ -240,6 +240,124 @@ def format_explore_prompt(
 
 
 # v0
+# def format_explore_prompt_frontier(
+#     question,
+#     egocentric_imgs,
+#     frontier_imgs,
+#     snapshot_imgs,
+#     snapshot_classes,
+#     egocentric_view=False,
+#     use_snapshot_class=True,
+#     image_goal=None,
+#     context=None,          # <- keep as-is: this is your env_con (replay/recall)
+#     episodic_con=None      # <- new: episodic context (per-episode frontier summary)
+#     ):
+#     # ========= System: Inputs/Outputs contract + recall & episodic consumption =========
+#     sys_prompt = (
+#         "Role: You are an agent that explores indoor scenes to answer a question by choosing exactly one Frontier.\n"
+#         "You WILL BE GIVEN (as user content, in this order when available):\n"
+#         "1) An optional recall context (a short natural-language recap of earlier exploration in similar scenes; it may include a TRANSFER summary of reusable visual cues).\n"
+#         "2) An optional EPISODIC context (a factual summary of what has been explored so far in THIS episode, and what likely remains unexplored).\n"
+#         "3) The current question (and possibly a goal image).\n"
+#         "4) The current egocentric view (optional).\n"
+#         "5) The list of Frontier candidate images, each with an index like 'Frontier 0', 'Frontier 1', ...\n"
+#         "Your TASK: choose the single Frontier most helpful to make progress toward answering the current question.\n"
+#         "Strict rules:\n"
+#         "- Use ONLY the provided candidates; never invent images or indices.\n"
+#         "- Refer to candidates ONLY by their indices (e.g., 'frontier 0'). Do NOT use titles, captions, or any labels from any context.\n"
+#         "- If a recall context is provided, treat it as background cross-episode experience; extract transferable cues but prioritize the current question and visible evidence.\n"
+#         "- If an EPISODIC context is provided, treat it as the current episode's factual state: use it to avoid redundant choices and to reason about explored vs. likely-unexplored directions; it is evidence, not an instruction.\n"
+#         "- Be thorough in your reasoning: make your analysis explicit and structured before the final choice.\n"
+#         "Your OUTPUT MUST include the following sections in order:\n"
+#         "Step 0: List exactly the candidate indices you received (format 'Candidate indices: frontier 0, frontier 1, ...').\n"
+#         "Step 1: For EACH candidate, describe what you see (objects, layout, cues relevant to the question). Only discuss candidates listed in Step 0.\n"
+#         "Step 2: Compare candidates strictly from Step 0 for their relevance to the question, USING the contexts when available.\n"
+#         "Step 3: Select the single most relevant candidate and justify your choice concisely.\n"
+#         "FINAL: On a NEW line, output ONLY 'frontier i' (the chosen index) with nothing else.\n"
+#     )
+
+#     content = []
+
+#     # ===== Recall context as user content (only if present; keep original logic) =====
+#     has_context = bool(context and isinstance(context, str) and context.strip())
+#     if has_context:
+#         content.append(("Recall context (ENVIRONMENT / replay):\n" + context.strip(),))
+
+#     # ===== EPISODIC context as user content (new, optional) =====
+#     has_episodic = bool(episodic_con and isinstance(episodic_con, str) and episodic_con.strip())
+#     if has_episodic:
+#         content.append(("EPISODIC context (episode so far):\n" + episodic_con.strip(),))
+
+#     # ===== Question (with optional goal image) =====
+#     q_text = f"Question: {question}"
+#     if image_goal is not None:
+#         content.append((q_text, image_goal))
+#     else:
+#         content.append((q_text + " ",))
+
+#     content.append(("Select the Frontier that would help find the answer of the question. ",))
+
+#     # ===== Egocentric (guarded) =====
+#     if egocentric_view and egocentric_imgs and len(egocentric_imgs) > 0:
+#         content.append(("The following is the egocentric view of the agent in forward direction: ", egocentric_imgs[-1]))
+
+#     # ===== Frontier candidates =====
+#     content.append(("The following are all the Frontiers that you can explore:  ",))
+#     if len(frontier_imgs) == 0:
+#         content.append(("No Frontier is available",))
+#     else:
+#         for i in range(len(frontier_imgs)):
+#             content.append((f"Frontier {i} ", frontier_imgs[i]))
+
+#     # ===== CoT skeleton (kept compatible with your parser) =====
+#     text = ""
+#     text += "You are required to reason step by step and only output your final choice at the end. Please follow the instructions below carefully. "
+
+#     # Step 0
+#     text += "Step 0: List all candidate images you are given and their indices in the following format: 'Candidate indices: frontier 0, frontier 1, ...' (listing only the actual indices provided below; do NOT add, omit, or change any index). "
+#     text += "You must ONLY discuss and compare the images whose indices are listed in Step 0. You are STRICTLY FORBIDDEN to invent, mention, analyze, or refer to any images or indices that are not explicitly listed in Step 0. "
+
+#     # Step 1 — richer per-candidate observation
+#     text += "Step 1: For each provided Frontier image, describe in detail what you see. Focus on visible objects, scene layout, and any clues relevant to the question. "
+#     text += "Provide 2–3 sentences per candidate, and ONLY describe the images with the indices listed in Step 0. Start your answer with 'Step 1:' and describe each candidate separately. "
+#     if has_context:
+#         text += "When relevant, naturally note resemblance or contrast with the recall (ENVIRONMENT) using visual features only (do not use any titles or indices from the recall). "
+#     if has_episodic:
+#         text += "When relevant, refer to the EPISODIC context to avoid redundant exploration or to highlight likely-unexplored directions (do not invent any indices). "
+
+#     # Step 2 — deeper, explicit dual-context use with labeled subparagraphs
+#     text += "Step 2: Analyze what the question is asking for. Then, compare ONLY the frontiers listed in Step 0, by analyzing the clues shown in each image and their relevance to the question. Do NOT mention, analyze, or imagine any other indices. Start this section with 'Step 2:'. "
+#     if has_context:
+#         text += "Include a labeled subparagraph starting with 'Context reflection — ENVIRONMENT:' (3–4 sentences) where you extract 1–2 transferable visual cues from the recall (prefer cues named in its TRANSFER summary if present) and apply them explicitly to the current candidates by naming which 'frontier i' match or conflict with those cues and why, citing concrete visible features. "
+#     if has_episodic:
+#         text += "Include a labeled subparagraph starting with 'Context reflection — EPISODIC:' (3–4 sentences) where you state which directions appear already explored vs. likely unexplored, indicate potential redundancy, and explain how this affects your preferences among the Step‑0 candidates. "
+#     if has_context or has_episodic:
+#         text += "Then write a labeled 'Synthesis:' subparagraph (2–3 sentences) that reconciles any tension between ENVIRONMENT cues and EPISODIC constraints, and identifies the one or two leading candidates by naming the decisive visual features. "
+#         text += "If the two contexts conflict, explicitly explain which one you prioritize and why (e.g., strong direct visual evidence may override a weak transferable cue). "
+#     else:
+#         text += "Provide a thorough comparison solely from current visual evidence (3–5 sentences). "
+#     text += "Avoid generic statements; name specific features (e.g., doorway/threshold/outdoor light for entrances; readable faces for text/symbols; sink–cabinet–countertop grouping for kitchen). "
+
+#     # Step 3 — justified choice + brief runner-up contrast
+#     text += "Step 3: Based on your analysis above, select the single most relevant frontier for making progress toward answering the question. Clearly state your reasoning and why you select this one, but ONLY from the indices listed in Step 0. Begin this section with 'Step 3:'. "
+#     if has_context or has_episodic:
+#         text += "Tie your justification back to the extracted ENVIRONMENT cue(s) and/or the EPISODIC constraints; if you deviate from a cue, name it and justify the deviation using current evidence. "
+#     text += "Briefly contrast your choice with the strongest runner‑up (1–2 sentences) to show why your chosen frontier better satisfies the question right now. "
+
+#     # Final constraints
+#     text += "After completing Step 3, output your final answer on a new line in the format: 'frontier i' (where i is one of the indices listed in Step 0). Do not include any other words, indices, or explanations on that line. "
+#     text += "You MUST select one and only one of the provided Frontier indices listed in Step 0. You are NOT allowed to say that none is suitable or refuse to choose. "
+#     text += "Choose the frontier that is MOST likely to help you answer the question, based ONLY on the visible clues, transferable cues, and episode-so-far constraints. "
+#     text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. "
+#     text += "Do NOT mention words like 'frontier', directions, or image positions in your reasoning except when referring to the candidate indices listed in Step 0. Only use the provided Frontier indices; do NOT make up or analyze any index that is not listed above. "
+#     text += "Only use the indices listed in Step 0. Any mention, analysis, or invention of other indices will be considered an error. Do NOT refer to images/frontiers not listed above."
+
+#     content.append((text,))
+
+#     return sys_prompt, content
+
+
+# v1
 def format_explore_prompt_frontier(
     question,
     egocentric_imgs,
@@ -249,100 +367,126 @@ def format_explore_prompt_frontier(
     egocentric_view=False,
     use_snapshot_class=True,
     image_goal=None,
-    context=None,          # <- keep as-is: this is your env_con (replay/recall)
-    episodic_con=None      # <- new: episodic context (per-episode frontier summary)
+    context=None,       # Experience replay text (cross-episode, similar-scene summaries)
+    episodic_con=None   # Episodic context text (this episode: recent steps/path & seen/unseen summary)
 ):
-    # ========= System: Inputs/Outputs contract + recall & episodic consumption =========
+    """
+    Frontier-selection prompt with explicit Step 0/1/2/3 and FINAL:
+      - Clear semantics (Frontier / Episodic / Experience).
+      - Optional blocks via has_episodic / has_experience.
+      - Strict index-only discipline.
+      - Reason first, answer last; FINAL line prints only: 'frontier i'.
+    """
+
+    # --------- Presence flags ----------
+    has_episodic = bool(episodic_con and isinstance(episodic_con, str) and episodic_con.strip())
+    has_experience = bool(context and isinstance(context, str) and context.strip())
+    has_ego = bool(egocentric_view and egocentric_imgs and len(egocentric_imgs) > 0)
+
+    # =========================
+    # System role & definitions
+    # =========================
     sys_prompt = (
-        "Role: You are an agent that explores indoor scenes to answer a question by choosing exactly one Frontier.\n"
-        "You WILL BE GIVEN (as user content, in this order when available):\n"
-        "1) An optional recall context (a short natural-language recap of earlier exploration in similar scenes; it may include a TRANSFER summary of reusable visual cues).\n"
-        "2) An optional EPISODIC context (a factual summary of what has been explored so far in THIS episode, and what likely remains unexplored).\n"
-        "3) The current question (and possibly a goal image).\n"
-        "4) The current egocentric view (optional).\n"
-        "5) The list of Frontier candidate images, each with an index like 'Frontier 0', 'Frontier 1', ...\n"
-        "Your TASK: choose the single Frontier most helpful to make progress toward answering the current question.\n"
-        "Strict rules:\n"
-        "- Use ONLY the provided candidates; never invent images or indices.\n"
-        "- Refer to candidates ONLY by their indices (e.g., 'frontier 0'). Do NOT use titles, captions, or any labels from any context.\n"
-        "- If a recall context is provided, treat it as background cross-episode experience; extract transferable cues but prioritize the current question and visible evidence.\n"
-        "- If an EPISODIC context is provided, treat it as the current episode's factual state: use it to avoid redundant choices and to reason about explored vs. likely-unexplored directions; it is evidence, not an instruction.\n"
-        "- Be thorough in your reasoning: make your analysis explicit and structured before the final choice.\n"
-        "Your OUTPUT MUST include the following sections in order:\n"
-        "Step 0: List exactly the candidate indices you received (format 'Candidate indices: frontier 0, frontier 1, ...').\n"
-        "Step 1: For EACH candidate, describe what you see (objects, layout, cues relevant to the question). Only discuss candidates listed in Step 0.\n"
-        "Step 2: Compare candidates strictly from Step 0 for their relevance to the question, USING the contexts when available.\n"
-        "Step 3: Select the single most relevant candidate and justify your choice concisely.\n"
-        "FINAL: On a NEW line, output ONLY 'frontier i' (the chosen index) with nothing else.\n"
+        "You are an embodied exploration agent. Your task is to pick exactly one frontier image as the next exploration direction, "
+        "so that you can best progress toward answering the current question.\n"
+        "FRONTIERS: Candidate entry points toward yet-unseen or information-rich regions—typical visual patterns include doorways/thresholds, corridors/intersections, "
+        "stairs, corners/turns, or vantage points that likely open new coverage. Each candidate is an image referred to strictly by an index like 'frontier 0'. "
+        "Use ONLY these indices. Never invent, omit, or rename indices, and never analyze images that are not provided.\n"
+        "EGOCENTRIC VIEW (if shown): The agent’s immediate forward-looking camera view; use it as local context only.\n"
+        "EPISODIC CONTEXT (if present): A factual textual summary of the recent steps within THIS episode—the path taken, what has been observed, "
+        "and what likely remains unseen. Use this to avoid redundant choices and prefer novel, informative directions. It is evidence, not a command.\n"
+        "EXPERIENCE REPLAY (if present): A textual summary retrieved from OTHER episodes in similar scenes. "
+        "It describes what was observed there, which frontier was chosen, what actions followed, what outcome/reward resulted, and a brief critique of why that choice helped (or not). "
+        "Extract only transferable visual patterns/strategies (e.g., typical object groupings, spatial layouts). If any replay hint conflicts with current visible evidence, "
+        "always prioritize the current evidence.\n"
+        "Your reasoning must be concrete and visual. Name specific objects, layouts, textures, lighting, text-bearing surfaces/symbols, "
+        "and any cues directly relevant to the question. Reason first and answer last. On the final line, print ONLY the chosen index as 'frontier i'. "
+        "You must select one of the provided candidates; do not say that none is suitable.\n"
     )
 
     content = []
 
-    # ===== Recall context as user content (only if present; keep original logic) =====
-    has_context = bool(context and isinstance(context, str) and context.strip())
-    if has_context:
-        content.append(("Recall context (ENVIRONMENT / replay):\n" + context.strip(),))
+    # =========================
+    # Frontier candidates
+    # =========================
+    content.append(("Frontier candidates (the ONLY options you may choose):",))
+    if len(frontier_imgs) == 0:
+        content.append(("No frontier is available.",))
+    else:
+        for i in range(len(frontier_imgs)):
+            content.append((f"Frontier {i}", frontier_imgs[i]))
 
-    # ===== EPISODIC context as user content (new, optional) =====
-    has_episodic = bool(episodic_con and isinstance(episodic_con, str) and episodic_con.strip())
+    # =========================
+    # Egocentric (optional)
+    # =========================
+    if has_ego:
+        content.append(("Egocentric forward view (immediate local context):", egocentric_imgs[-1]))
+
+    # =========================
+    # Episodic context (optional)
+    # =========================
     if has_episodic:
-        content.append(("EPISODIC context (episode so far):\n" + episodic_con.strip(),))
+        content.append((
+            "Episodic context — summary of the recent steps within THIS episode (path you followed, what you observed, "
+            "what seems already covered vs. still unexplored). Use this to avoid redundancy and to prefer novel, decision-relevant directions:\n"
+            + episodic_con.strip(),
+        ))
 
-    # ===== Question (with optional goal image) =====
+    # =========================
+    # Experience replay (optional)
+    # =========================
+    if has_experience:
+        content.append((
+            "Experience replay — knowledge from OTHER episodes in similar scenes. "
+            "It states what was observed, which frontier was chosen, what actions followed, what outcome/reward resulted, "
+            "and a short critique explaining why that choice helped or hindered the final result. "
+            "Extract only transferable visual patterns/strategies and prefer the current visible evidence when conflicts arise:\n"
+            + context.strip(),
+        ))
+
+    # =========================
+    # Question
+    # =========================
     q_text = f"Question: {question}"
     if image_goal is not None:
         content.append((q_text, image_goal))
     else:
-        content.append((q_text + " ",))
+        content.append((q_text,))
 
-    content.append(("Select the Frontier that would help find the answer of the question. ",))
-
-    # ===== Egocentric (guarded) =====
-    if egocentric_view and egocentric_imgs and len(egocentric_imgs) > 0:
-        content.append(("The following is the egocentric view of the agent in forward direction: ", egocentric_imgs[-1]))
-
-    # ===== Frontier candidates =====
-    content.append(("The following are all the Frontiers that you can explore:  ",))
-    if len(frontier_imgs) == 0:
-        content.append(("No Frontier is available",))
-    else:
-        for i in range(len(frontier_imgs)):
-            content.append((f"Frontier {i} ", frontier_imgs[i]))
-
-    # ===== CoT skeleton (kept compatible with your parser) =====
-    text = ""
-    text += "You are required to reason step by step and only output your final choice at the end. Please follow the instructions below carefully. "
+    # =========================
+    # CoT skeleton
+    # =========================
 
     # Step 0
     text += "Step 0: List all candidate images you are given and their indices in the following format: 'Candidate indices: frontier 0, frontier 1, ...' (listing only the actual indices provided below; do NOT add, omit, or change any index). "
     text += "You must ONLY discuss and compare the images whose indices are listed in Step 0. You are STRICTLY FORBIDDEN to invent, mention, analyze, or refer to any images or indices that are not explicitly listed in Step 0. "
 
-    # Step 1 — richer per-candidate observation
+    # Step 1
     text += "Step 1: For each provided Frontier image, describe in detail what you see. Focus on visible objects, scene layout, and any clues relevant to the question. "
     text += "Provide 2–3 sentences per candidate, and ONLY describe the images with the indices listed in Step 0. Start your answer with 'Step 1:' and describe each candidate separately. "
-    if has_context:
-        text += "When relevant, naturally note resemblance or contrast with the recall (ENVIRONMENT) using visual features only (do not use any titles or indices from the recall). "
+    if has_experience:
+        text += "Explicitly compare each candidate with the EXPERIENCE replay, noting resemblance or contrast using visual features only (do not copy titles or indices from the replay). "
     if has_episodic:
-        text += "When relevant, refer to the EPISODIC context to avoid redundant exploration or to highlight likely-unexplored directions (do not invent any indices). "
+        text += "Explicitly compare each candidate with the EPISODIC context, showing whether it avoids redundancy or opens likely-unexplored directions. "
 
-    # Step 2 — deeper, explicit dual-context use with labeled subparagraphs
+    # Step 2
     text += "Step 2: Analyze what the question is asking for. Then, compare ONLY the frontiers listed in Step 0, by analyzing the clues shown in each image and their relevance to the question. Do NOT mention, analyze, or imagine any other indices. Start this section with 'Step 2:'. "
-    if has_context:
-        text += "Include a labeled subparagraph starting with 'Context reflection — ENVIRONMENT:' (3–4 sentences) where you extract 1–2 transferable visual cues from the recall (prefer cues named in its TRANSFER summary if present) and apply them explicitly to the current candidates by naming which 'frontier i' match or conflict with those cues and why, citing concrete visible features. "
+    if has_experience:
+        text += "Include a labeled subparagraph 'Context reflection — EXPERIENCE:' (3–4 sentences) where you extract 1–2 transferable cues from the replay and apply them explicitly to the current candidates by naming which 'frontier i' match or conflict with those cues and why, citing concrete visible features. "
     if has_episodic:
-        text += "Include a labeled subparagraph starting with 'Context reflection — EPISODIC:' (3–4 sentences) where you state which directions appear already explored vs. likely unexplored, indicate potential redundancy, and explain how this affects your preferences among the Step‑0 candidates. "
-    if has_context or has_episodic:
-        text += "Then write a labeled 'Synthesis:' subparagraph (2–3 sentences) that reconciles any tension between ENVIRONMENT cues and EPISODIC constraints, and identifies the one or two leading candidates by naming the decisive visual features. "
+        text += "Include a labeled subparagraph 'Context reflection — EPISODIC:' (3–4 sentences) where you state which directions appear already explored vs. likely unexplored, indicate potential redundancy, and explain how this affects your preferences among the Step-0 candidates. "
+    if has_experience or has_episodic:
+        text += "Then write a labeled 'Synthesis:' subparagraph (2–3 sentences) that reconciles any tension between EXPERIENCE cues and EPISODIC constraints, and identifies the one or two leading candidates by naming the decisive visual features. "
         text += "If the two contexts conflict, explicitly explain which one you prioritize and why (e.g., strong direct visual evidence may override a weak transferable cue). "
     else:
         text += "Provide a thorough comparison solely from current visual evidence (3–5 sentences). "
     text += "Avoid generic statements; name specific features (e.g., doorway/threshold/outdoor light for entrances; readable faces for text/symbols; sink–cabinet–countertop grouping for kitchen). "
 
-    # Step 3 — justified choice + brief runner-up contrast
+    # Step 3
     text += "Step 3: Based on your analysis above, select the single most relevant frontier for making progress toward answering the question. Clearly state your reasoning and why you select this one, but ONLY from the indices listed in Step 0. Begin this section with 'Step 3:'. "
-    if has_context or has_episodic:
-        text += "Tie your justification back to the extracted ENVIRONMENT cue(s) and/or the EPISODIC constraints; if you deviate from a cue, name it and justify the deviation using current evidence. "
-    text += "Briefly contrast your choice with the strongest runner‑up (1–2 sentences) to show why your chosen frontier better satisfies the question right now. "
+    if has_experience or has_episodic:
+        text += "Tie your justification back to the EXPERIENCE cue(s) and/or the EPISODIC constraints; if you deviate from a cue, name it and justify the deviation using current evidence. "
+    text += "Briefly contrast your choice with the strongest runner-up (1–2 sentences) to show why your chosen frontier better satisfies the question right now. "
 
     # Final constraints
     text += "After completing Step 3, output your final answer on a new line in the format: 'frontier i' (where i is one of the indices listed in Step 0). Do not include any other words, indices, or explanations on that line. "
