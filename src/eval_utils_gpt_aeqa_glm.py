@@ -32,29 +32,6 @@ def format_content(contents):
             )
     return formated_content
 
-# def format_content(contents):
-#     formated_content = []
-#     for c in contents:
-#         # 跳过内容仅为换行或空的text，避免污染
-#         if c[0].strip() == "":
-#             continue
-#         if c[0].strip() == " ":
-#             continue
-#         formated_content.append({"type": "text", "text": c[0]})
-#         if len(c) == 2:
-#             formated_content.append(
-#                 {
-#                     "type": "image_url",
-#                     "image_url": {
-#                         "url": f"data:image/png;base64,{c[1]}",
-#                         # detail参数可以删掉，llava/vllm并不识别这个key
-#                     },
-#                 }
-#             )
-#     return formated_content
-
-
-
 
 # send information to openai
 def call_openai_api(sys_prompt, contents) -> Optional[str]:
@@ -68,10 +45,10 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="GLM-4.1V-9B-Thinking",  # replaced from minicpm
+                model="glm",
                 messages=message_text,
                 temperature=0.7,
-                max_tokens=4096, # 4096 for gpt-4o
+                max_tokens=4096,
                 top_p=0.95,
                 frequency_penalty=0,
                 presence_penalty=0,
@@ -89,42 +66,6 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
             continue
 
     return None
-# def call_openai_api(sys_prompt, contents) -> Optional[str]:
-#     max_tries = 5
-#     retry_count = 0
-#     formated_content = format_content(contents)
-#     # ====== 最小修改 START ======
-#     # 把 sys_prompt 塞到 user 的 content 数组第一个
-#     formated_content = [{"type": "text", "text": sys_prompt}] + formated_content
-#     message_text = [
-#         {"role": "user", "content": formated_content},
-#     ]
-#     # ====== 最小修改 END ======
-
-#     while retry_count < max_tries:
-#         try:
-#             completion = client.chat.completions.create(
-#                 model="llava",  # gpt-4o
-#                 messages=message_text,
-#                 temperature=0.7,
-#                 max_tokens=2048, # 4096 for gpt-4o
-#                 top_p=0.95,
-#                 frequency_penalty=0,
-#                 presence_penalty=0,
-#             )
-#             return completion.choices[0].message.content
-#         except openai.RateLimitError as e:
-#             print("Rate limit error, waiting for 60s")
-#             time.sleep(30)
-#             retry_count += 1
-#             continue
-#         except Exception as e:
-#             print("Error: ", e)
-#             time.sleep(60)
-#             retry_count += 1
-#             continue
-
-#     return None
 
 
 # encode tensor images to base64 format
@@ -402,32 +343,12 @@ def explore_step(step, cfg, verbose=False):
             print("call_openai_api returns None, retrying")
             continue
 
-        # full_response = full_response.strip()
-        # if isinstance(full_response, list):
-        #     full_response = " ".join(full_response)
-        # if " " in full_response:
-        #     full_response = full_response.split(" ")
-        #     response, reason = full_response[0], full_response[-1]
-        #     response, reason = response.strip(), reason.strip()
-        # else:
-        #     response = full_response
-        #     reason = ""
-        # response = response.lower()
-        # try:
-        #     choice_type, choice_id = response.split(" ")
-        # except Exception as e:
-        #     print(f"Error in splitting response: {response}")
-        #     print(e)
-        #     continue
-
-        # 如果 full_response 是 token list（vLLM 的返回格式），先拼成字符串
+        # If token list, join
         if isinstance(full_response, list):
             full_response = " ".join(full_response)
 
-        # 去掉前后空格
         full_response = full_response.strip()
 
-        # 拆分 token 提取结果和理由
         tokens = full_response.split()
         if len(tokens) >= 2:
             response = f"{tokens[0]} {tokens[1]}"
@@ -444,7 +365,6 @@ def explore_step(step, cfg, verbose=False):
             print(f"Error in splitting response: {response}")
             print(e)
             continue
-
 
         response_valid = False
         if (
@@ -466,3 +386,5 @@ def explore_step(step, cfg, verbose=False):
             break
 
     return final_response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+
+

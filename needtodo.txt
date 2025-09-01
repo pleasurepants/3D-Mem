@@ -1,0 +1,21 @@
+prompt order
+1. instructions
+    (json) or other formats 
+2. Frontiers selection \n (eg. Frontier 0: Pic, Frontier 1: Pic)
+3. episodic memory(explaination, what you have seen from the past steps, or what have you done before...)
+4. experience replay(as a embodied agent, you have seen similar scenes in the past exploration...)(all the .. based on the scene similarity...)
+    experience 1: text-based:(observation, step_info, Frontier selection, actions, final reward, critic(maybe why did it choose the frontier, and how much this choice can influent the final result. or other dimensions)) (experience generation part) definition!
+    top2-3...(retrieved by similarity(one of them))
+5. COT instructions(output)
+
+reason first, answer last
+
+setting now / training set
+
+similarity(scene/question)
+
+
+need to be done:
+1. success rate of past settings
+2. experience prompt(highest priority)
+3. goat bench(episode same with 3dmem?)

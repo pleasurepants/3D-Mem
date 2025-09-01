@@ -30,7 +30,7 @@ from src.geom import get_cam_intr, get_scene_bnds
 from src.tsdf_planner import TSDFPlanner, Frontier, SnapShot
 from src.scene_aeqa import Scene
 from src.utils import resize_image, get_pts_angle_aeqa
-from src.query_vlm_aeqa_internvl import query_vlm_for_response
+from src.query_vlm_aeqa_glm import query_vlm_for_response
 from src.logger_aeqa import Logger
 from src.const import *
 
@@ -68,7 +68,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
     logging.info(f"Load SAM model {cfg.sam_model_name} successful!")
 
     clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
-        "ViT-H-14" # "ViT-H-14", "laion2b_s32b_b79k"
+        "ViT-B-32"  # "ViT-H-14", "laion2b_s32b_b79k"
     )
     clip_tokenizer = open_clip.get_tokenizer("ViT-B-32")
     logging.info(f"Load CLIP model successful!")
@@ -426,3 +426,5 @@ if __name__ == "__main__":
     # run
     logging.info(f"***** Running {cfg.exp_name} *****")
     main(cfg, args.start_ratio, args.end_ratio)
+
+
