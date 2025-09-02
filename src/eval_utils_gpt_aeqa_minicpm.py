@@ -975,9 +975,9 @@ def explore_step(step, cfg, verbose=False):
         logging.info(message)
 
     for _ in range(retry_bound):
-        # full_response = call_openai_api(sys_prompt, content)
+        full_response = call_openai_api(sys_prompt, content)
         # full_response = call_openai_api_vote(sys_prompt, content)
-        full_response = call_openai_api_score(sys_prompt, content)
+        # full_response = call_openai_api_score(sys_prompt, content)
         if full_response is None:
             print("call_openai_api (frontier) returns None, retrying")
             continue
