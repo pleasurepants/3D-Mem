@@ -1,0 +1,4 @@
+sentence-transformers
+ipdb
+ipykernel
+notebook
