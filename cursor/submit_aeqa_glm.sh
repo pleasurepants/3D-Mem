@@ -19,7 +19,7 @@ for SEED in 32 82 19 568; do
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
-#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-3,worker-4,worker-8,worker-9,worker-1,worker-2
+#SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-3,worker-4,worker-5,worker-8,worker-9,worker-1,worker-2
 #SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/glm/baseline_3dmem/baseline-${SEED}-%j.out
 #SBATCH --partition all
 
@@ -29,7 +29,7 @@ unset HTTP_PROXY
 unset HTTPS_PROXY
 
 echo "=== JOB START ==="; date; hostname; nvidia-smi; echo "SLURM_JOB_ID: \$SLURM_JOB_ID"
-export LD_LIBRARY_PATH=/home/wiss/zhang/local_cuda118/cuda_cudart/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=/home/wiss/zhang/local_cuda118/cuda_cudart/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
 
 source /home/wiss/zhang/anaconda3/bin/activate vllm
 
