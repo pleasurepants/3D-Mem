@@ -10,12 +10,12 @@ sbatch <<EOF
 #!/bin/bash
 #SBATCH --job-name=qwen-exp-168
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a40:2
+#SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00
 #SBATCH --output=${SLURM_OUT}
-#SBATCH --partition a40
+#SBATCH --partition a100
 
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 echo "=== JOB START ==="; date; hostname; nvidia-smi; echo "SLURM_JOB_ID: $SLURM_JOB_ID"
