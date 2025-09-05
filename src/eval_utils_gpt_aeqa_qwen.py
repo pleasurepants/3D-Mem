@@ -456,7 +456,6 @@ def format_explore_prompt_frontier(
     # =========================
     # CoT skeleton
     # =========================
-
     text = ""
     # Step 0
     text += "Step 0: List all candidate images you are given and their indices in the following format: 'Candidate indices: frontier 0, frontier 1, ...' (listing only the actual indices provided below; do NOT add, omit, or change any index). "
