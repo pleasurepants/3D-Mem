@@ -20,8 +20,8 @@ prefiltering: true  # whether to use prefiltering (you in fact cannot turn this 
 top_k_categories: 10  # keep the top k relevant categories during prefiltering
 
 # about detection model
-yolo_model_name: /nfs/data8/jingpei/eqa/3D-Mem/model/yolov8x-world.pt
-sam_model_name: /nfs/data8/jingpei/eqa/3D-Mem/model/sam_l.pt
+yolo_model_name: /nfs/data8/jingpei/eqa/models/yolov8x-world.pt
+sam_model_name: /nfs/data8/jingpei/eqa/models/sam_l.pt
 class_set: scannet200  # use the 200-class set for yolo-world detector
 
 # about snapshots clustering

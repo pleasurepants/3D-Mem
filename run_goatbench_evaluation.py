@@ -7,6 +7,9 @@ os.environ["HABITAT_SIM_LOG"] = (
 )
 os.environ["MAGNUM_LOG"] = "quiet"
 
+SENTENCE_TRANSFORMERS_PATH = '/nfs/data8/jingpei/eqa/models/clip-ViT-B-32'
+CLIP_PATH = '/nfs/data8/jingpei/eqa/models/CLIP-ViT-H-14-laion2B-s32B-b79K'
+
 import argparse
 from omegaconf import OmegaConf
 import random
@@ -46,7 +49,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
     # Load dataset
     scene_data_list = os.listdir(cfg.test_data_dir)
     num_scene = len(scene_data_list)
-    random.shuffle(scene_data_list)
+    # random.shuffle(scene_data_list)   # consistent for debugging
 
     # split the test data by scene
     scene_data_list = scene_data_list[
@@ -77,9 +80,11 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
     logging.info(f"Load SAM model {cfg.sam_model_name} successful!")
 
     clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
-        "ViT-B-32", "laion2b_s34b_b79k"  # "ViT-H-14", "laion2b_s32b_b79k"
+        # "ViT-B-32", "laion2b_s34b_b79k"  # "ViT-H-14", "laion2b_s32b_b79k"
+        "ViT-H-14", pretrained=CLIP_PATH + "/open_clip_pytorch_model.bin"
     )
-    clip_tokenizer = open_clip.get_tokenizer("ViT-B-32")
+    # clip_tokenizer = open_clip.get_tokenizer("ViT-B-32")
+    clip_tokenizer = open_clip.get_tokenizer("ViT-H-14")
     logging.info(f"Load CLIP model successful!")
 
     # Initialize the logger
@@ -96,6 +101,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
         )
 
         # selecat the episodes according to the split
+        ## why only one episode?
         scene_data["episodes"] = scene_data["episodes"][split - 1 : split]
         total_episodes = len(scene_data["episodes"])
 
@@ -115,6 +121,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                     all_navigation_goals=all_navigation_goals,
                 )
             )
+            # all_subtask_goals[0/1/2][0].keys(): ['object_category', 'object_id', 'position', 'view_points', 'children_object_categories', 'lang_desc', 'image_goals']
 
             # check whether this episode has been processed
             finished_subtask_ids = list(logger.success_by_snapshot.keys())

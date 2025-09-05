@@ -550,7 +550,8 @@ def generate_step_replay_prompt(
     current_idx: int,
     current_frontier_b64: str,
     compact: bool = False,
-    current_step_idx: int | None = None,  # temporal position of current step
+    # current_step_idx: int | None = None,  # temporal position of current step
+    current_step_idx: Optional[int] = None,
 ):
     """
     Experience paragraph generator (ENRICHED with self-critique / self-verification principles).
