@@ -962,17 +962,34 @@ def explore_step(step, cfg, verbose=False):
 
 
 
-    # === Step 2: frontier tournament ===
+    # === Step 2: frontier single-shot selection (no vote/score) ===
     if len(frontier_imgs) == 0:
         return None, snapshot_id_mapping, None, len(snapshot_imgs)
 
-    winner_index, reason = king_of_the_hill_frontier(
+    sys_f, content_f = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
         frontier_imgs,
+        snapshot_imgs,
+        snapshot_classes,
         egocentric_view=step.get("use_egocentric_views", False),
+        use_snapshot_class=True,
         image_goal=image_goal,
-        call_api_func=call_openai_api_score,  # 你自己的API调用函数
     )
-    response = f"frontier {winner_index}"
-    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+
+    resp = call_openai_api(sys_f, content_f)
+    if resp is None:
+        return None, snapshot_id_mapping, None, len(snapshot_imgs)
+
+    resp_l = resp.strip().lower()
+    import re as _re
+    m = _re.search(r"frontier\s+(\d+)", resp_l)
+    if m:
+        idx = int(m.group(1))
+        if 0 <= idx < len(frontier_imgs):
+            reason = clean_reason(resp_l[m.end():].strip())
+            response = f"frontier {idx}"
+            return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+
+    # fallback: 未能解析到合法index
+    return None, snapshot_id_mapping, None, len(snapshot_imgs)
