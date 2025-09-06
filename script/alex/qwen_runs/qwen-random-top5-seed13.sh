@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=q-sim-top1-13
+#SBATCH --job-name=q-rand-top5-13
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/qwen-sim-top1-13-%j.out
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/qwen-rand-top5-13-%j.out
 #SBATCH --partition a40
 
 
@@ -76,9 +76,9 @@ source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/qwen_13.yaml \
-    --replay_mode sim \
-    --replay_top 1 \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/qwen_runs/qwen-random-top5-seed13.yaml \
+    --replay_mode random \
+    --replay_top 5 \
     --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168
 
 

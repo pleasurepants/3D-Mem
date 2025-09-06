@@ -30,10 +30,39 @@ class FrontierSimilaritySearcher:
         self.replay_json_path = replay_json_path
         self.method = method
         self.feature_fn = feature_fn
+        # aHash 索引缓存
+        self._index = None
+        self._index_path = None
+
+    # ---------- index helpers ----------
+    def _ensure_index_loaded(self):
+        if isinstance(getattr(self, "_index", None), dict) and self._index is not None:
+            return
+        try:
+            base_root = getattr(self.cfg, "retrieve_root", None) or os.path.join(self.cfg.output_parent_dir, self.cfg.exp_name)
+            index_path = os.path.join(base_root, ".frontier_ahash_index.json")
+            self._index_path = index_path
+            if not os.path.exists(index_path):
+                self._index = {}
+                return
+            with open(index_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self._index = data if isinstance(data, dict) else {}
+        except Exception:
+            self._index = {}
+
+    @staticmethod
+    def _list_to_bits(bits_list):
+        try:
+            arr = np.asarray(bits_list, dtype=np.uint8).reshape(-1)
+            return arr
+        except Exception:
+            return None
 
         self._replay_json: Optional[Dict] = None
         self._qid2episode_from_questions: Dict[str, str] = {}
         self._cand_bits_cache: Dict[str, np.ndarray] = {}
+        self._qid2episode_from_experience: Dict[str, str] = {}
         self._replay_missing = False  # 标记 replay_json 是否缺失
 
     # ---------- load helpers ----------
@@ -68,6 +97,26 @@ class FrontierSimilaritySearcher:
                 self._replay_json = json.load(f)
             self._replay_missing = False
 
+    def _ensure_experience_index(self):
+        """从 experience_output.json 建立 question_id -> episode_id 的索引"""
+        if self._qid2episode_from_experience:
+            return
+        try:
+            base_root = getattr(self.cfg, "retrieve_root", None) or os.path.join(self.cfg.output_parent_dir, self.cfg.exp_name)
+            exp_path = os.path.join(base_root, "experience_output.json")
+            if not os.path.exists(exp_path):
+                return
+            with open(exp_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                for ep_id, qdict in data.items():
+                    if not isinstance(qdict, dict):
+                        continue
+                    for qid in qdict.keys():
+                        self._qid2episode_from_experience[qid] = ep_id
+        except Exception as e:
+            logging.info(f"[ReplaySim] build exp index failed: {e}")
+
     # ---------- episode resolve ----------
     def resolve_episode_id(self, question_id: str) -> Optional[str]:
         """优先从 questions_list_path 查找，找不到则从 replay_json 扫描"""
@@ -81,47 +130,56 @@ class FrontierSimilaritySearcher:
 
         self._ensure_replay_loaded()
         if self._replay_missing:
-            return None
+            # 尝试从 experience_output.json 建立索引
+            self._ensure_experience_index()
+            return self._qid2episode_from_experience.get(question_id)
 
         for epi_id, qdict in self._replay_json.items():
             if question_id in qdict:
                 return epi_id
-        return None
+        # 最后再尝试 experience_output.json
+        self._ensure_experience_index()
+        return self._qid2episode_from_experience.get(question_id)
 
     # ---------- candidate iterator ----------
     def _candidate_iter(self, episode_id: str, exclude_qid: Optional[str] = None):
-        self._ensure_replay_loaded()
-        if self._replay_missing or not self._replay_json or episode_id not in self._replay_json:
+        """优先使用离线索引 <root>/.frontier_ahash_index.json 遍历候选；无需读盘解码图片。"""
+        base_root = getattr(self.cfg, "retrieve_root", None) or os.path.join(self.cfg.output_parent_dir, self.cfg.exp_name)
+        self._ensure_index_loaded()
+        self._ensure_experience_index()
+        try:
+            index_size = len(self._index)
+        except Exception:
+            index_size = -1
+        logging.info(f"[ReplaySim] Using aHash index at {getattr(self, '_index_path', '<unknown>')} (entries={index_size})")
+
+        if not isinstance(self._index, dict) or len(self._index) == 0:
+            logging.info("[ReplaySim] aHash index is empty; please run build_frontier_ahash_index.py first.")
             return
 
-        base_root = os.path.join(self.cfg.output_parent_dir, self.cfg.exp_name)
-        for qid, qinfo in self._replay_json[episode_id].items():
-            if exclude_qid and qid == exclude_qid:
+        for path, rec in self._index.items():
+            try:
+                qid = rec.get("question_id")
+                if exclude_qid and qid == exclude_qid:
+                    continue
+                epi_of_q = self._qid2episode_from_experience.get(qid)
+                if episode_id and epi_of_q and epi_of_q != episode_id:
+                    continue
+                fn = rec.get("filename")
+                step_key = rec.get("step_key")
+                level = rec.get("level")
+                # path 现在是相对键（qid/frontier/xxx.png），统一生成相对与绝对路径
+                rel_key = path
+                abs_path = os.path.join(base_root, rel_key)
+                yield abs_path, {
+                    "episode_id": epi_of_q or episode_id,
+                    "question_id": qid,
+                    "step_key": step_key,
+                    "level": level,
+                    "filename_rel": os.path.join("frontier", fn) if fn else None,
+                }
+            except Exception:
                 continue
-            steps = qinfo.get("steps", {})
-            for step_key, step_info in steps.items():
-                frontier = step_info.get("frontier", {})
-                # layer0 keys
-                for layer0_key, layer1_list in frontier.items():
-                    layer0_rel = os.path.join("frontier", layer0_key)
-                    layer0_abs = os.path.join(base_root, qid, layer0_rel)
-                    yield layer0_abs, {
-                        "episode_id": episode_id,
-                        "question_id": qid,
-                        "step_key": step_key,
-                        "level": "layer0",
-                        "filename_rel": layer0_rel,
-                    }
-                    # layer1 values
-                    for l1_rel in layer1_list:
-                        l1_abs = os.path.join(base_root, qid, l1_rel)
-                        yield l1_abs, {
-                            "episode_id": episode_id,
-                            "question_id": qid,
-                            "step_key": step_key,
-                            "level": "layer1",
-                            "filename_rel": l1_rel,
-                        }
 
     # ---------- hashing utils ----------
     @staticmethod
@@ -155,6 +213,18 @@ class FrontierSimilaritySearcher:
         except Exception:
             return None
 
+    def _all_index_records(self):
+        # 返回 (abs_path, meta, bits) 三元组迭代器
+        self._ensure_index_loaded()
+        for p, rec in self._index.items():
+            bits_list = rec.get("bits")
+            if not isinstance(bits_list, list):
+                continue
+            bits = self._list_to_bits(bits_list)
+            if bits is None:
+                continue
+            yield p, rec, bits
+
     def _image_bits_ahash_from_b64(self, b64: str) -> Optional[np.ndarray]:
         try:
             return self._ahash(self._pil_from_base64(b64))
@@ -169,8 +239,9 @@ class FrontierSimilaritySearcher:
         exclude_question_id: Optional[str] = None,
         top_k: int = 1,
     ) -> List[Dict]:
-        self._ensure_replay_loaded()
-        if self._replay_missing:
+        # 以离线索引为候选池
+        self._ensure_index_loaded()
+        if not isinstance(self._index, dict) or len(self._index) == 0:
             return []
 
         # build target descriptors once
@@ -182,15 +253,28 @@ class FrontierSimilaritySearcher:
         if not target_descs:
             return []
 
+        # 遍历索引项并计算 similarity
         candidates = []
-        for cand_abs, meta in self._candidate_iter(episode_id, exclude_qid=exclude_question_id):
-            cand_bits = self._image_bits_ahash_from_path(cand_abs)
-            if cand_bits is None:
+        for abs_path, rec, bits in self._all_index_records():
+            qid = rec.get("question_id")
+            if exclude_question_id and qid == exclude_question_id:
                 continue
-            sim = float(max(self._similarity_from_bits(cand_bits, t) for t in target_descs))
-            candidates.append({"similarity": sim, "candidate_abs": cand_abs, **meta})
-        
-        # 按相似度排序并返回前 top_k 个
+            epi_of_q = self._qid2episode_from_experience.get(qid)
+            if episode_id and epi_of_q and epi_of_q != episode_id:
+                continue
+            try:
+                sim = float(max(self._similarity_from_bits(bits, t) for t in target_descs))
+            except Exception:
+                continue
+            meta = {
+                "episode_id": epi_of_q or episode_id,
+                "question_id": qid,
+                "step_key": rec.get("step_key"),
+                "level": rec.get("level"),
+                "filename_rel": os.path.join("frontier", rec.get("filename", "")),
+            }
+            candidates.append({"similarity": sim, "candidate_abs": abs_path, **meta})
+
         candidates.sort(key=lambda x: x["similarity"], reverse=True)
         return candidates[:top_k]
 
@@ -821,57 +905,96 @@ def _process_candidate_one(
     top_k: int = 1
 ):
     """
-    For one frontier image candidate:
-      1) retrieve up to top_k matches using the given strategy ("sim" or "random")
-      2) for each match, build a narrative prompt and call the VLM to get a short recall text
-      3) concatenate texts: first prefixed with "Most similar previously: " and the rest with "Additionally similar: "
-    Return (best_of_list, combined_ctx_text | None).
+    新版检索：
+      1) 使用 sim/random 在 replay_step_info.json 候选中检索 top_k 匹配项；
+      2) 不再调用任何 VLM/生成器，而是直接读取实验根目录下的 experience_output.json，
+         取对应 question_id 的 steps[step_x].experience 作为上下文；
+      3) 组合为一段可直接注入到 prompt 的文本（首个命中加“Most similar: ”前缀，其余用“Additionally: ”）。
+    返回: (最相似候选, 合并后的上下文字符串或 None)。
     """
     # 当 top_k <= 0 时，明确不进行任何回放回忆，直接返回 None
     if top_k <= 0:
         return None, None
 
+    # 为了日志统一，每次检索都请求最多前5个候选用于打印；实际使用仍取前 top_k
+    request_k = max(5, top_k)
     candidates = searcher.search_with_strategy(
         target_b64_list=[b64_str],
         episode_id=episode_id,
         exclude_question_id=exclude_qid,
         strategy=strategy,
-        top_k=top_k
+        top_k=request_k
     )
     if not candidates:
         return None, None
     try:
-        logging.info(f"[ReplayCtx] {layer_tag}[{idx}] candidates: {len(candidates)} (top_k={top_k}, strategy={strategy})")
+        logging.info(f"[ReplayCtx] {layer_tag}[{idx}] candidates_found={len(candidates)} (requested={request_k}, strategy={strategy})")
     except Exception:
         pass
 
-    # 逐个候选生成回忆，并合并
+    # 打印前5个候选的关键信息（路径/元数据/相似度）
+    try:
+        log_n = min(5, len(candidates))
+        logging.info(f"[ReplayCtx] {layer_tag}[{idx}] TOP{log_n} candidates:")
+        for rank, cand in enumerate(candidates[:log_n]):
+            logging.info(
+                f"  #{rank+1}: sim={cand.get('similarity', 'n/a'):.4f} | epi={cand.get('episode_id')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | rel={cand.get('filename_rel')} | abs={cand.get('candidate_abs')}"
+            )
+    except Exception:
+        pass
+
+    # 读取 experience_output.json（优先使用 cfg.retrieve_root，其次默认输出目录）
+    try:
+        base_root = getattr(cfg, "retrieve_root", None)
+        if not base_root:
+            base_root = os.path.join(cfg.output_parent_dir, cfg.exp_name)
+        exp_json_path = os.path.join(base_root, "experience_output.json")
+        with open(exp_json_path, "r", encoding="utf-8") as f:
+            exp_data = json.load(f)
+        try:
+            logging.info(f"[ReplayCtx] experience_output.json loaded: {exp_json_path} (episodes={len(exp_data) if isinstance(exp_data, dict) else 'n/a'})")
+        except Exception:
+            pass
+    except Exception as e:
+        logging.warning(f"[ReplayCtx] load experience_output.json failed: {e}")
+        exp_data = {}
+
+    # 逐个候选读取对应的 experience 文本
     selected = candidates[: max(1, top_k)]
     texts = []
     for j, cand in enumerate(selected):
-        prompt_pack = generate_step_replay_prompt(
-            best=cand,
-            cfg=cfg,
-            replay_json_path=replay_json_path,
-            current_layer=layer_tag,
-            current_idx=idx,
-            current_frontier_b64=b64_str,
-            compact=(top_k > 1),
-        )
-        if not prompt_pack:
-            continue
-        sys_p, cont = prompt_pack
-        t = call_openai_api(sys_p, cont)
-        if not t:
-            continue
-        prefix = "Most similar previously: " if j == 0 else "Additionally similar: "
-        texts.append(prefix + t.strip())
+        epi_id = cand.get("episode_id")
+        qid = cand.get("question_id")
+        step_key = cand.get("step_key")
+        exp_text = None
+        try:
+            bucket_epi = exp_data.get(epi_id, {}) if isinstance(exp_data, dict) else {}
+            if not bucket_epi:
+                logging.info(f"[ReplayCtx] experience: episode_id not found: {epi_id}")
+            bucket_qid = bucket_epi.get(qid, {}) if isinstance(bucket_epi, dict) else {}
+            if not bucket_qid:
+                logging.info(f"[ReplayCtx] experience: question_id not found under episode {epi_id}: {qid}")
+            bucket_steps = bucket_qid.get("steps", {}) if isinstance(bucket_qid, dict) else {}
+            if not bucket_steps:
+                logging.info(f"[ReplayCtx] experience: steps empty for episode {epi_id} qid {qid}")
+            bucket_step = bucket_steps.get(step_key, {}) if isinstance(bucket_steps, dict) else {}
+            if not bucket_step:
+                logging.info(f"[ReplayCtx] experience: step not found: {step_key} for qid {qid}")
+            exp_text = bucket_step.get("experience") if isinstance(bucket_step, dict) else None
+        except Exception:
+            exp_text = None
 
-    # 使用段落分隔，保证每个候选保留与之前相同的篇幅；总体约为 k 倍
+        if isinstance(exp_text, str) and exp_text.strip():
+            prefix = "Most similar: " if j == 0 else "Additionally: "
+            texts.append(prefix + exp_text.strip())
+        else:
+            # 若无经验文本，跳过该候选
+            continue
+
     combined = "\n\n".join(texts) if texts else None
     best = selected[0] if selected else None
     try:
-        logging.info(f"[ReplayCtx] {layer_tag}[{idx}] texts_generated: {len(texts)} / {len(selected)}")
+        logging.info(f"[ReplayCtx] {layer_tag}[{idx}] experience_texts: {len(texts)} / {len(selected)}")
     except Exception:
         pass
     return best, combined
@@ -893,7 +1016,11 @@ def run_layer0_recall_and_aggregate(
         step["replay_layer0_aggregated_context"] = None
         logging.info("[ReplaySim] top_k=0; skip layer0 recall and env context.")
         return
-    replay_json_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
+    # 根据外部传入的检索根目录优先读取
+    _root = getattr(cfg, "retrieve_root", None)
+    if not _root:
+        _root = os.path.join(cfg.output_parent_dir, cfg.exp_name)
+    replay_json_path = os.path.join(_root, 'replay_step_info.json')
 
     # init containers
     step["replay_match_per_frontier"] = step.get("replay_match_per_frontier", {})
@@ -916,34 +1043,204 @@ def run_layer0_recall_and_aggregate(
         step["replay_layer0_aggregated_context"] = None
         return
 
-    # per candidate
+    # ========= 新策略：对每个候选分别取 TOP5，再跨候选合并排序，取最终 top_k =========
+    request_k = max(5, top_k)
+    merged_candidates = []  # 收集所有候选的 TOP5
     for i, b64 in enumerate(frontier_imgs_0):
         try:
-            best, ctx_text = _process_candidate_one(
-                searcher=searcher,
+            cands = searcher.search_with_strategy(
+                target_b64_list=[b64],
                 episode_id=episode_id,
-                exclude_qid=exclude_qid,
-                b64_str=b64,
-                cfg=cfg,
-                replay_json_path=replay_json_path,
-                layer_tag="layer0",
-                idx=i,
+                exclude_question_id=exclude_qid,
                 strategy=strategy,
-                top_k=top_k
+                top_k=request_k
             )
-            step["replay_match_per_frontier"]["layer0"][i] = best
-            step["replay_context_prompt_per_frontier"]["layer0"][i] = {"sys": "<hidden>", "content_len": -1} if best else None
-            step["replay_context_text_per_frontier"]["layer0"][i] = ctx_text
-        except Exception as e:
-            logging.warning(f"[ReplayCtx] layer0[{i}] failed: {e}")
+            # 记录 per-frontier 去重后的 TOP5（按 (qid, step_key) 去重）
+            try:
+                log_n = min(5, len(cands))
+                logging.info(f"[ReplayCtx] layer0 per-frontier idx={i} TOP{log_n}:")
+                for rank, cand in enumerate(cands[:log_n]):
+                    logging.info(
+                        f"  #{rank+1}: sim={cand.get('similarity', 'n/a'):.4f} | epi={cand.get('episode_id')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | rel={cand.get('filename_rel')} | abs={cand.get('candidate_abs')}"
+                    )
+            except Exception:
+                pass
 
-    # aggregate to natural-language summary (no 'layer' words)
-    step["replay_layer0_aggregated_context"] = aggregate_recall_contexts_for_layer(
-        layer_alias="initial directions",
-        contexts=step["replay_context_text_per_frontier"]["layer0"],
-        max_len=None
-    )
-    logging.info(f"[ReplayCtx] layer0 aggregated context ready: {bool(step['replay_layer0_aggregated_context'])}")
+            # per-frontier 去重并保存
+            seen_keys = set()
+            per_frontier_top = []
+            for cand in cands:
+                qid = cand.get("question_id")
+                sk = cand.get("step_key")
+                if not qid or not sk:
+                    continue
+                key = (qid, sk)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                per_frontier_top.append(cand)
+                if len(per_frontier_top) >= 5:
+                    break
+
+            # 写回 per-frontier 存储（保存 qid/step 等关键字段供后续使用）
+            try:
+                step["replay_match_per_frontier"]["layer0"][i] = [
+                    {
+                        "episode_id": x.get("episode_id"),
+                        "question_id": x.get("question_id"),
+                        "step_key": x.get("step_key"),
+                        "similarity": x.get("similarity"),
+                        "level": x.get("level"),
+                        "filename_rel": x.get("filename_rel"),
+                    }
+                    for x in per_frontier_top
+                ]
+            except Exception:
+                pass
+
+            # 汇总合并候选用 per-frontier 去重结果
+            for cand in per_frontier_top:
+                cand = dict(cand)
+                cand["source_frontier_index"] = i
+                merged_candidates.append(cand)
+        except Exception as e:
+            logging.warning(f"[ReplayCtx] layer0 per-frontier search failed idx={i}: {e}")
+
+    if not merged_candidates:
+        logging.info("[ReplayCtx] layer0 merged_candidates empty.")
+        step["replay_layer0_aggregated_context"] = None
+    else:
+        # 统一按 (qid, step_key) 去重，保留相似度最高的一条；再排序取最终 top_k
+        best_by_key = {}
+        for cand in merged_candidates:
+            qid = cand.get("question_id")
+            sk = cand.get("step_key")
+            if not qid or not sk:
+                continue
+            key = (qid, sk)
+            prev = best_by_key.get(key)
+            if prev is None or float(cand.get("similarity", 0.0)) > float(prev.get("similarity", 0.0)):
+                best_by_key[key] = cand
+        merged_unique = list(best_by_key.values())
+        merged_unique.sort(key=lambda x: x.get("similarity", 0.0), reverse=True)
+        final_selected = merged_unique[: max(1, top_k)]
+        try:
+            logging.info(f"[ReplayCtx] layer0 FINAL merged TOP{len(final_selected)} (k={top_k}):")
+            for rank, cand in enumerate(final_selected):
+                logging.info(
+                    f"  #{rank+1}: sim={cand.get('similarity', 'n/a'):.4f} | src_idx={cand.get('source_frontier_index')} | epi={cand.get('episode_id')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | rel={cand.get('filename_rel')}"
+                )
+        except Exception:
+            pass
+
+        # 读取 experience_output.json 一次
+        try:
+            _root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
+            _exp_path = os.path.join(_root, "experience_output.json")
+            with open(_exp_path, 'r', encoding='utf-8') as f:
+                _exp = json.load(f)
+        except Exception as e:
+            logging.warning(f"[ReplayCtx] layer0 load experience_output.json failed: {e}")
+            _exp = {}
+
+        texts = []
+        for j, cand in enumerate(final_selected):
+            epi_id = cand.get('episode_id')
+            qid = cand.get('question_id')
+            step_key = cand.get('step_key')
+            try:
+                exp_text = (
+                    _exp.get(epi_id, {})
+                        .get(qid, {})
+                        .get('steps', {})
+                        .get(step_key, {})
+                        .get('experience')
+                )
+            except Exception:
+                exp_text = None
+            if isinstance(exp_text, str) and exp_text.strip():
+                prefix = "Most similar: " if j == 0 else "Additionally: "
+                texts.append(prefix + exp_text.strip())
+
+        step["replay_layer0_aggregated_context"] = "\n\n".join(texts) if texts else None
+        logging.info(f"[ReplayCtx] layer0 aggregated context ready: {bool(step['replay_layer0_aggregated_context'])}")
+
+    # -------- Global search：总是执行全局一次性检索，用于观测/兜底；仅在逐候选为空时采用 --------
+    try:
+        logging.info("[ReplayCtx] layer0 run global search across all layer0 candidates (always).")
+        request_k = max(5, top_k)
+        global_cands = searcher.search_with_strategy(
+            target_b64_list=list(frontier_imgs_0),
+            episode_id=episode_id,
+            exclude_question_id=exclude_qid,
+            strategy=strategy,
+            top_k=request_k
+        )
+        if global_cands:
+            try:
+                log_n = min(5, len(global_cands))
+                logging.info(f"[ReplayCtx] layer0 GLOBAL TOP{log_n}:")
+                for rank, cand in enumerate(global_cands[:log_n]):
+                    logging.info(
+                        f"  #{rank+1}: sim={cand.get('similarity', 'n/a'):.4f} | epi={cand.get('episode_id')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | rel={cand.get('filename_rel')} | abs={cand.get('candidate_abs')}"
+                    )
+            except Exception:
+                pass
+
+            # 读取 experience_output.json
+            try:
+                _root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
+                _exp_path = os.path.join(_root, "experience_output.json")
+                with open(_exp_path, 'r', encoding='utf-8') as f:
+                    _exp = json.load(f)
+            except Exception as e:
+                logging.warning(f"[ReplayCtx] global load experience_output.json failed: {e}")
+                _exp = {}
+
+            # 全局候选也进行去重后截取 top_k
+            best_by_key = {}
+            for cand in global_cands:
+                qid = cand.get('question_id')
+                sk = cand.get('step_key')
+                if not qid or not sk:
+                    continue
+                key = (qid, sk)
+                prev = best_by_key.get(key)
+                if prev is None or float(cand.get('similarity', 0.0)) > float(prev.get('similarity', 0.0)):
+                    best_by_key[key] = cand
+            global_unique = list(best_by_key.values())
+            global_unique.sort(key=lambda x: x.get('similarity', 0.0), reverse=True)
+
+            texts = []
+            usable = 0
+            for j, cand in enumerate(global_unique[:max(1, top_k)]):
+                epi_id = cand.get('episode_id')
+                qid = cand.get('question_id')
+                step_key = cand.get('step_key')
+                exp_text = None
+                try:
+                    exp_text = (
+                        _exp.get(epi_id, {})
+                            .get(qid, {})
+                            .get('steps', {})
+                            .get(step_key, {})
+                            .get('experience')
+                    )
+                except Exception:
+                    exp_text = None
+                if isinstance(exp_text, str) and exp_text.strip():
+                    prefix = "Most similar: " if j == 0 else "Additionally: "
+                    texts.append(prefix + exp_text.strip())
+                    usable += 1
+
+            # 仅当逐候选聚合为空时采用全局结果
+            if not step["replay_layer0_aggregated_context"] and texts:
+                step["replay_layer0_aggregated_context"] = "\n\n".join(texts)
+                logging.info(f"[ReplayCtx] layer0 aggregated (global-used) prepared with {usable} entries.")
+        else:
+            logging.info("[ReplayCtx] layer0 global search returns no candidates.")
+    except Exception as e:
+        logging.warning(f"[ReplayCtx] layer0 global search failed: {e}")
 
 def run_layer1_recall_and_aggregate_for_subgroup(
     step: dict,
@@ -964,7 +1261,10 @@ def run_layer1_recall_and_aggregate_for_subgroup(
     if top_k <= 0:
         logging.info("[ReplaySim] top_k=0; skip layer1 subgroup recall and env context.")
         return None
-    replay_json_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
+    _root = getattr(cfg, "retrieve_root", None)
+    if not _root:
+        _root = os.path.join(cfg.output_parent_dir, cfg.exp_name)
+    replay_json_path = os.path.join(_root, 'replay_step_info.json')
 
     # ensure containers
     step["replay_match_per_frontier"] = step.get("replay_match_per_frontier", {})
@@ -987,36 +1287,125 @@ def run_layer1_recall_and_aggregate_for_subgroup(
         logging.warning("[ReplaySim] Cannot resolve episode_id; skip layer1 subgroup recall.")
         return None
 
-    # per candidate in subgroup
+    # 新策略：对子集每个候选取 TOP5，再跨候选合并排序取最终 top_k
+    request_k = max(5, top_k)
+    merged_candidates = []
     for gidx in layer1_indices:
         b64 = frontier_imgs_1[gidx]
         try:
-            best, ctx_text = _process_candidate_one(
-                searcher=searcher,
+            cands = searcher.search_with_strategy(
+                target_b64_list=[b64],
                 episode_id=episode_id,
-                exclude_qid=exclude_qid,
-                b64_str=b64,
-                cfg=cfg,
-                replay_json_path=replay_json_path,
-                layer_tag="layer1",
-                idx=gidx,
+                exclude_question_id=exclude_qid,
                 strategy=strategy,
-                top_k=top_k
+                top_k=request_k
             )
-            step["replay_match_per_frontier"]["layer1"][gidx] = best
-            step["replay_context_prompt_per_frontier"]["layer1"][gidx] = {"sys": "<hidden>", "content_len": -1} if best else None
-            step["replay_context_text_per_frontier"]["layer1"][gidx] = ctx_text
-        except Exception as e:
-            logging.warning(f"[ReplayCtx] layer1[{gidx}] failed: {e}")
+            try:
+                log_n = min(5, len(cands))
+                logging.info(f"[ReplayCtx] layer1 per-frontier idx={gidx} TOP{log_n}:")
+                for rank, cand in enumerate(cands[:log_n]):
+                    logging.info(
+                        f"  #{rank+1}: sim={cand.get('similarity', 'n/a'):.4f} | epi={cand.get('episode_id')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | rel={cand.get('filename_rel')} | abs={cand.get('candidate_abs')}"
+                    )
+            except Exception:
+                pass
 
-    # aggregate subgroup natural-language summary
-    layer1_texts_all = step["replay_context_text_per_frontier"]["layer1"]
-    return aggregate_recall_contexts_for_layer(
-        layer_alias="closer looks",
-        contexts=layer1_texts_all,
-        indices=layer1_indices,
-        max_len=None
-    )
+            # per-frontier 去重后的 TOP5
+            seen_keys = set()
+            per_frontier_top = []
+            for cand in cands:
+                qid = cand.get("question_id")
+                sk = cand.get("step_key")
+                if not qid or not sk:
+                    continue
+                key = (qid, sk)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                per_frontier_top.append(cand)
+                if len(per_frontier_top) >= 5:
+                    break
+
+            # 写回 per-frontier layer1 存储
+            try:
+                step["replay_match_per_frontier"]["layer1"][gidx] = [
+                    {
+                        "episode_id": x.get("episode_id"),
+                        "question_id": x.get("question_id"),
+                        "step_key": x.get("step_key"),
+                        "similarity": x.get("similarity"),
+                        "level": x.get("level"),
+                        "filename_rel": x.get("filename_rel"),
+                    }
+                    for x in per_frontier_top
+                ]
+            except Exception:
+                pass
+
+            for cand in per_frontier_top:
+                cand = dict(cand)
+                cand["source_frontier_index"] = gidx
+                merged_candidates.append(cand)
+        except Exception as e:
+            logging.warning(f"[ReplayCtx] layer1 per-frontier search failed idx={gidx}: {e}")
+
+    if not merged_candidates:
+        logging.info("[ReplayCtx] layer1 merged_candidates empty.")
+        return None
+
+    # 按 (qid, step_key) 去重并取最终 top_k
+    best_by_key = {}
+    for cand in merged_candidates:
+        qid = cand.get('question_id')
+        sk = cand.get('step_key')
+        if not qid or not sk:
+            continue
+        key = (qid, sk)
+        prev = best_by_key.get(key)
+        if prev is None or float(cand.get('similarity', 0.0)) > float(prev.get('similarity', 0.0)):
+            best_by_key[key] = cand
+    merged_unique = list(best_by_key.values())
+    merged_unique.sort(key=lambda x: x.get('similarity', 0.0), reverse=True)
+    final_selected = merged_unique[: max(1, top_k)]
+    try:
+        logging.info(f"[ReplayCtx] layer1 FINAL merged TOP{len(final_selected)} (k={top_k}):")
+        for rank, cand in enumerate(final_selected):
+            logging.info(
+                f"  #{rank+1}: sim={cand.get('similarity', 'n/a'):.4f} | src_idx={cand.get('source_frontier_index')} | epi={cand.get('episode_id')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | rel={cand.get('filename_rel')}"
+            )
+    except Exception:
+        pass
+
+    # 读取 experience_output.json 一次
+    try:
+        _root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
+        _exp_path = os.path.join(_root, "experience_output.json")
+        with open(_exp_path, 'r', encoding='utf-8') as f:
+            _exp = json.load(f)
+    except Exception as e:
+        logging.warning(f"[ReplayCtx] layer1 load experience_output.json failed: {e}")
+        _exp = {}
+
+    texts = []
+    for j, cand in enumerate(final_selected):
+        epi_id = cand.get('episode_id')
+        qid = cand.get('question_id')
+        step_key = cand.get('step_key')
+        try:
+            exp_text = (
+                _exp.get(epi_id, {})
+                    .get(qid, {})
+                    .get('steps', {})
+                    .get(step_key, {})
+                    .get('experience')
+            )
+        except Exception:
+            exp_text = None
+        if isinstance(exp_text, str) and exp_text.strip():
+            prefix = "Most similar: " if j == 0 else "Additionally: "
+            texts.append(prefix + exp_text.strip())
+
+    return "\n\n".join(texts) if texts else None
 
 # ========= 使用示例 =========
 def example_usage():

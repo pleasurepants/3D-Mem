@@ -985,12 +985,15 @@ if __name__ == "__main__":
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
     parser.add_argument("--replay_mode", help="replay selection mode: sim or random", default="sim", type=str)
     parser.add_argument("--replay_top", help="top-k for replay candidates", default=1, type=int)
+    parser.add_argument("--retrieve_root", help="external retrieve root; expects replay_step_info.json & experience_output.json inside", default="", type=str)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
     # CLI overrides for replay recall behavior
     cfg.replay_mode = args.replay_mode
     cfg.replay_top = args.replay_top
+    if args.retrieve_root:
+        cfg.retrieve_root = args.retrieve_root
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)

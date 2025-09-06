@@ -246,6 +246,8 @@ def generate_experience_from_captions(
         "Critique: <one paragraph>\n"
         "Abstraction: <one sentence summary instruction>"
     )
+    # generate abstraction again. 
+
 
     # User content per template
     content = []
