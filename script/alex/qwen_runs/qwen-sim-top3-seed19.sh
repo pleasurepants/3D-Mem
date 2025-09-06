@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=q-sim-top1-568
+#SBATCH --job-name=q-sim-top3-19
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/qwen-sim-top1-568-%j.out
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/qwen-sim-top3-19-%j.out
 #SBATCH --partition a40
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
@@ -38,14 +38,13 @@ source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/qwen_568.yaml \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/qwen_runs/qwen-sim-top3-seed19.yaml \
     --replay_mode sim \
-    --replay_top 1 \
+    --replay_top 3 \
     --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
 if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then kill "$VLLM_PID"; else echo "[WARN] No running vLLM process to kill"; fi
 echo "=== JOB END ==="
-
 
 

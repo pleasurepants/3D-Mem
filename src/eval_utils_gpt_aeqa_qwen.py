@@ -11,8 +11,7 @@ from src.const import *
 import re
 import json
 import random
-from src.context_generator import FrontierSimilaritySearcher
-from src.context_generator import _build_searcher_if_ready, _resolve_episode_id, _process_candidate_one, run_layer0_recall_and_aggregate, run_layer1_recall_and_aggregate_for_subgroup
+import numpy as np
 client = OpenAI(
     base_url=END_POINT,
     api_key=OPENAI_KEY,
@@ -166,6 +165,303 @@ def get_step_info(step, verbose=False):
     )
 
 
+# ================== 最简检索实现（独立于 context_generator） ==================
+def _pil_bits_from_b64(b64: str, hash_size: int = 8):
+    try:
+        img_bytes = base64.b64decode(b64)
+        im = Image.open(BytesIO(img_bytes)).convert("L").resize((hash_size, hash_size), Image.BILINEAR)
+        arr = np.asarray(im, dtype=np.float32)
+        return (arr > arr.mean()).astype(np.uint8).reshape(-1)
+    except Exception:
+        return None
+
+
+def _hamming(a: np.ndarray, b: np.ndarray) -> int:
+    return int(np.count_nonzero(a ^ b))
+
+
+def _similarity(a: np.ndarray, b: np.ndarray) -> float:
+    return 1.0 - _hamming(a, b) / float(a.size)
+
+
+def _load_frontier_index(cfg):
+    root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
+    idx_path = os.path.join(root, ".frontier_ahash_index.json")
+    if not os.path.exists(idx_path):
+        logging.info(f"[SimpleRecall] index not found: {idx_path}")
+        return {}
+    try:
+        with open(idx_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        logging.warning(f"[SimpleRecall] load index failed: {e}")
+        return {}
+
+
+def _load_experience(cfg):
+    root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
+    exp_path = os.path.join(root, "experience_output.json")
+    if not os.path.exists(exp_path):
+        logging.info(f"[SimpleRecall] experience_output.json not found: {exp_path}")
+        return {}
+    try:
+        with open(exp_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        logging.warning(f"[SimpleRecall] load experience failed: {e}")
+        return {}
+
+
+_AEQA_QID2QUESTION = None
+
+
+def _load_questions_en() -> dict:
+    global _AEQA_QID2QUESTION
+    if isinstance(_AEQA_QID2QUESTION, dict):
+        return _AEQA_QID2QUESTION
+    try:
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        qpath = os.path.join(repo_root, "data", "aeqa_questions-168.json")
+        with open(qpath, 'r', encoding='utf-8') as f:
+            arr = json.load(f)
+        qmap = {}
+        if isinstance(arr, list):
+            for it in arr:
+                if not isinstance(it, dict):
+                    continue
+                qid = it.get("question_id")
+                qtext = it.get("question")
+                if isinstance(qid, str) and isinstance(qtext, str) and qid and qtext:
+                    qmap[qid] = qtext
+        _AEQA_QID2QUESTION = qmap
+        return qmap
+    except Exception as e:
+        logging.warning(f"[SimpleRecall] load questions file failed: {e}")
+        _AEQA_QID2QUESTION = {}
+        return _AEQA_QID2QUESTION
+
+
+def _tokenize(text: str):
+    if not isinstance(text, str):
+        return []
+    import re as _re
+    t = _re.sub(r"[^\w\s]", " ", text.lower())
+    return [w for w in t.split() if w]
+
+
+def _cosine_sim_tokens(a: str, b: str) -> float:
+    ta = _tokenize(a)
+    tb = _tokenize(b)
+    if not ta or not tb:
+        return 0.0
+    from collections import Counter
+    ca, cb = Counter(ta), Counter(tb)
+    import math
+    keys = set(ca.keys()) | set(cb.keys())
+    dot = sum(ca[k] * cb[k] for k in keys)
+    na = math.sqrt(sum(v * v for v in ca.values()))
+    nb = math.sqrt(sum(v * v for v in cb.values()))
+    if na == 0 or nb == 0:
+        return 0.0
+    return float(dot / (na * nb))
+
+
+def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None, top_k=1, strategy: str = 'sim', current_question: str = None, rrf_k: int = 60):
+    if not frontier_imgs_b64 or top_k <= 0:
+        return None
+
+    index_map = _load_frontier_index(cfg)
+    if not index_map:
+        return None
+
+    # 预解码：索引 bits
+    idx_bits = {}
+    idx_meta = {}
+    for rel_key, rec in index_map.items():
+        if not isinstance(rec, dict):
+            continue
+        qid = rec.get('question_id')
+        sk = rec.get('step_key')
+        if not qid or not sk:
+            continue
+        if exclude_question_id and qid == exclude_question_id:
+            continue
+        bits_list = rec.get('bits')
+        if not isinstance(bits_list, list):
+            continue
+        try:
+            bits = np.asarray(bits_list, dtype=np.uint8).reshape(-1)
+        except Exception:
+            continue
+        idx_bits[rel_key] = bits
+        idx_meta[rel_key] = {
+            'episode_id': None,            # 不依赖 episode 过滤，统一从 experience 里回取
+            'question_id': qid,
+            'step_key': sk,
+            'level': rec.get('level'),
+            'filename_rel': os.path.join('frontier', rec.get('filename', '')),
+        }
+
+    # 预解码：目标 bits
+    target_bits_list = []
+    for b64 in frontier_imgs_b64:
+        bits = _pil_bits_from_b64(b64)
+        if bits is not None:
+            target_bits_list.append(bits)
+    if not target_bits_list:
+        return None
+
+    # per-frontier：取去重后的 top-5 (qid, step_key)
+    merged_candidates = []
+    for i, tbits in enumerate(target_bits_list):
+        # 对全索引计算最大相似度（与所有目标 bits 中的最大）
+        per_scores = []
+        for rel_key, cbits in idx_bits.items():
+            try:
+                sim = float(_similarity(cbits, tbits))
+            except Exception:
+                continue
+            meta = idx_meta[rel_key]
+            per_scores.append({
+                'similarity': sim,
+                **meta,
+                'source_frontier_index': i,
+            })
+        if not per_scores:
+            continue
+        per_scores.sort(key=lambda x: x['similarity'], reverse=True)
+        # 去重 top-5
+        seen = set()
+        kept = []
+        for cand in per_scores:
+            key = (cand['question_id'], cand['step_key'])
+            if key in seen:
+                continue
+            seen.add(key)
+            kept.append(cand)
+            if len(kept) >= 5:
+                break
+        merged_candidates.extend(kept)
+
+    if not merged_candidates:
+        return None
+
+    # 全局去重（按 (qid, step) 保留相似度最高的图像分数）
+    best_by_key = {}
+    for cand in merged_candidates:
+        key = (cand['question_id'], cand['step_key'])
+        prev = best_by_key.get(key)
+        if prev is None or float(cand['similarity']) > float(prev['similarity']):
+            best_by_key[key] = cand
+    merged_unique = list(best_by_key.values())
+    # 基于英文问题文本计算文本相似度
+    qid2question = _load_questions_en()
+    image_sorted = sorted(merged_unique, key=lambda x: x['similarity'], reverse=True)
+    text_scores = {}
+    if isinstance(current_question, str) and current_question.strip():
+        for cand in merged_unique:
+            qid = cand.get('question_id')
+            qtext = qid2question.get(qid, '')
+            text_scores[(cand.get('question_id'), cand.get('step_key'))] = _cosine_sim_tokens(current_question, qtext)
+    else:
+        for cand in merged_unique:
+            text_scores[(cand.get('question_id'), cand.get('step_key'))] = 0.0
+
+    text_sorted = sorted(merged_unique, key=lambda x: text_scores[(x.get('question_id'), x.get('step_key'))], reverse=True)
+    # RRF 前的统计日志
+    try:
+        qtext_coverage = sum(1 for cand in merged_unique if qid2question.get(cand.get('question_id')))
+        qsim_values = [text_scores[(c.get('question_id'), c.get('step_key'))] for c in merged_unique]
+        nonzero_qsim = [v for v in qsim_values if v > 0]
+        nz_count = len(nonzero_qsim)
+        nz_mean = (sum(nonzero_qsim) / nz_count) if nz_count > 0 else 0.0
+        nz_max = max(nonzero_qsim) if nz_count > 0 else 0.0
+        logging.info(
+            f"[SimpleRecall][RRF] candidates={len(merged_unique)} | qtext_coverage={qtext_coverage} | nonzero_qsim={nz_count} | qsim_mean={nz_mean:.4f} | qsim_max={nz_max:.4f} | rrf_k={rrf_k}"
+        )
+        # 各自通道的前 top_k 摘要
+        log_n = min(max(1, top_k), len(image_sorted))
+        if log_n > 0:
+            logging.info(f"[SimpleRecall][RRF] image-only ranking (top {log_n}):")
+            for rank, cand in enumerate(image_sorted[:log_n]):
+                logging.info(
+                    f"  #{rank+1}: img_sim={cand.get('similarity', 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')}"
+                )
+            logging.info(f"[SimpleRecall][RRF] text-only ranking (top {log_n}):")
+            for rank, cand in enumerate(text_sorted[:log_n]):
+                key = (cand.get('question_id'), cand.get('step_key'))
+                logging.info(
+                    f"  #{rank+1}: qsim={text_scores.get(key, 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')}"
+                )
+    except Exception:
+        pass
+    # 计算 RRF 分数：score = 1/(k + rank_img) + 1/(k + rank_txt)
+    rank_img = { (c.get('question_id'), c.get('step_key')): i+1 for i, c in enumerate(image_sorted) }
+    rank_txt = { (c.get('question_id'), c.get('step_key')): i+1 for i, c in enumerate(text_sorted) }
+    for cand in merged_unique:
+        key = (cand.get('question_id'), cand.get('step_key'))
+        ri = rank_img.get(key, len(image_sorted) + 1)
+        rt = rank_txt.get(key, len(text_sorted) + 1)
+        cand['rrf_score'] = (1.0 / (rrf_k + ri)) + (1.0 / (rrf_k + rt))
+        cand['qsim'] = text_scores.get(key, 0.0)
+    # 打印融合后排行（仅 top_k）
+    final_sorted = sorted(merged_unique, key=lambda x: x.get('rrf_score', 0.0), reverse=True)
+    try:
+        logging.info(f"[SimpleRecall] final candidate pool size={len(merged_unique)}, strategy={strategy}, request_top_k={top_k}")
+        log_n = min(max(1, top_k), len(final_sorted))
+        if log_n > 0:
+            logging.info(f"[SimpleRecall] fused ranking by RRF (top {log_n}):")
+        for rank, cand in enumerate(final_sorted[:log_n]):
+            logging.info(
+                f"  #{rank+1}: rrf={cand.get('rrf_score', 0.0):.6f} | img_sim={cand.get('similarity', 0.0):.4f} | qsim={cand.get('qsim', 0.0):.4f} | src_idx={cand.get('source_frontier_index')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')}"
+            )
+    except Exception:
+        pass
+
+    if (strategy or 'sim') == 'random':
+        k = min(max(1, top_k), len(merged_unique))
+        final_selected = random.sample(merged_unique, k) if k > 0 else []
+    else:
+        final_selected = final_sorted[: max(1, top_k)]
+
+    # 回取 experience 文本
+    exp = _load_experience(cfg)
+    texts = []
+    for j, cand in enumerate(final_selected):
+        qid = cand.get('question_id')
+        sk = cand.get('step_key')
+        exp_text = None
+        # 不知道 episode_id 时，穷举查找一次（字典层级通常不大）
+        try:
+            for ep_id, qdict in exp.items():
+                if not isinstance(qdict, dict):
+                    continue
+                qinfo = qdict.get(qid)
+                if not isinstance(qinfo, dict):
+                    continue
+                steps = qinfo.get('steps', {})
+                if not isinstance(steps, dict):
+                    continue
+                step_entry = steps.get(sk, {})
+                if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
+                    exp_text = step_entry['experience']
+                    break
+            if isinstance(exp_text, str) and exp_text.strip():
+                texts.append(f"Experience {j}: " + exp_text.strip())
+        except Exception:
+            continue
+        try:
+            logging.info(
+                f"[SimpleRecall] selected #{j+1}: rrf={cand.get('rrf_score', 0.0):.6f} | img_sim={cand.get('similarity', 0.0):.4f} | qsim={cand.get('qsim', 0.0):.4f} | src_idx={cand.get('source_frontier_index')} | qid={qid} | step={sk} | lvl={cand.get('level')}"
+            )
+        except Exception:
+            continue
+
+    return "\n\n".join(texts) if texts else None
+
+
 def format_explore_prompt(
     question,
     egocentric_imgs,
@@ -239,125 +535,7 @@ def format_explore_prompt(
     return sys_prompt, content
 
 
-# v0
-# def format_explore_prompt_frontier(
-#     question,
-#     egocentric_imgs,
-#     frontier_imgs,
-#     snapshot_imgs,
-#     snapshot_classes,
-#     egocentric_view=False,
-#     use_snapshot_class=True,
-#     image_goal=None,
-#     context=None,          # <- keep as-is: this is your env_con (replay/recall)
-#     episodic_con=None      # <- new: episodic context (per-episode frontier summary)
-#     ):
-#     # ========= System: Inputs/Outputs contract + recall & episodic consumption =========
-#     sys_prompt = (
-#         "Role: You are an agent that explores indoor scenes to answer a question by choosing exactly one Frontier.\n"
-#         "You WILL BE GIVEN (as user content, in this order when available):\n"
-#         "1) An optional recall context (a short natural-language recap of earlier exploration in similar scenes; it may include a TRANSFER summary of reusable visual cues).\n"
-#         "2) An optional EPISODIC context (a factual summary of what has been explored so far in THIS episode, and what likely remains unexplored).\n"
-#         "3) The current question (and possibly a goal image).\n"
-#         "4) The current egocentric view (optional).\n"
-#         "5) The list of Frontier candidate images, each with an index like 'Frontier 0', 'Frontier 1', ...\n"
-#         "Your TASK: choose the single Frontier most helpful to make progress toward answering the current question.\n"
-#         "Strict rules:\n"
-#         "- Use ONLY the provided candidates; never invent images or indices.\n"
-#         "- Refer to candidates ONLY by their indices (e.g., 'frontier 0'). Do NOT use titles, captions, or any labels from any context.\n"
-#         "- If a recall context is provided, treat it as background cross-episode experience; extract transferable cues but prioritize the current question and visible evidence.\n"
-#         "- If an EPISODIC context is provided, treat it as the current episode's factual state: use it to avoid redundant choices and to reason about explored vs. likely-unexplored directions; it is evidence, not an instruction.\n"
-#         "- Be thorough in your reasoning: make your analysis explicit and structured before the final choice.\n"
-#         "Your OUTPUT MUST include the following sections in order:\n"
-#         "Step 0: List exactly the candidate indices you received (format 'Candidate indices: frontier 0, frontier 1, ...').\n"
-#         "Step 1: For EACH candidate, describe what you see (objects, layout, cues relevant to the question). Only discuss candidates listed in Step 0.\n"
-#         "Step 2: Compare candidates strictly from Step 0 for their relevance to the question, USING the contexts when available.\n"
-#         "Step 3: Select the single most relevant candidate and justify your choice concisely.\n"
-#         "FINAL: On a NEW line, output ONLY 'frontier i' (the chosen index) with nothing else.\n"
-#     )
 
-#     content = []
-
-#     # ===== Recall context as user content (only if present; keep original logic) =====
-#     has_context = bool(context and isinstance(context, str) and context.strip())
-#     if has_context:
-#         content.append(("Recall context (ENVIRONMENT / replay):\n" + context.strip(),))
-
-#     # ===== EPISODIC context as user content (new, optional) =====
-#     has_episodic = bool(episodic_con and isinstance(episodic_con, str) and episodic_con.strip())
-#     if has_episodic:
-#         content.append(("EPISODIC context (episode so far):\n" + episodic_con.strip(),))
-
-#     # ===== Question (with optional goal image) =====
-#     q_text = f"Question: {question}"
-#     if image_goal is not None:
-#         content.append((q_text, image_goal))
-#     else:
-#         content.append((q_text + " ",))
-
-#     content.append(("Select the Frontier that would help find the answer of the question. ",))
-
-#     # ===== Egocentric (guarded) =====
-#     if egocentric_view and egocentric_imgs and len(egocentric_imgs) > 0:
-#         content.append(("The following is the egocentric view of the agent in forward direction: ", egocentric_imgs[-1]))
-
-#     # ===== Frontier candidates =====
-#     content.append(("The following are all the Frontiers that you can explore:  ",))
-#     if len(frontier_imgs) == 0:
-#         content.append(("No Frontier is available",))
-#     else:
-#         for i in range(len(frontier_imgs)):
-#             content.append((f"Frontier {i} ", frontier_imgs[i]))
-
-#     # ===== CoT skeleton (kept compatible with your parser) =====
-#     text = ""
-#     text += "You are required to reason step by step and only output your final choice at the end. Please follow the instructions below carefully. "
-
-#     # Step 0
-#     text += "Step 0: List all candidate images you are given and their indices in the following format: 'Candidate indices: frontier 0, frontier 1, ...' (listing only the actual indices provided below; do NOT add, omit, or change any index). "
-#     text += "You must ONLY discuss and compare the images whose indices are listed in Step 0. You are STRICTLY FORBIDDEN to invent, mention, analyze, or refer to any images or indices that are not explicitly listed in Step 0. "
-
-#     # Step 1 — richer per-candidate observation
-#     text += "Step 1: For each provided Frontier image, describe in detail what you see. Focus on visible objects, scene layout, and any clues relevant to the question. "
-#     text += "Provide 2–3 sentences per candidate, and ONLY describe the images with the indices listed in Step 0. Start your answer with 'Step 1:' and describe each candidate separately. "
-#     if has_context:
-#         text += "When relevant, naturally note resemblance or contrast with the recall (ENVIRONMENT) using visual features only (do not use any titles or indices from the recall). "
-#     if has_episodic:
-#         text += "When relevant, refer to the EPISODIC context to avoid redundant exploration or to highlight likely-unexplored directions (do not invent any indices). "
-
-#     # Step 2 — deeper, explicit dual-context use with labeled subparagraphs
-#     text += "Step 2: Analyze what the question is asking for. Then, compare ONLY the frontiers listed in Step 0, by analyzing the clues shown in each image and their relevance to the question. Do NOT mention, analyze, or imagine any other indices. Start this section with 'Step 2:'. "
-#     if has_context:
-#         text += "Include a labeled subparagraph starting with 'Context reflection — ENVIRONMENT:' (3–4 sentences) where you extract 1–2 transferable visual cues from the recall (prefer cues named in its TRANSFER summary if present) and apply them explicitly to the current candidates by naming which 'frontier i' match or conflict with those cues and why, citing concrete visible features. "
-#     if has_episodic:
-#         text += "Include a labeled subparagraph starting with 'Context reflection — EPISODIC:' (3–4 sentences) where you state which directions appear already explored vs. likely unexplored, indicate potential redundancy, and explain how this affects your preferences among the Step‑0 candidates. "
-#     if has_context or has_episodic:
-#         text += "Then write a labeled 'Synthesis:' subparagraph (2–3 sentences) that reconciles any tension between ENVIRONMENT cues and EPISODIC constraints, and identifies the one or two leading candidates by naming the decisive visual features. "
-#         text += "If the two contexts conflict, explicitly explain which one you prioritize and why (e.g., strong direct visual evidence may override a weak transferable cue). "
-#     else:
-#         text += "Provide a thorough comparison solely from current visual evidence (3–5 sentences). "
-#     text += "Avoid generic statements; name specific features (e.g., doorway/threshold/outdoor light for entrances; readable faces for text/symbols; sink–cabinet–countertop grouping for kitchen). "
-
-#     # Step 3 — justified choice + brief runner-up contrast
-#     text += "Step 3: Based on your analysis above, select the single most relevant frontier for making progress toward answering the question. Clearly state your reasoning and why you select this one, but ONLY from the indices listed in Step 0. Begin this section with 'Step 3:'. "
-#     if has_context or has_episodic:
-#         text += "Tie your justification back to the extracted ENVIRONMENT cue(s) and/or the EPISODIC constraints; if you deviate from a cue, name it and justify the deviation using current evidence. "
-#     text += "Briefly contrast your choice with the strongest runner‑up (1–2 sentences) to show why your chosen frontier better satisfies the question right now. "
-
-#     # Final constraints
-#     text += "After completing Step 3, output your final answer on a new line in the format: 'frontier i' (where i is one of the indices listed in Step 0). Do not include any other words, indices, or explanations on that line. "
-#     text += "You MUST select one and only one of the provided Frontier indices listed in Step 0. You are NOT allowed to say that none is suitable or refuse to choose. "
-#     text += "Choose the frontier that is MOST likely to help you answer the question, based ONLY on the visible clues, transferable cues, and episode-so-far constraints. "
-#     text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. "
-#     text += "Do NOT mention words like 'frontier', directions, or image positions in your reasoning except when referring to the candidate indices listed in Step 0. Only use the provided Frontier indices; do NOT make up or analyze any index that is not listed above. "
-#     text += "Only use the indices listed in Step 0. Any mention, analysis, or invention of other indices will be considered an error. Do NOT refer to images/frontiers not listed above."
-
-#     content.append((text,))
-
-#     return sys_prompt, content
-
-
-# v1
 def format_explore_prompt_frontier(
     question,
     egocentric_imgs,
@@ -368,7 +546,8 @@ def format_explore_prompt_frontier(
     use_snapshot_class=True,
     image_goal=None,
     context=None,       # Experience replay text (cross-episode, similar-scene summaries)
-    episodic_con=None   # Episodic context text (this episode: recent steps/path & seen/unseen summary)
+    episodic_con=None,  # Episodic context text (this episode: recent steps/path & seen/unseen summary)
+    frontier_type: str = "BVF",  # "BVF" for broad-view (layer0) or "CVF" for closer-view (layer1)
 ):
     """
     Frontier-selection prompt with explicit Step 0/1/2/3 and FINAL:
@@ -384,24 +563,27 @@ def format_explore_prompt_frontier(
     has_ego = bool(egocentric_view and egocentric_imgs and len(egocentric_imgs) > 0)
 
     # =========================
-    # System role & definitions
+    # System role & definitions (based on user's template)
     # =========================
+    label_word = "BVF" if str(frontier_type).upper() == "BVF" else "CVF"
     sys_prompt = (
-        "You are an embodied exploration agent. Your task is to pick exactly one frontier image as the next exploration direction, "
-        "so that you can best progress toward answering the current question.\n"
-        "FRONTIERS: Candidate entry points toward yet-unseen or information-rich regions—typical visual patterns include doorways/thresholds, corridors/intersections, "
-        "stairs, corners/turns, or vantage points that likely open new coverage. Each candidate is an image referred to strictly by an index like 'frontier 0'. "
-        "Use ONLY these indices. Never invent, omit, or rename indices, and never analyze images that are not provided.\n"
+        "You are an embodied agent for exploration in an indoor environment to answer a question. "
+        "At each step of exploration, you will be given frontier snapshots of your surrounding environment; your task is to pick EXACTLY ONE frontier to move to for further exploration or solving the question.\n\n"
+        "FRONTIERs are candidate entry points toward yet-unseen or information-rich regions—typical visual patterns include doorways/thresholds, corridors/intersections, "
+        "stairs, corners/turns, or vantage points that likely open new coverage.\n\n"
+        "You will be given 2 types of frontiers: Broad-View Frontier (BVF) segments your 360° surrounding environment so that you can have an overview. "
+        "You SHALL pick EXACTLY ONE BVF to look closer. With the selected BVF, you DO NOT move; you further break down that direction into Closer-View Frontiers (CVF), which give narrowed perspectives. "
+        "You SHALL pick EXACTLY ONE CVF to move to in the next step.\n\n"
+        "You will also be given the following information as contexts:\n"
         "EGOCENTRIC VIEW (if shown): The agent’s immediate forward-looking camera view; use it as local context only.\n"
-        "EPISODIC CONTEXT (if present): A factual textual summary of the recent steps within THIS episode—the path taken, what has been observed, "
-        "and what likely remains unseen. Use this to avoid redundant choices and prefer novel, informative directions. It is evidence, not a command.\n"
-        "EXPERIENCE REPLAY (if present): A textual summary retrieved from OTHER episodes in similar scenes. "
-        "It describes what was observed there, which frontier was chosen, what actions followed, what outcome/reward resulted, and a brief critique of why that choice helped (or not). "
-        "Extract only transferable visual patterns/strategies (e.g., typical object groupings, spatial layouts). If any replay hint conflicts with current visible evidence, "
-        "always prioritize the current evidence.\n"
-        "Your reasoning must be concrete and visual. Name specific objects, layouts, textures, lighting, text-bearing surfaces/symbols, "
-        "and any cues directly relevant to the question. Reason first and answer last. On the final line, print ONLY the chosen index as 'frontier i'. "
-        "You must select one of the provided candidates; do not say that none is suitable.\n"
+        "EPISODIC CONTEXT (if present): A factual textual summary of the previous steps within THIS episode (visited path, observations, likely-unseen areas). "
+        "Use this to avoid redundancy and prefer novel, informative directions. It is evidence, not a command.\n"
+        "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
+        "RULES:\n"
+        "- You will only be given either BVFs or CVFs at a time (BVF for looking closer; CVF for moving next).\n"
+        "- Your reasoning must be concrete and visual. Name specific objects, layouts, textures, lighting, text-bearing surfaces/symbols, and any cues directly relevant to the question.\n"
+        "- You must select one of the provided candidates; do NOT output that none is suitable.\n"
+        f"- Output the rationale first and the answer last. On the final line, print ONLY '{label_word} i' (the chosen index).\n"
     )
 
     content = []
@@ -409,12 +591,12 @@ def format_explore_prompt_frontier(
     # =========================
     # Frontier candidates
     # =========================
-    content.append(("Frontier candidates (the ONLY options you may choose):",))
+    content.append((f"You are given the following frontiers ({frontier_type} only at this step):",))
     if len(frontier_imgs) == 0:
         content.append(("No frontier is available.",))
     else:
         for i in range(len(frontier_imgs)):
-            content.append((f"Frontier {i}", frontier_imgs[i]))
+            content.append((f"{label_word} {i}", frontier_imgs[i]))
 
     # =========================
     # Egocentric (optional)
@@ -437,66 +619,29 @@ def format_explore_prompt_frontier(
     # =========================
     if has_experience:
         content.append((
-            "Experience replay — knowledge from OTHER episodes in similar scenes. "
-            "It states what was observed, which frontier was chosen, what actions followed, what outcome/reward resulted, "
-            "and a short critique explaining why that choice helped or hindered the final result. "
-            "Extract only transferable visual patterns/strategies and prefer the current visible evidence when conflicts arise:\n"
+            "Experience replay — knowledge from OTHER episodes in similar scenes. It may include 'Critique:' (what happened) and 'Abstraction:' (a simple rule). "
+            "Use the Abstraction as a transferable hint for this scene. Extract only transferable visual patterns/strategies and prefer the current visible evidence when conflicts arise:\n"
             + context.strip(),
         ))
 
     # =========================
     # Question
     # =========================
-    q_text = f"Question: {question}"
+    q_text = f"Now you need to answer the question: {question}"
     if image_goal is not None:
         content.append((q_text, image_goal))
     else:
         content.append((q_text,))
 
     # =========================
-    # CoT skeleton
+    # Minimal reasoning scaffold consistent with user's instruction
     # =========================
-    text = ""
-    # Step 0
-    text += "Step 0: List all candidate images you are given and their indices in the following format: 'Candidate indices: frontier 0, frontier 1, ...' (listing only the actual indices provided below; do NOT add, omit, or change any index). "
-    text += "You must ONLY discuss and compare the images whose indices are listed in Step 0. You are STRICTLY FORBIDDEN to invent, mention, analyze, or refer to any images or indices that are not explicitly listed in Step 0. "
-
-    # Step 1
-    text += "Step 1: For each provided Frontier image, describe in detail what you see. Focus on visible objects, scene layout, and any clues relevant to the question. "
-    text += "Provide 2–3 sentences per candidate, and ONLY describe the images with the indices listed in Step 0. Start your answer with 'Step 1:' and describe each candidate separately. "
-    if has_experience:
-        text += "Explicitly compare each candidate with the EXPERIENCE replay, noting resemblance or contrast using visual features only (do not copy titles or indices from the replay). "
-    if has_episodic:
-        text += "Explicitly compare each candidate with the EPISODIC context, showing whether it avoids redundancy or opens likely-unexplored directions. "
-
-    # Step 2
-    text += "Step 2: Analyze what the question is asking for. Then, compare ONLY the frontiers listed in Step 0, by analyzing the clues shown in each image and their relevance to the question. Do NOT mention, analyze, or imagine any other indices. Start this section with 'Step 2:'. "
-    if has_experience:
-        text += "Include a labeled subparagraph 'Context reflection — EXPERIENCE:' (3–4 sentences) where you extract 1–2 transferable cues from the replay and apply them explicitly to the current candidates by naming which 'frontier i' match or conflict with those cues and why, citing concrete visible features. "
-    if has_episodic:
-        text += "Include a labeled subparagraph 'Context reflection — EPISODIC:' (3–4 sentences) where you state which directions appear already explored vs. likely unexplored, indicate potential redundancy, and explain how this affects your preferences among the Step-0 candidates. "
-    if has_experience or has_episodic:
-        text += "Then write a labeled 'Synthesis:' subparagraph (2–3 sentences) that reconciles any tension between EXPERIENCE cues and EPISODIC constraints, and identifies the one or two leading candidates by naming the decisive visual features. "
-        text += "If the two contexts conflict, explicitly explain which one you prioritize and why (e.g., strong direct visual evidence may override a weak transferable cue). "
-    else:
-        text += "Provide a thorough comparison solely from current visual evidence (3–5 sentences). "
-    text += "Avoid generic statements; name specific features (e.g., doorway/threshold/outdoor light for entrances; readable faces for text/symbols; sink–cabinet–countertop grouping for kitchen). "
-
-    # Step 3
-    text += "Step 3: Based on your analysis above, select the single most relevant frontier for making progress toward answering the question. Clearly state your reasoning and why you select this one, but ONLY from the indices listed in Step 0. Begin this section with 'Step 3:'. "
-    if has_experience or has_episodic:
-        text += "Tie your justification back to the EXPERIENCE cue(s) and/or the EPISODIC constraints; if you deviate from a cue, name it and justify the deviation using current evidence. "
-    text += "Briefly contrast your choice with the strongest runner-up (1–2 sentences) to show why your chosen frontier better satisfies the question right now. "
-
-    # Final constraints
-    text += "After completing Step 3, output your final answer on a new line in the format: 'frontier i' (where i is one of the indices listed in Step 0). Do not include any other words, indices, or explanations on that line. "
-    text += "You MUST select one and only one of the provided Frontier indices listed in Step 0. You are NOT allowed to say that none is suitable or refuse to choose. "
-    text += "Choose the frontier that is MOST likely to help you answer the question, based ONLY on the visible clues, transferable cues, and episode-so-far constraints. "
-    text += "If you choose a frontier to answer the question: you should provide a clear and specific reason directly related to the question. "
-    text += "Do NOT mention words like 'frontier', directions, or image positions in your reasoning except when referring to the candidate indices listed in Step 0. Only use the provided Frontier indices; do NOT make up or analyze any index that is not listed above. "
-    text += "Only use the indices listed in Step 0. Any mention, analysis, or invention of other indices will be considered an error. Do NOT refer to images/frontiers not listed above."
-
-    content.append((text,))
+    guidance = (
+        "IMPORTANT: You MUST reason step by step using ONLY the provided frontiers (Step 1, Step 2, ...), and do NOT skip steps. "
+        "Use the contexts (EPISODIC/EXPERIENCE) if present to avoid redundancy and transfer useful cues. "
+        f"Output the rationale first and the answer last. On the final line, print ONLY '{label_word} i'."
+    )
+    content.append((guidance,))
 
     return sys_prompt, content
 
@@ -708,7 +853,8 @@ def parse_frontier_index(output: str):
     解析输出文本，返回(reason, index)
     支持全文任意位置的frontier index格式
     """
-    matches = list(re.finditer(r'frontier\s*(\d+)', output, re.IGNORECASE))
+    # 支持 'frontier i'、'bvf i'、'cvf i' 三种格式（取最后一个命中）
+    matches = list(re.finditer(r'(?:frontier|bvf|cvf)\s*(\d+)', output, re.IGNORECASE))
     if matches:
         last_match = matches[-1]
         index = int(last_match.group(1))
@@ -941,16 +1087,16 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     # ==== (NEW) Layer-0 回忆与聚合（只对初始方向层做） ====
     _replay_top = int(getattr(cfg, "replay_top", 1))
     if _replay_top > 0:
-        run_layer0_recall_and_aggregate(
-            step=step,
+        # 使用本文件中的最简实现（不依赖 context_generator）
+        step["replay_layer0_aggregated_context"] = simple_recall_and_aggregate(
+            frontier_imgs_b64=frontier_imgs_0,
             cfg=cfg,
-            frontier_imgs_0=frontier_imgs_0,
-            chosen_frontier_path=chosen_frontier_path,
-            strategy=("random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"),
+            exclude_question_id=step.get("question_id"),
             top_k=_replay_top,
+            strategy=("random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"),
+            current_question=question,
         )
     else:
-        # 明确禁用 env 回放上下文
         step["replay_layer0_aggregated_context"] = None
         logging.info("[ReplayCtx] replay_top=0; skip layer0 recall and env context injection.")
 
@@ -988,6 +1134,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         image_goal=image_goal,
         context=(layer0_con if _replay_top > 0 else None),
         episodic_con=episodic_con,
+        frontier_type="BVF",
     )
     if verbose:
         try:
@@ -1067,14 +1214,15 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
         # ==== (NEW) 对该方向的更近处子集做回忆与聚合 ====
         if _replay_top > 0:
-            layer1_context_text = run_layer1_recall_and_aggregate_for_subgroup(
-                step=step,
+            # 根据选择的大簇子集做同样的最简实现
+            subgroup_b64 = [frontier_imgs_1[i] for i in layer1_indices]
+            layer1_context_text = simple_recall_and_aggregate(
+                frontier_imgs_b64=subgroup_b64,
                 cfg=cfg,
-                frontier_imgs_1=frontier_imgs_1,
-                layer1_indices=layer1_indices,
-                chosen_frontier_path=chosen_frontier_path,
-                strategy=("random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"),
+                exclude_question_id=step.get("question_id"),
                 top_k=_replay_top,
+                strategy=("random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"),
+                current_question=question,
             )
         else:
             layer1_context_text = None
@@ -1092,6 +1240,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             image_goal=image_goal,
             context=(layer1_context_text if _replay_top > 0 else None),
             episodic_con=episodic_con,
+            frontier_type="CVF",
         )
         if verbose:
             try:
