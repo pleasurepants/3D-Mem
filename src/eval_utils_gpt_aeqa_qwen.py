@@ -201,7 +201,8 @@ def _load_frontier_index(cfg):
 
 def _load_experience(cfg):
     root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
-    exp_path = os.path.join(root, "experience_output.json")
+    exp_filename = getattr(cfg, "experience_filename", "experience_output.json")
+    exp_path = os.path.join(root, exp_filename)
     if not os.path.exists(exp_path):
         logging.info(f"[SimpleRecall] experience_output.json not found: {exp_path}")
         return {}
@@ -268,13 +269,400 @@ def _cosine_sim_tokens(a: str, b: str) -> float:
     return float(dot / (na * nb))
 
 
+def _load_vector_store(cfg):
+    """
+    加载使用 build_retrieve_store 生成的向量仓库。
+    期望结构：<root>/retrieve/png|question/{embeddings.npy, meta.json, encoders.json, index.faiss?}
+    返回：{
+        'png': {'emb': np.ndarray [N_img, D], 'meta': list[dict], 'enc': dict},
+        'question': {'emb': np.ndarray [N_q, Dq], 'meta': list[dict], 'enc': dict},
+        'root': <retrieve_dir>
+    } 或 None
+    """
+    root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
+    retrieve_dir = os.path.join(root, "retrieve")
+    try:
+        import numpy as _np
+        import json as _json
+        def _load_one(sub):
+            subdir = os.path.join(retrieve_dir, sub)
+            emb = _np.load(os.path.join(subdir, 'embeddings.npy'))
+            with open(os.path.join(subdir, 'meta.json'), 'r', encoding='utf-8') as f:
+                meta = _json.load(f)
+            with open(os.path.join(subdir, 'encoders.json'), 'r', encoding='utf-8') as f:
+                enc = _json.load(f)
+            return {'emb': emb.astype(_np.float32), 'meta': meta, 'enc': enc}
+        png = _load_one('png')
+        qst = _load_one('question')
+        return {'png': png, 'question': qst, 'root': retrieve_dir}
+    except Exception as e:
+        logging.warning(f"[VecRetrieve] load vector store failed: {e}")
+        return None
+
+
+def _embed_images_with_clip(pil_list, model_name: str, pretrained: str = None, device: str = 'cpu'):
+    try:
+        import torch
+        import open_clip
+        model, _, preprocess = open_clip.create_model_and_transforms(model_name, pretrained=(pretrained or 'openai'))
+        model = model.to(device)
+        model.eval()
+        import torch as _torch
+        ims = [preprocess(img).unsqueeze(0) for img in pil_list]
+        batch = _torch.cat(ims, dim=0).to(device)
+        with torch.no_grad():
+            feats = model.encode_image(batch).float()
+            feats = feats / feats.norm(dim=-1, keepdim=True).clamp(min=1e-12)
+            return feats.cpu().numpy().astype(np.float32)
+    except Exception as e:
+        logging.warning(f"[VecRetrieve] open_clip image embed failed: {e}")
+        return None
+
+
+def _embed_text_with_clip(texts, model_name: str, pretrained: str = None, tokenizer_model: str = None, device: str = 'cpu'):
+    """
+    尝试使用 open_clip 对文本编码；失败返回 None。
+    不依赖 PIL。
+    """
+    try:
+        import torch
+        import open_clip
+        model, _, _ = open_clip.create_model_and_transforms(model_name, pretrained=(pretrained or 'openai'))
+        model = model.to(device)
+        model.eval()
+        tokenizer = open_clip.get_tokenizer(tokenizer_model or model_name)
+        with torch.no_grad():
+            toks = tokenizer(texts).to(device)
+            feats = model.encode_text(toks).float()
+            feats = feats / feats.norm(dim=-1, keepdim=True).clamp(min=1e-12)
+            return feats.cpu().numpy().astype(np.float32)
+    except Exception as e:
+        logging.warning(f"[VecRetrieve] open_clip text embed failed: {e}")
+        return None
+
+
+def _embed_text_with_sbert(texts, model_name: str, device: str = 'cpu'):
+    try:
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer(model_name, device=device)
+        emb = model.encode(texts, batch_size=64, show_progress_bar=False, normalize_embeddings=True)
+        return np.asarray(emb, dtype=np.float32)
+    except Exception as e:
+        logging.warning(f"[VecRetrieve] SBERT text embed failed: {e}")
+        return None
+
+
+def _device_auto():
+    try:
+        import torch
+        return 'cuda' if torch.cuda.is_available() else 'cpu'
+    except Exception:
+        return 'cpu'
+
+
+def _rank_by_vectors_for_question(current_question: str, store: dict, top_k: int = 5, rrf_k: int = 60):
+    """
+    使用问题文本向量对两路库（png 与 question）做检索，并用 RRF 融合，返回 top_k 的 question_id 列表及分数。
+    若无法向量化，则返回空列表。
+    """
+    if not isinstance(current_question, str) or not current_question.strip():
+        return []
+    try:
+        dev = _device_auto()
+        # 先决定文本编码器
+        q_enc = store['question']['enc'] or {}
+        text_encoder = str(q_enc.get('text_encoder', 'clip')).lower()
+        txt_vec = None
+        if text_encoder == 'clip':
+            q_enc = store['question']['enc'] or {}
+            p_enc = store['png']['enc'] or {}
+            model_name = str(q_enc.get('clip_model', p_enc.get('clip_model', 'ViT-B-32')))
+            pretrained = q_enc.get('open_clip_pretrained') or p_enc.get('open_clip_pretrained') or None
+            tok_model = q_enc.get('open_clip_tokenizer_model') or p_enc.get('open_clip_tokenizer_model') or 'ViT-B-32'
+            txt_vec = _embed_text_with_clip(
+                [current_question], model_name=model_name, pretrained=pretrained, tokenizer_model=tok_model, device=dev
+            )
+        else:
+            sbert_name = str(q_enc.get('sbert_model', 'sentence-transformers/all-MiniLM-L6-v2'))
+            txt_vec = _embed_text_with_sbert([current_question], model_name=sbert_name, device=dev)
+        if txt_vec is None:
+            return []
+        qv = txt_vec[0]
+        # 两路相似度（若文本编码器不是 CLIP，则禁用 text→png 通道）
+        import numpy as _np
+        def _cos_sim(v, M):
+            return (M @ v.astype(_np.float32))  # M 和 v 已 L2 归一化
+        text_encoder = str((store['question']['enc'] or {}).get('text_encoder', 'clip')).lower()
+        sims_img = None
+        if text_encoder == 'clip':
+            sims_img = _cos_sim(qv, store['png']['emb'])  # text-image CLIP 相似度
+        sims_txt = _cos_sim(qv, store['question']['emb'])  # text-text 相似度（CLIP或SBERT）
+        # 排名到 RRF
+        rank_img = _np.argsort(-sims_img) if sims_img is not None else _np.array([], dtype=int)
+        rank_txt = _np.argsort(-sims_txt)
+        # 取前若干用于融合
+        topN_img = rank_img[: max(1000, top_k)] if sims_img is not None and rank_img.size > 0 else []
+        topN_txt = rank_txt[: max(1000, top_k)]
+        # 统计 question_id 层面（png 通道需要把每张图映射到其 qid）
+        qid_rrf = {}
+        # img 通道：qid 取最优 rank
+        qid_best_rank_img = {}
+        if sims_img is not None and len(topN_img) > 0:
+            for ri, idx in enumerate(topN_img, start=1):
+                qid = store['png']['meta'][int(idx)].get('question_id')
+                if qid is None:
+                    continue
+                if (qid not in qid_best_rank_img) or (ri < qid_best_rank_img[qid]):
+                    qid_best_rank_img[qid] = ri
+        # txt 通道：qid 对应其在 question 库中的行
+        qid_to_row = { m.get('question_id'): i for i, m in enumerate(store['question']['meta']) }
+        qid_best_rank_txt = {}
+        for rt, idx in enumerate(topN_txt, start=1):
+            qid = store['question']['meta'][int(idx)].get('question_id')
+            if qid is None:
+                continue
+            if (qid not in qid_best_rank_txt) or (rt < qid_best_rank_txt[qid]):
+                qid_best_rank_txt[qid] = rt
+        # 融合打分
+        for qid in set(list(qid_best_rank_img.keys()) + list(qid_best_rank_txt.keys())):
+            ri = qid_best_rank_img.get(qid, 10**9)
+            rt = qid_best_rank_txt.get(qid, 10**9)
+            score = (1.0 / (rrf_k + ri)) + (1.0 / (rrf_k + rt))
+            qid_rrf[qid] = score
+        # 日志：展示 image-only 和 text-only 的前 top_k（按 qid 聚合）
+        try:
+            if sims_img is not None and len(topN_img) > 0:
+                qid_best_sim_img = {}
+                for idx in topN_img:
+                    meta = store['png']['meta'][int(idx)]
+                    qid = meta.get('question_id')
+                    if qid is None:
+                        continue
+                    s = float(sims_img[int(idx)])
+                    if (qid not in qid_best_sim_img) or (s > qid_best_sim_img[qid]):
+                        qid_best_sim_img[qid] = s
+                img_only_top = sorted(qid_best_sim_img.items(), key=lambda x: x[1], reverse=True)[: max(1, top_k)]
+                logging.info(f"[VecRetrieve][RRF] image-only top {len(img_only_top)}:")
+                for rank, (qid, s) in enumerate(img_only_top, 1):
+                    logging.info(f"  #{rank}: qid={qid} | clip_sim={s:.4f}")
+            qid_best_sim_txt = {}
+            for idx in topN_txt:
+                qid = store['question']['meta'][int(idx)].get('question_id')
+                if qid is None:
+                    continue
+                s = float(sims_txt[int(idx)])
+                if (qid not in qid_best_sim_txt) or (s > qid_best_sim_txt[qid]):
+                    qid_best_sim_txt[qid] = s
+            text_only_top = sorted(qid_best_sim_txt.items(), key=lambda x: x[1], reverse=True)[: max(1, top_k)]
+            logging.info(f"[VecRetrieve][RRF] text-only top {len(text_only_top)}:")
+            for rank, (qid, s) in enumerate(text_only_top, 1):
+                logging.info(f"  #{rank}: qid={qid} | qsim={s:.4f}")
+        except Exception:
+            pass
+
+        # 取 top_k qid
+        ranked = sorted(qid_rrf.items(), key=lambda x: x[1], reverse=True)[: max(1, top_k)]
+        return ranked
+    except Exception as e:
+        logging.warning(f"[VecRetrieve] ranking failed: {e}")
+        return []
+
+
 def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None, top_k=1, strategy: str = 'sim', current_question: str = None, rrf_k: int = 60):
     if not frontier_imgs_b64 or top_k <= 0:
         return None
 
-    index_map = _load_frontier_index(cfg)
-    if not index_map:
-        return None
+    # 'sim' = 图像向量检索（当前BVF/CVF图片 → 训练集PNG向量）+ 文本相似（问题→问题文本）做 RRF 融合；'random' 维持不变
+    if (strategy or 'sim') == 'sim':
+        store = _load_vector_store(cfg)
+        if not store or not frontier_imgs_b64:
+            logging.info("[VecRetrieve] vector store not available or no frontiers")
+        else:
+            try:
+                dev = _device_auto()
+                from PIL import Image as _Image
+                from io import BytesIO as _BytesIO
+                pil_list = []
+                for b64 in frontier_imgs_b64:
+                    try:
+                        img_bytes = base64.b64decode(b64)
+                        pil_list.append(_Image.open(_BytesIO(img_bytes)).convert('RGB'))
+                    except Exception:
+                        pil_list.append(_Image.new('RGB', (224, 224), color=(0, 0, 0)))
+                enc = store['png']['enc'] or {}
+                clip_model = str(enc.get('clip_model', 'ViT-B-32'))
+                pretrained = enc.get('open_clip_pretrained') or None
+                t_emb = _embed_images_with_clip(pil_list, model_name=clip_model, pretrained=pretrained, device=dev)
+                if t_emb is None:
+                    logging.info("[VecRetrieve] image embedding failed; skip vecimg sim")
+                else:
+                    import numpy as _np
+                    corpus = store['png']['emb']  # [N, D], 已归一化
+                    merged_candidates = []
+                    for i in range(t_emb.shape[0]):
+                        v = t_emb[i]
+                        sims = corpus @ v.astype(_np.float32)
+                        # 取前若干高相似度的条目
+                        top_idx = _np.argsort(-sims)[: min(2000, max(50, top_k * 50))]
+                        per_scores = []
+                        for idx in top_idx:
+                            meta = store['png']['meta'][int(idx)]
+                            qid = meta.get('question_id')
+                            if exclude_question_id and qid == exclude_question_id:
+                                continue
+                            per_scores.append({
+                                'similarity': float(sims[int(idx)]),
+                                'question_id': qid,
+                                'step_key': meta.get('step_key'),
+                                'level': meta.get('level'),
+                                'filename_rel': meta.get('src_rel_path'),
+                                'source_frontier_index': i,
+                            })
+                        # 去重 top-5（按 (qid, step_key)）
+                        seen = set()
+                        kept = []
+                        for cand in per_scores:
+                            key = (cand['question_id'], cand['step_key'])
+                            if key in seen:
+                                continue
+                            seen.add(key)
+                            kept.append(cand)
+                            if len(kept) >= 5:
+                                break
+                        merged_candidates.extend(kept)
+                    if merged_candidates:
+                        # 全局去重
+                        best_by_key = {}
+                        for cand in merged_candidates:
+                            key = (cand['question_id'], cand['step_key'])
+                            prev = best_by_key.get(key)
+                            if prev is None or float(cand['similarity']) > float(prev['similarity']):
+                                best_by_key[key] = cand
+                        merged_unique = list(best_by_key.values())
+                        # 文本相似（问题 → 训练集问题文本）
+                        qid2question = _load_questions_en()
+                        image_sorted = sorted(merged_unique, key=lambda x: x['similarity'], reverse=True)
+                        text_scores = {}
+                        if isinstance(current_question, str) and current_question.strip():
+                            for cand in merged_unique:
+                                qid = cand.get('question_id')
+                                qtext = qid2question.get(qid, '')
+                                text_scores[(cand.get('question_id'), cand.get('step_key'))] = _cosine_sim_tokens(current_question, qtext)
+                        else:
+                            for cand in merged_unique:
+                                text_scores[(cand.get('question_id'), cand.get('step_key'))] = 0.0
+                        text_sorted = sorted(merged_unique, key=lambda x: text_scores[(x.get('question_id'), x.get('step_key'))], reverse=True)
+                        # RRF 融合
+                        rank_img = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(image_sorted) }
+                        rank_txt = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(text_sorted) }
+                        for cand in merged_unique:
+                            key = (cand.get('question_id'), cand.get('step_key'))
+                            ri = rank_img.get(key, len(image_sorted) + 1)
+                            rt = rank_txt.get(key, len(text_sorted) + 1)
+                            cand['rrf_score'] = (1.0 / (rrf_k + ri)) + (1.0 / (rrf_k + rt))
+                            cand['qsim'] = text_scores.get(key, 0.0)
+                        final_sorted = sorted(merged_unique, key=lambda x: x.get('rrf_score', 0.0), reverse=True)
+                        # 日志：展示 CLIP 相似度
+                        try:
+                            log_n = min(max(1, top_k), len(final_sorted))
+                            if log_n > 0:
+                                logging.info(f"[VecRetrieve] fused ranking by RRF (top {log_n}):")
+                            for rank, cand in enumerate(final_sorted[:log_n]):
+                                logging.info(
+                                    f"  #{rank+1}: rrf={cand.get('rrf_score', 0.0):.6f} | clip_sim={cand.get('similarity', 0.0):.4f} | qsim={cand.get('qsim', 0.0):.4f} | src_idx={cand.get('source_frontier_index')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')}"
+                                )
+                        except Exception:
+                            pass
+                        # 选取 top_k 并回取经验
+                        final_selected = final_sorted[: max(1, top_k)]
+                        exp = _load_experience(cfg)
+                        texts = []
+                        for j, cand in enumerate(final_selected):
+                            qid = cand.get('question_id')
+                            sk = cand.get('step_key')
+                            exp_text = None
+                            try:
+                                for ep_id, qdict in exp.items():
+                                    if not isinstance(qdict, dict):
+                                        continue
+                                    qinfo = qdict.get(qid)
+                                    if not isinstance(qinfo, dict):
+                                        continue
+                                    steps = qinfo.get('steps', {})
+                                    if not isinstance(steps, dict):
+                                        continue
+                                    step_entry = steps.get(sk, {})
+                                    if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
+                                        exp_text = step_entry['experience']
+                                        break
+                                if isinstance(exp_text, str) and exp_text.strip():
+                                    texts.append(f"Experience {j}: " + exp_text.strip())
+                            except Exception:
+                                continue
+                        return "\n\n".join(texts) if texts else None
+            except Exception as e:
+                logging.warning(f"[VecRetrieve] sim(vecimg) branch failed: {e}")
+
+    # random：从向量库 PNG 通道随机抽取，映射到 (qid, step_key) 后回取 experience
+    if (strategy or 'sim') == 'random':
+        store = _load_vector_store(cfg)
+        if not store:
+            logging.info("[VecRetrieve][random] vector store not available")
+        else:
+            try:
+                import random as _rnd
+                meta = store['png']['meta'] or []
+                # 随机打乱并去重 (qid, step_key)
+                idxs = list(range(len(meta)))
+                _rnd.shuffle(idxs)
+                seen = set()
+                selected = []
+                for idx in idxs:
+                    m = meta[idx]
+                    qid = m.get('question_id')
+                    sk = m.get('step_key')
+                    if not qid or not sk:
+                        continue
+                    if exclude_question_id and qid == exclude_question_id:
+                        continue
+                    key = (qid, sk)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    selected.append({'question_id': qid, 'step_key': sk, 'level': m.get('level')})
+                    if len(selected) >= max(1, top_k):
+                        break
+                # 回取 experience
+                exp = _load_experience(cfg)
+                texts = []
+                for j, cand in enumerate(selected):
+                    qid = cand.get('question_id')
+                    sk = cand.get('step_key')
+                    exp_text = None
+                    try:
+                        for ep_id, qdict in exp.items():
+                            if not isinstance(qdict, dict):
+                                continue
+                            qinfo = qdict.get(qid)
+                            if not isinstance(qinfo, dict):
+                                continue
+                            steps = qinfo.get('steps', {})
+                            if not isinstance(steps, dict):
+                                continue
+                            step_entry = steps.get(sk, {})
+                            if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
+                                exp_text = step_entry['experience']
+                                break
+                        if isinstance(exp_text, str) and exp_text.strip():
+                            texts.append(f"Experience {j}: " + exp_text.strip())
+                    except Exception:
+                        continue
+                return "\n\n".join(texts) if texts else None
+            except Exception as e:
+                logging.warning(f"[VecRetrieve][random] failed: {e}")
+
+    # 没有其他可用策略，返回 None
+    return None
 
     # 预解码：索引 bits
     idx_bits = {}
@@ -1093,7 +1481,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             cfg=cfg,
             exclude_question_id=step.get("question_id"),
             top_k=_replay_top,
-            strategy=("random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"),
+            strategy=(
+                "random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"
+            ),
             current_question=question,
         )
     else:
@@ -1170,7 +1560,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             print(f"Layer0 format error: {full_response} | {e}")
             
     if idx0 is None:
-        idx_random = random.choice(frontier_imgs_0)
+        idx_random = random.randrange(0, max(1, len(frontier_imgs_0)))
         response = f'frontier {idx_random}'
         reason = "no valid index found, randomly selected one."
         return response, snapshot_id_mapping, reason, len(snapshot_imgs)
@@ -1221,7 +1611,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 cfg=cfg,
                 exclude_question_id=step.get("question_id"),
                 top_k=_replay_top,
-                strategy=("random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"),
+                strategy=(
+                    "random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"
+                ),
                 current_question=question,
             )
         else:
@@ -1289,9 +1681,12 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 print(f"Layer1 format error: {full_response} | {e}")
 
         if idx1_in_subgroup is None:
-            idx_random = random.choice(frontier_imgs_subgroup)
-            response = f'frontier {idx_random}'
-            reason = f"Randomly selected index {idx_random} due to parsing failure."
+            idx_random = random.randrange(0, max(1, len(frontier_imgs_subgroup)))
+            # 映射回全局 layer1 索引
+            final_layer1_idx = layer1_indices[idx_random]
+            global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
+            response = f'frontier {global_frontier_idx}'
+            reason = f"Randomly selected index {global_frontier_idx} due to parsing failure."
             return response, snapshot_id_mapping, reason, len(snapshot_imgs)
         
         elif idx1_in_subgroup >= len(layer1_indices):
