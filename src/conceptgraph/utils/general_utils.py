@@ -777,7 +777,18 @@ class ObjectClasses:
 
         elif self.class_set == "scannet200":
             # load scannet 200 class
-            self.classes_file_path = Path("data/scannet200_classes.txt")
+            # For scannet200, we need the class file, not the scene semantic file
+            # If the provided path doesn't exist or is not the class file, use default
+            if not self.classes_file_path.exists() or "scannet200_classes" not in str(self.classes_file_path):
+                default_path = Path("data/scannet200_classes.txt")
+                if default_path.exists():
+                    self.classes_file_path = default_path
+                else:
+                    # Try to find it relative to the project root
+                    import os
+                    project_root = Path(__file__).parent.parent.parent.parent
+                    self.classes_file_path = project_root / "data" / "scannet200_classes.txt"
+
             with open(self.classes_file_path, "r") as f:
                 all_lines = [cls.strip() for cls in f.readlines()]
                 all_classes = list(set(all_lines))

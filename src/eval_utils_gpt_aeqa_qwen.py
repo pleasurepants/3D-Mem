@@ -43,7 +43,7 @@ def format_content(contents):
 
 
 # send information to openai
-def call_openai_api(sys_prompt, contents) -> Optional[str]:
+def call_openai_api(sys_prompt, contents, seed: Optional[int] = None) -> Optional[str]:
     max_tries = 5
     retry_count = 0
     formated_content = format_content(contents)
@@ -53,6 +53,18 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     ]
     while retry_count < max_tries:
         try:
+            # 支持从参数或环境变量注入 seed（优先参数，其次 VLLM_SEED）
+            # 读取优先级：参数 seed > cfg.chat_seed（经外层传入）> 环境变量 VLLM_SEED
+            _seed_env = None
+            try:
+                _seed_env = int(os.getenv("VLLM_SEED")) if os.getenv("VLLM_SEED") is not None else None
+            except Exception:
+                _seed_env = None
+            _seed = seed if seed is not None else _seed_env
+            try:
+                logging.info(f"[ChatSeed] using seed={_seed}")
+            except Exception:
+                pass
             completion = client.chat.completions.create(
                 model="qwen",  # gpt-4o-internvl-minicpm-qwen
                 messages=message_text,
@@ -61,6 +73,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
                 top_p=0.95,
                 frequency_penalty=0,
                 presence_penalty=0,
+                **({"seed": int(_seed)} if _seed is not None else {}),
             )
             return completion.choices[0].message.content
         except openai.RateLimitError as e:
@@ -472,7 +485,152 @@ def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None
     if not frontier_imgs_b64 or top_k <= 0:
         return None
 
-    # 'sim' = 图像向量检索（当前BVF/CVF图片 → 训练集PNG向量）+ 文本相似（问题→问题文本）做 RRF 融合；'random' 维持不变
+    # 'sim' = 图像向量检索（当前BVF/CVF图片 → 训练集PNG向量）+ 文本相似（问题→问题文本）做 RRF 融合；'question-first' = 先召回top-3相似question，再在这些question的PNG中做CLIP检索；'random' 维持不变
+    if (strategy or 'sim') == 'question-first':
+        # 步骤1: 先用问题相似度召回top-3相似question
+        store = _load_vector_store(cfg)
+        if not store:
+            logging.info("[VecRetrieve] vector store not available")
+        else:
+            try:
+                # 日志：记录当前问题
+                logging.info(f"[VecRetrieve][question-first] Current question: {current_question or 'N/A'}")
+                ranked_qids = _rank_by_vectors_for_question(current_question=current_question or '', store=store, top_k=3, rrf_k=rrf_k)
+                # 日志：记录retrieve回来的top-3相似question
+                if ranked_qids:
+                    logging.info(f"[VecRetrieve][question-first] Retrieved top-3 similar questions:")
+                    for rank, (qid, score) in enumerate(ranked_qids, 1):
+                        qtext = next((m['question'] for m in store['question']['meta'] if m['question_id'] == qid), 'N/A')
+                        logging.info(f"  #{rank}: qid={qid} | qsim={score:.4f} | question={qtext}")
+                if not ranked_qids or not frontier_imgs_b64:
+                    logging.info("[VecRetrieve] question ranking empty or no frontiers")
+                else:
+                    # 步骤2: 收集这些question对应的PNG向量索引
+                    qid_to_indices = {}
+                    for idx, meta in enumerate(store['png']['meta']):
+                        qid = meta.get('question_id')
+                        if qid and qid in [q for q, _ in ranked_qids]:
+                            if qid not in qid_to_indices:
+                                qid_to_indices[qid] = []
+                            qid_to_indices[qid].append(idx)
+
+                    relevant_indices = []
+                    for indices in qid_to_indices.values():
+                        relevant_indices.extend(indices)
+                    if not relevant_indices:
+                        logging.info("[VecRetrieve] no relevant PNGs")
+                    else:
+                        corpus = store['png']['emb'][relevant_indices]
+                        meta_list = [store['png']['meta'][idx] for idx in relevant_indices]
+
+                        # 步骤3: 对当前frontier图片做CLIP相似度检索
+                        dev = _device_auto()
+                        from PIL import Image as _Image
+                        from io import BytesIO as _BytesIO
+                        pil_list = []
+                        for b64 in frontier_imgs_b64:
+                            try:
+                                img_bytes = base64.b64decode(b64)
+                                pil_list.append(_Image.open(_BytesIO(img_bytes)).convert('RGB'))
+                            except Exception:
+                                pil_list.append(_Image.new('RGB', (224, 224), color=(0, 0, 0)))
+                        enc = store['png']['enc'] or {}
+                        clip_model = str(enc.get('clip_model', 'ViT-B-32'))
+                        pretrained = enc.get('open_clip_pretrained') or None
+                        t_emb = _embed_images_with_clip(pil_list, model_name=clip_model, pretrained=pretrained, device=dev)
+                        if t_emb is None:
+                            logging.info("[VecRetrieve] image embedding failed")
+                        else:
+                            import numpy as _np
+                            merged_candidates = []
+                            # 日志：记录图片相似度检索结果
+                            logging.info(f"[VecRetrieve][question-first] Image similarity retrieval for {len(frontier_imgs_b64)} frontier(s):")
+                            for i in range(t_emb.shape[0]):
+                                v = t_emb[i]
+                                sims = corpus @ v.astype(_np.float32)
+                                top_idx = _np.argsort(-sims)[: min(2000, max(50, top_k * 50))]
+                                logging.info(f"  Frontier #{i} top image similarities:")
+                                for rank, idx in enumerate(top_idx[:10], 1):  # 只显示前10个
+                                    sim_score = float(sims[int(idx)])
+                                    meta = meta_list[int(idx)]
+                                    qid = meta.get('question_id')
+                                    filename = meta.get('src_rel_path')
+                                    logging.info(f"    #{rank}: clip_sim={sim_score:.4f} | qid={qid} | filename={filename}")
+                                per_scores = []
+                                for idx in top_idx:
+                                    meta = meta_list[int(idx)]
+                                    qid = meta.get('question_id')
+                                    if exclude_question_id and qid == exclude_question_id:
+                                        continue
+                                    per_scores.append({
+                                        'similarity': float(sims[int(idx)]),
+                                        'question_id': qid,
+                                        'step_key': meta.get('step_key'),
+                                        'level': meta.get('level'),
+                                        'filename_rel': meta.get('src_rel_path'),
+                                        'source_frontier_index': i,
+                                    })
+                                seen = set()
+                                kept = []
+                                for cand in per_scores:
+                                    key = (cand['question_id'], cand.get('step_key'))
+                                    if key in seen:
+                                        continue
+                                    seen.add(key)
+                                    kept.append(cand)
+                                    if len(kept) >= 5:
+                                        break
+                                merged_candidates.extend(kept)
+                            if merged_candidates:
+                                best_by_key = {}
+                                for cand in merged_candidates:
+                                    key = (cand['question_id'], cand.get('step_key'))
+                                    prev = best_by_key.get(key)
+                                    if prev is None or float(cand['similarity']) > float(prev['similarity']):
+                                        best_by_key[key] = cand
+                                merged_unique = list(best_by_key.values())
+
+                                # question-first模式：直接按clip相似度排序，不用RRF
+                                final_sorted = sorted(merged_unique, key=lambda x: x['similarity'], reverse=True)
+                                try:
+                                    log_n = min(max(1, top_k), len(final_sorted))
+                                    if log_n > 0:
+                                        logging.info(f"[VecRetrieve] question-first ranking by CLIP similarity (top {log_n}):")
+                                    for rank, cand in enumerate(final_sorted[:log_n]):
+                                        logging.info(
+                                            f"  #{rank+1}: clip_sim={cand.get('similarity', 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | filename={cand.get('filename_rel') or 'N/A'}"
+                                        )
+                                except Exception:
+                                    pass
+                                final_selected = final_sorted[: max(1, top_k)]
+                                exp = _load_experience(cfg)
+                                texts = []
+                                for j, cand in enumerate(final_selected):
+                                    qid = cand.get('question_id')
+                                    sk = cand.get('step_key')
+                                    exp_text = None
+                                    try:
+                                        for ep_id, qdict in exp.items():
+                                            if not isinstance(qdict, dict):
+                                                continue
+                                            qinfo = qdict.get(qid)
+                                            if not isinstance(qinfo, dict):
+                                                continue
+                                            steps = qinfo.get('steps', {})
+                                            if not isinstance(steps, dict):
+                                                continue
+                                            step_entry = steps.get(sk, {})
+                                            if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
+                                                exp_text = step_entry['experience']
+                                                break
+                                        if isinstance(exp_text, str) and exp_text.strip():
+                                            texts.append(f"Experience {j}: " + exp_text.strip())
+                                    except Exception:
+                                        continue
+                                return "\n\n".join(texts) if texts else None
+            except Exception as e:
+                logging.warning(f"[VecRetrieve] question-first failed: {e}")
+
     if (strategy or 'sim') == 'sim':
         store = _load_vector_store(cfg)
         if not store or not frontier_imgs_b64:
@@ -662,7 +820,7 @@ def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None
                 logging.warning(f"[VecRetrieve][random] failed: {e}")
 
     # 没有其他可用策略，返回 None
-    return None
+        return None
 
     # 预解码：索引 bits
     idx_bits = {}
@@ -1436,7 +1594,11 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         print(f"Snapshot images available: {len(snapshot_imgs)}")
         retry_bound = 3
         for _ in range(retry_bound):
-            full_response = call_openai_api(sys_prompt, content)
+            full_response = call_openai_api(
+                sys_prompt,
+                content,
+                seed=(int(getattr(cfg, "chat_seed")) if hasattr(cfg, "chat_seed") and getattr(cfg, "chat_seed") is not None else None)
+            )
             if full_response is None:
                 print("call_openai_api (snapshot) returns None, retrying")
                 continue
@@ -1482,7 +1644,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             exclude_question_id=step.get("question_id"),
             top_k=_replay_top,
             strategy=(
-                "random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"
+                "random" if getattr(cfg, "replay_mode", "sim") == "random" else (
+                    "question-first" if getattr(cfg, "replay_mode", "sim") == "question-first" else "sim"
+                )
             ),
             current_question=question,
         )
@@ -1495,17 +1659,23 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     if not os.path.exists(chosen_frontier_path):
         os.makedirs(chosen_frontier_path, exist_ok=True)
 
-    png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
-    if len(png_files) > 0:
-        sys_prompt, content = frontier_context(chosen_frontier_path)
-        episodic_con = call_openai_api(sys_prompt, content)
-        logging.info(f"Froncon label: {episodic_con}")
-
+    # 允许通过 cfg.use_episodic_context 显式关闭 episodic context
+    if bool(getattr(cfg, "use_episodic_context", True)):
+        png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
+        if len(png_files) > 0:
+            sys_prompt, content = frontier_context(chosen_frontier_path)
+            episodic_con = call_openai_api(
+                sys_prompt,
+                content,
+                seed=(int(getattr(cfg, "chat_seed")) if hasattr(cfg, "chat_seed") and getattr(cfg, "chat_seed") is not None else None)
+            )
+            logging.info(f"Froncon label: {episodic_con}")
     else:
-        pass
+        logging.info("[EpisodicCtx] Disabled by cfg.use_episodic_context=False")
 
 
 
+    # 当 _replay_top=0 时，不注入任何 experience（env recall）
     layer0_con = step.get("replay_layer0_aggregated_context") if _replay_top > 0 else None
     try:
         logging.info(f"[ReplayCtx] layer0 aggregated context len: {len(layer0_con) if isinstance(layer0_con, str) else 'None'}")
@@ -1523,7 +1693,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         use_snapshot_class=True,
         image_goal=image_goal,
         context=(layer0_con if _replay_top > 0 else None),
-        episodic_con=episodic_con,
+        episodic_con=(episodic_con if bool(getattr(cfg, "use_episodic_context", True)) else None),
         frontier_type="BVF",
     )
     if verbose:
@@ -1543,7 +1713,11 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
     idx0 = None
     for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
+        full_response = call_openai_api(
+            sys_prompt,
+            content,
+            seed=(int(getattr(cfg, "chat_seed")) if hasattr(cfg, "chat_seed") and getattr(cfg, "chat_seed") is not None else None)
+        )
         if full_response is None:
             print("call_openai_api (frontier layer0) returns None, retrying")
             continue
@@ -1612,7 +1786,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 exclude_question_id=step.get("question_id"),
                 top_k=_replay_top,
                 strategy=(
-                    "random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"
+                    "random" if getattr(cfg, "replay_mode", "sim") == "random" else (
+                        "question-first" if getattr(cfg, "replay_mode", "sim") == "question-first" else "sim"
+                    )
                 ),
                 current_question=question,
             )
@@ -1631,7 +1807,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             use_snapshot_class=True,
             image_goal=image_goal,
             context=(layer1_context_text if _replay_top > 0 else None),
-            episodic_con=episodic_con,
+            episodic_con=(episodic_con if bool(getattr(cfg, "use_episodic_context", True)) else None),
             frontier_type="CVF",
         )
         if verbose:
@@ -1656,7 +1832,11 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         idx1_in_subgroup = None
         final_reason = ""
         for _ in range(retry_bound):
-            full_response = call_openai_api(sys_prompt, content)
+            full_response = call_openai_api(
+                sys_prompt,
+                content,
+                seed=(int(getattr(cfg, "chat_seed")) if hasattr(cfg, "chat_seed") and getattr(cfg, "chat_seed") is not None else None)
+            )
             
             if full_response is None:
                 print("call_openai_api (frontier layer1) returns None, retrying")

@@ -986,6 +986,8 @@ if __name__ == "__main__":
     parser.add_argument("--replay_mode", help="replay selection mode: sim or random", default="sim", type=str)
     parser.add_argument("--replay_top", help="top-k for replay candidates", default=1, type=int)
     parser.add_argument("--retrieve_root", help="external retrieve root; expects replay_step_info.json & experience_output.json inside", default="", type=str)
+    parser.add_argument("--use_episodic_context", help="whether to enable episodic context (0/1)", default=1, type=int)
+    parser.add_argument("--chat_seed", help="random seed for vLLM generation (decoupled from cfg.seed)", default=None, type=int)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
@@ -994,6 +996,11 @@ if __name__ == "__main__":
     cfg.replay_top = args.replay_top
     if args.retrieve_root:
         cfg.retrieve_root = args.retrieve_root
+    # Episodic context toggle
+    cfg.use_episodic_context = bool(args.use_episodic_context)
+    # vLLM per-request seed (independent from cfg.seed)
+    if args.chat_seed is not None:
+        cfg.chat_seed = int(args.chat_seed)
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
@@ -1032,6 +1039,19 @@ if __name__ == "__main__":
     for handler in logging.getLogger().handlers:
         handler.setFormatter(formatter)
 
+    # If chat_seed is provided, propagate to environment so all API calls (even without explicit seed) use it
+    try:
+        if hasattr(cfg, 'chat_seed') and cfg.chat_seed is not None:
+            os.environ['VLLM_SEED'] = str(int(cfg.chat_seed))
+    except Exception:
+        pass
+
     # run
     logging.info(f"***** Running {cfg.exp_name} *****")
+    try:
+        logging.info(
+            f"[ChatSeed] chat_seed={getattr(cfg, 'chat_seed', None)} | VLLM_SEED={os.getenv('VLLM_SEED')}"
+        )
+    except Exception:
+        pass
     main(cfg, args.start_ratio, args.end_ratio)
