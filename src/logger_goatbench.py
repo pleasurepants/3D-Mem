@@ -475,7 +475,7 @@ class Logger:
         goal_positions = [x["position"] for x in subtask_goal]
         goal_positions_voxel = [tsdf_planner.habitat2voxel(p) for p in goal_positions]
 
-        viewpoints = [
+        viewpoints = [  # flattened list of multiple viewpoints for each object goal
             view_point["agent_state"]["position"]
             for goal in subtask_goal
             for view_point in goal["view_points"]

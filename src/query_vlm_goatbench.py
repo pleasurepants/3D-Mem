@@ -32,7 +32,7 @@ def query_vlm_for_response(
     for rgb_id, snapshot in scene.snapshots.items():
         resized_rgb = resize_image(
             scene.all_observations[rgb_id], cfg.prompt_h, cfg.prompt_w
-        )
+        )   # why no resizing in aeqa?
 
         step_dict["snapshot_objects"][rgb_id] = snapshot.cluster
         step_dict["snapshot_imgs"][rgb_id] = {

@@ -18,9 +18,11 @@ client = OpenAI(
 
 def format_content(contents):
     formated_content = []
+    image_count = 0
     for c in contents:
         formated_content.append({"type": "text", "text": c[0]})
         if len(c) == 2:
+            image_count += 1
             formated_content.append(
                 {
                     "type": "image_url",
@@ -30,6 +32,16 @@ def format_content(contents):
                     },
                 }
             )
+    
+    # 记录图片数量
+    logging.info(f"输入模型的图片总数: {image_count}")
+    
+    # 检查是否超过限制
+    if image_count > 30:
+        logging.warning(f"警告：图片数量 ({image_count}) 超过了30张的限制！")
+        logging.warning("建议措施：1. 增加预过滤（prefiltering）以减少快照数量，2. 减少 top_k_categories 参数， 3. 调整 vLLM 服务器的 --limit-mm-per-prompt 参数")
+        # raise ValueError(f"图片数量 ({image_count}) 超过了vLLM设置的30张限制")
+    
     return formated_content
 
 

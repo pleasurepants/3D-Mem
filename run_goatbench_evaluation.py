@@ -122,6 +122,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                 )
             )
             # all_subtask_goals[0/1/2][0].keys(): ['object_category', 'object_id', 'position', 'view_points', 'children_object_categories', 'lang_desc', 'image_goals']
+            # first index for subtask, second index for goals (len=1 for type description and image, len as in goals for type object)
 
             # check whether this episode has been processed
             finished_subtask_ids = list(logger.success_by_snapshot.keys())
@@ -176,7 +177,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
             logging.info(f"\n\nScene {scene_id} initialization successful!")
 
             # run questions in the scene
-            global_step = -1
+            global_step = -1    # in the whole episode
             for subtask_idx, (goal_type, subtask_goal) in enumerate(
                 zip(all_subtask_goal_types, all_subtask_goals)
             ):
@@ -202,7 +203,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
 
                 # run steps
                 task_success = False
-                cnt_step = -1
+                cnt_step = -1   # in the subtask
                 n_filtered_snapshots = 0
 
                 # reset tsdf planner
@@ -320,7 +321,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                     all_added_obj_ids = [
                         obj_id
                         for obj_id in all_added_obj_ids
-                        if obj_id in scene.objects
+                        if obj_id in scene.objects  # list(scene.objects.values())[0].keys()
                     ]
                     for obj_id, obj in scene.objects.items():
                         if (
@@ -330,7 +331,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             all_added_obj_ids.append(obj_id)
                     scene.update_snapshots(
                         obj_ids=set(all_added_obj_ids), min_detection=cfg.min_detection
-                    )
+                    )   # ['all_observations', 'frames', 'snapshots', ...]
                     logging.info(
                         f"Step {cnt_step}, update snapshots, {len(scene.objects)} objects, {len(scene.snapshots)} snapshots"
                     )
