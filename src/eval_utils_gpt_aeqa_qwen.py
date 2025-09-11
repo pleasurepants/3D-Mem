@@ -1163,6 +1163,8 @@ def format_explore_prompt_frontier(
     # =========================
     # Experience replay (optional)
     # =========================
+
+
     if has_experience:
         content.append((
             "Experience replay — knowledge from OTHER episodes in similar scenes. It may include 'Critique:' (what happened) and 'Abstraction:' (a simple rule). "
