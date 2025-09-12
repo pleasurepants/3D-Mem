@@ -75,13 +75,18 @@ source .env
 # export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 # -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
-CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
+CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
+ /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
     -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/qwen_debug.yaml \
-    --replay_mode question-first \
-    --replay_top 0 \
+    --replay_mode random \
+    --replay_top 2 \
     --use_episodic_context 1 \
     --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168 \
-    --chat_seed 13
+    --chat_seed 32 \
+    --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/exp_tuple_v0.json \
+    --caption true \
+    --critique false \
+    --abstraction false
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

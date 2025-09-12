@@ -481,7 +481,19 @@ def _rank_by_vectors_for_question(current_question: str, store: dict, top_k: int
         return []
 
 
-def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None, top_k=1, strategy: str = 'sim', current_question: str = None, rrf_k: int = 60):
+def simple_recall_and_aggregate(
+    frontier_imgs_b64,
+    cfg,
+    exclude_question_id=None,
+    top_k=1,
+    strategy: str = 'sim',
+    current_question: str = None,
+    rrf_k: int = 60,
+    exp_tuple_path: Optional[str] = None,
+    inject_experience: bool = False,
+    inject_critique: bool = False,
+    inject_abstraction: bool = False,
+):
     if not frontier_imgs_b64 or top_k <= 0:
         return None
 
@@ -603,30 +615,83 @@ def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None
                                 except Exception:
                                     pass
                                 final_selected = final_sorted[: max(1, top_k)]
-                                exp = _load_experience(cfg)
                                 texts = []
+                                try:
+                                    # 从 exp_tuple_path 读取，并按 (qid, step_key) 构造三块文本
+                                    if isinstance(exp_tuple_path, str) and len(exp_tuple_path) > 0 and os.path.exists(exp_tuple_path):
+                                        with open(exp_tuple_path, 'r', encoding='utf-8') as _f:
+                                            tuple_data = json.load(_f)
+                                    else:
+                                        tuple_data = None
+                                except Exception:
+                                    tuple_data = None
+
+                                def _fetch_tuple_step(_data, _qid, _step_key):
+                                    if not isinstance(_data, dict):
+                                        return None
+                                    # 顶层 qid
+                                    if _qid in _data and isinstance(_data[_qid], dict):
+                                        qnode = _data[_qid]
+                                    else:
+                                        qnode = None
+                                        for _, bucket in _data.items():
+                                            if isinstance(bucket, dict) and _qid in bucket:
+                                                qnode = bucket.get(_qid)
+                                                break
+                                    if not isinstance(qnode, dict):
+                                        return None
+                                    q_text = qnode.get('question', '')
+                                    steps = qnode.get('steps') if isinstance(qnode.get('steps'), dict) else qnode
+                                    step_entry = None
+                                    if isinstance(steps, dict):
+                                        step_entry = steps.get(_step_key)
+                                    if not isinstance(step_entry, dict):
+                                        return None
+                                    return q_text, step_entry
+
                                 for j, cand in enumerate(final_selected):
                                     qid = cand.get('question_id')
                                     sk = cand.get('step_key')
-                                    exp_text = None
-                                    try:
-                                        for ep_id, qdict in exp.items():
-                                            if not isinstance(qdict, dict):
-                                                continue
-                                            qinfo = qdict.get(qid)
-                                            if not isinstance(qinfo, dict):
-                                                continue
-                                            steps = qinfo.get('steps', {})
-                                            if not isinstance(steps, dict):
-                                                continue
-                                            step_entry = steps.get(sk, {})
-                                            if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
-                                                exp_text = step_entry['experience']
-                                                break
-                                        if isinstance(exp_text, str) and exp_text.strip():
-                                            texts.append(f"Experience {j}: " + exp_text.strip())
-                                    except Exception:
+                                    if tuple_data is None:
                                         continue
+                                    fetched = _fetch_tuple_step(tuple_data, qid, sk)
+                                    if not fetched:
+                                        continue
+                                    q_text, step_entry = fetched
+                                    cur = step_entry.get('current_step')
+                                    tot = step_entry.get('total_step')
+                                    caption = step_entry.get('Caption') or step_entry.get('caption') or ''
+                                    critique = step_entry.get('Critique') or step_entry.get('critique')
+                                    abstraction = step_entry.get('Abstraction') or step_entry.get('abstraction')
+                                    bvf = step_entry.get('chosen_BVF')
+                                    cvf = step_entry.get('chosen_CVF')
+                                    outcome = step_entry.get('final_reward')
+
+                                    blocks = []
+                                    exp_id = j + 1
+                                    if inject_experience:
+                                        sentence = f"Experience {exp_id}: \nAt step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                                        if caption:
+                                            sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                                        if (bvf is not None and cvf is not None):
+                                            sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                                        elif (bvf is not None):
+                                            sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                                        elif (cvf is not None):
+                                            sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                                        if outcome is not None:
+                                            sentence += f"and the outcome of that trial was {outcome}."
+                                        blocks.append(sentence.strip())
+                                    else:
+                                        blocks.append(f"Experience {exp_id}:")
+
+                                    if inject_critique and isinstance(critique, str) and critique.strip():
+                                        blocks.append("")
+                                        blocks.append(f"Critique: {critique}")
+                                    if inject_abstraction and isinstance(abstraction, str) and abstraction.strip():
+                                        blocks.append("")
+                                        blocks.append(f"Abstraction: {abstraction}")
+                                    texts.append("\n".join(blocks))
                                 return "\n\n".join(texts) if texts else None
             except Exception as e:
                 logging.warning(f"[VecRetrieve] question-first failed: {e}")
@@ -731,32 +796,83 @@ def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None
                                 )
                         except Exception:
                             pass
-                        # 选取 top_k 并回取经验
+                        # 选取 top_k 并回取 tuple 经验
                         final_selected = final_sorted[: max(1, top_k)]
-                        exp = _load_experience(cfg)
                         texts = []
+                        try:
+                            if isinstance(exp_tuple_path, str) and len(exp_tuple_path) > 0 and os.path.exists(exp_tuple_path):
+                                with open(exp_tuple_path, 'r', encoding='utf-8') as _f:
+                                    tuple_data = json.load(_f)
+                            else:
+                                tuple_data = None
+                        except Exception:
+                            tuple_data = None
+
+                        def _fetch_tuple_step(_data, _qid, _step_key):
+                            if not isinstance(_data, dict):
+                                return None
+                            if _qid in _data and isinstance(_data[_qid], dict):
+                                qnode = _data[_qid]
+                            else:
+                                qnode = None
+                                for _, bucket in _data.items():
+                                    if isinstance(bucket, dict) and _qid in bucket:
+                                        qnode = bucket.get(_qid)
+                                        break
+                            if not isinstance(qnode, dict):
+                                return None
+                            q_text = qnode.get('question', '')
+                            steps = qnode.get('steps') if isinstance(qnode.get('steps'), dict) else qnode
+                            step_entry = None
+                            if isinstance(steps, dict):
+                                step_entry = steps.get(_step_key)
+                            if not isinstance(step_entry, dict):
+                                return None
+                            return q_text, step_entry
+
                         for j, cand in enumerate(final_selected):
                             qid = cand.get('question_id')
                             sk = cand.get('step_key')
-                            exp_text = None
-                            try:
-                                for ep_id, qdict in exp.items():
-                                    if not isinstance(qdict, dict):
-                                        continue
-                                    qinfo = qdict.get(qid)
-                                    if not isinstance(qinfo, dict):
-                                        continue
-                                    steps = qinfo.get('steps', {})
-                                    if not isinstance(steps, dict):
-                                        continue
-                                    step_entry = steps.get(sk, {})
-                                    if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
-                                        exp_text = step_entry['experience']
-                                        break
-                                if isinstance(exp_text, str) and exp_text.strip():
-                                    texts.append(f"Experience {j}: " + exp_text.strip())
-                            except Exception:
+                            if tuple_data is None:
                                 continue
+                            fetched = _fetch_tuple_step(tuple_data, qid, sk)
+                            if not fetched:
+                                continue
+                            q_text, step_entry = fetched
+                            cur = step_entry.get('current_step')
+                            tot = step_entry.get('total_step')
+                            caption = step_entry.get('Caption') or step_entry.get('caption') or ''
+                            critique = step_entry.get('Critique') or step_entry.get('critique')
+                            abstraction = step_entry.get('Abstraction') or step_entry.get('abstraction')
+                            bvf = step_entry.get('chosen_BVF')
+                            cvf = step_entry.get('chosen_CVF')
+                            outcome = step_entry.get('final_reward')
+
+                            blocks = []
+                            exp_id = j + 1
+                            if inject_experience:
+                                sentence = f"Experience {exp_id}:\n At step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                                if caption:
+                                    sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                                if (bvf is not None and cvf is not None):
+                                    sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                                elif (bvf is not None):
+                                    sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                                elif (cvf is not None):
+                                    sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                                if outcome is not None:
+                                    sentence += f"and the outcome of that trial was {outcome}."
+                                blocks.append(sentence.strip())
+                            else:
+                                blocks.append(f"Experience {exp_id}:")
+
+                            if inject_critique and isinstance(critique, str) and critique.strip():
+                                blocks.append("")
+                                blocks.append(f"Critique: {critique}")
+                            if inject_abstraction and isinstance(abstraction, str) and abstraction.strip():
+                                blocks.append("")
+                                blocks.append(f"Abstraction: {abstraction}")
+                            texts.append("\n".join(blocks))
                         return "\n\n".join(texts) if texts else None
             except Exception as e:
                 logging.warning(f"[VecRetrieve] sim(vecimg) branch failed: {e}")
@@ -1121,7 +1237,7 @@ def format_explore_prompt_frontier(
         "You SHALL pick EXACTLY ONE BVF to look closer. With the selected BVF, you DO NOT move; you further break down that direction into Closer-View Frontiers (CVF), which give narrowed perspectives. "
         "You SHALL pick EXACTLY ONE CVF to move to in the next step.\n\n"
         "You will also be given the following information as contexts:\n"
-        "EGOCENTRIC VIEW (if shown): The agent’s immediate forward-looking camera view; use it as local context only.\n"
+        "EGOCENTRIC VIEW (if shown): The agent's immediate forward-looking camera view; use it as local context only.\n"
         "EPISODIC CONTEXT (if present): A factual textual summary of the previous steps within THIS episode (visited path, observations, likely-unseen areas). "
         "Use this to avoid redundancy and prefer novel, informative directions. It is evidence, not a command.\n"
         "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
@@ -1135,59 +1251,39 @@ def format_explore_prompt_frontier(
     content = []
 
     # =========================
-    # Frontier candidates
+    # 按用户模板重排 Content
     # =========================
-    content.append((f"You are given the following frontiers ({frontier_type} only at this step):",))
-    if len(frontier_imgs) == 0:
-        content.append(("No frontier is available.",))
-    else:
-        for i in range(len(frontier_imgs)):
-            content.append((f"{label_word} {i}", frontier_imgs[i]))
-
-    # =========================
-    # Egocentric (optional)
-    # =========================
-    if has_ego:
-        content.append(("Egocentric forward view (immediate local context):", egocentric_imgs[-1]))
-
-    # =========================
-    # Episodic context (optional)
-    # =========================
-    if has_episodic:
-        content.append((
-            "Episodic context — summary of the recent steps within THIS episode (path you followed, what you observed, "
-            "what seems already covered vs. still unexplored). Use this to avoid redundancy and to prefer novel, decision-relevant directions:\n"
-            + episodic_con.strip(),
-        ))
-
-    # =========================
-    # Experience replay (optional)
-    # =========================
-
-
-    if has_experience:
-        content.append((
-            "Experience replay — knowledge from OTHER episodes in similar scenes. It may include 'Critique:' (what happened) and 'Abstraction:' (a simple rule). "
-            "Use the Abstraction as a transferable hint for this scene. Extract only transferable visual patterns/strategies and prefer the current visible evidence when conflicts arise:\n"
-            + context.strip(),
-        ))
-
-    # =========================
-    # Question
-    # =========================
+    # 1) Question 开头
     q_text = f"Now you need to answer the question: {question}"
     if image_goal is not None:
         content.append((q_text, image_goal))
     else:
         content.append((q_text,))
 
-    # =========================
-    # Minimal reasoning scaffold consistent with user's instruction
-    # =========================
+    # 2) Frontier 列表
+    content.append(("You are given following frontier:",))
+    if len(frontier_imgs) == 0:
+        content.append(("No frontier is available.",))
+    else:
+        for i in range(len(frontier_imgs)):
+            content.append((f"{label_word} {i}:", frontier_imgs[i]))
+
+    # 3) Episodic Context（可选）
+    if has_ego:
+        content.append(("Egocentric forward view (immediate local context):", egocentric_imgs[-1]))
+    if has_episodic:
+        content.append(("\nEPISODIC CONTEXT:",))
+        content.append((episodic_con.strip(),))
+
+    # 4) EXPERIENCE REPLAY（来自 exp_tuple 或回忆 context）
+    # 优先使用已传入的 context 文本；若后续在 explore_step 中用 exp_tuple 构造，会经由 context 传进来
+    if has_experience:
+        content.append(("\nEXPERIENCE REPLAY:",))
+        content.append((context.strip(),))
+
+    # 5) 最后给出行为指令
     guidance = (
-        "IMPORTANT: You MUST reason step by step using ONLY the provided frontiers (Step 1, Step 2, ...), and do NOT skip steps. "
-        "Use the contexts (EPISODIC/EXPERIENCE) if present to avoid redundancy and transfer useful cues. "
-        f"Output the rationale first and the answer last. On the final line, print ONLY '{label_word} i'."
+        f"Now reason in steps and tell me which frontier to select. On the final line, print ONLY '{label_word} i'."
     )
     content.append((guidance,))
 
@@ -1420,6 +1516,120 @@ def _shorten(text: str, max_len: int = 400) -> str:
     t = text.strip()
     return (t[:max_len] + " ...") if len(t) > max_len else t
 
+
+def build_experience_replay_from_tuple(
+    exp_tuple_path: Optional[str],
+    question_id: Optional[str],
+    default_question: Optional[str] = None,
+    inject_experience: bool = True,
+    inject_critique: bool = True,
+    inject_abstraction: bool = True,
+) -> Optional[str]:
+    """
+    从 exp_tuple json 中读取指定 question_id 的各 step 信息，生成 EXPERIENCE REPLAY 文本。
+
+    兼容两种结构：
+    1) 顶层直接以 question_id 作为键，值中包含 "question" 与多个 "step_*"。
+    2) 顶层为 episode 映射，再到 question_id，值中包含 "question" 与 "steps" 字段。
+    """
+    try:
+        if not exp_tuple_path or not os.path.exists(exp_tuple_path) or not question_id:
+            return None
+        with open(exp_tuple_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        qnode = None
+        # 结构1：顶层 question_id
+        if isinstance(data, dict) and question_id in data:
+            qnode = data.get(question_id)
+        # 结构2：顶层 episode -> question_id -> {question, steps}
+        if qnode is None and isinstance(data, dict):
+            for _, bucket in data.items():
+                if isinstance(bucket, dict) and question_id in bucket:
+                    qnode = bucket.get(question_id)
+                    break
+
+        if not isinstance(qnode, dict):
+            return None
+
+        q_text = qnode.get("question", default_question or "")
+
+        # 可能有两种存储：直接多个 step_* 或统一 steps 字段
+        steps_obj = None
+        if "steps" in qnode and isinstance(qnode["steps"], dict):
+            steps_obj = qnode["steps"]
+        else:
+            # 收集所有 step_*
+            steps_obj = {k: v for k, v in qnode.items() if isinstance(v, dict) and k.startswith("step_")}
+
+        if not steps_obj:
+            return None
+
+        # 按 step 序号排序
+        def _step_order(k: str) -> int:
+            try:
+                return int(k.split("_")[-1])
+            except Exception:
+                return 0
+
+        lines = []
+        for idx, step_key in enumerate(sorted(steps_obj.keys(), key=_step_order), start=1):
+            s = steps_obj.get(step_key) or {}
+            cur = s.get("current_step")
+            tot = s.get("total_step")
+            caption = s.get("Caption") or s.get("caption") or ""
+            critique = s.get("Critique") or s.get("critique")
+            abstraction = s.get("Abstraction") or s.get("abstraction")
+            bvf = s.get("chosen_BVF")
+            cvf = s.get("chosen_CVF")
+            outcome = s.get("final_reward") or qnode.get("final_reward")
+
+            # 若三项全关，则跳过该 step
+            if not (inject_experience or inject_critique or inject_abstraction):
+                continue
+
+            # 经验编号统一使用顺序编号 1..K，避免 current_step 不连续导致编号缺失
+            exp_id = idx
+
+            # 组块1：Caption tuple（可关，润色用词）
+            if inject_experience:
+                sentence = f"Experience {exp_id}: \nAt step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                if caption:
+                    sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                if (bvf is not None and cvf is not None):
+                    sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                elif (bvf is not None):
+                    sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                elif (cvf is not None):
+                    sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                if outcome is not None:
+                    sentence += f"and the outcome of that trial was {outcome}."
+                lines.append(sentence.strip())
+            else:
+                # 若关闭 caption 仍保留 Experience 分组标题，便于阅读分块
+                lines.append(f"Experience {exp_id}:")
+
+            # 组块2：Critique（可关，按要求前置换行并以 'Critique:' 开头）
+            if inject_critique and critique:
+                lines.append("")
+                lines.append(f"Critique: {critique}")
+
+            # 组块3：Abstraction（可关，按要求前置换行并以 'Abstraction:' 开头）
+            if inject_abstraction and abstraction:
+                lines.append("")
+                lines.append(f"Abstraction: {abstraction}")
+            # 空行分隔不同 experience
+            lines.append("")
+
+        text = "\n".join(lines).strip()
+        return text if text else None
+    except Exception as e:
+        try:
+            logging.info(f"[ExpTuple] build failed for qid={question_id}: {e}")
+        except Exception:
+            pass
+        return None
+
 def aggregate_recall_contexts_for_layer(
     layer_alias: str,        # 用自然词，比如 "initial directions" / "closer looks"
     contexts: list,          # List[Optional[str]]，与候选对齐
@@ -1550,7 +1760,17 @@ def frontier_context(
 
 
 
-def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
+def explore_step(
+    step,
+    cfg,
+    verbose=False,
+    chosen_frontier_path=None,
+    step_idx=None,
+    exp_tuple_path: Optional[str] = None,
+    inject_experience: bool = False,
+    inject_critique: bool = False,
+    inject_abstraction: bool = False,
+):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
     (
@@ -1651,6 +1871,10 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 )
             ),
             current_question=question,
+            exp_tuple_path=exp_tuple_path,
+            inject_experience=bool(inject_experience),
+            inject_critique=bool(inject_critique),
+            inject_abstraction=bool(inject_abstraction),
         )
     else:
         step["replay_layer0_aggregated_context"] = None
@@ -1685,6 +1909,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         pass
 
     # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
+    # 经验文本统一通过 simple_recall_and_aggregate 基于检索候选 (qid, step) 从 exp_tuple 中回取
     sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
@@ -1766,7 +1991,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
 
 
-        # —— 对该方向下的“更近处视角”子集做聚合（indices 为全局 layer1 索引） ——
+        # —— 对该方向下的"更近处视角"子集做聚合（indices 为全局 layer1 索引） ——
         layer1_texts_all = step.get("replay_context_text_per_frontier", {}).get("layer1", [])
         layer1_context_text = None
         if layer1_texts_all and isinstance(layer1_indices, list) and len(layer1_indices) > 0:
@@ -1793,6 +2018,10 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                     )
                 ),
                 current_question=question,
+                exp_tuple_path=exp_tuple_path,
+                inject_experience=bool(inject_experience),
+                inject_critique=bool(inject_critique),
+                inject_abstraction=bool(inject_abstraction),
             )
         else:
             layer1_context_text = None

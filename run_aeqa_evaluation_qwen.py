@@ -794,6 +794,13 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     logging.info(f"[ReplaySim] Pre-create replay json failed: {e}")
 
                 # query the VLM for the next navigation point, and the reason for the choice
+                # annotate identifiers into cfg for prompt construction
+                try:
+                    cfg.episode_history_id = scene_id
+                    cfg.current_question_id = question_id
+                    cfg.current_question_text = question
+                except Exception:
+                    pass
                 vlm_response = query_vlm_for_response(
                     question=question,
                     scene=scene,
@@ -805,6 +812,10 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     step_idx=cnt_step,
                     question_id=question_id,
                     lifelong_json_path=lifelong_json_path,
+                    exp_tuple_path=(args.exp_tuple if isinstance(args.exp_tuple, str) and len(args.exp_tuple) > 0 else None),
+                    inject_experience=bool(args.caption),
+                    inject_critique=bool(args.critique),
+                    inject_abstraction=bool(args.abstraction),
                     # lifelong_context=lifelong_context,
                 )
                 if vlm_response is None:
@@ -988,6 +999,12 @@ if __name__ == "__main__":
     parser.add_argument("--retrieve_root", help="external retrieve root; expects replay_step_info.json & experience_output.json inside", default="", type=str)
     parser.add_argument("--use_episodic_context", help="whether to enable episodic context (0/1)", default=1, type=int)
     parser.add_argument("--chat_seed", help="random seed for vLLM generation (decoupled from cfg.seed)", default=None, type=int)
+    parser.add_argument("--exp_tuple", help="path to exp_tuple json for EXPERIENCE REPLAY (no default)", default="", type=str)
+    # toggles for injecting experience/critique/abstraction from JSON (default off)
+    _bool = lambda x: str(x).lower() in ("1", "true", "t", "yes", "y")
+    parser.add_argument("--caption", "--experience", dest="caption", help="inject base caption tuple lines", default=False, type=_bool)
+    parser.add_argument("--critique", help="inject critique reflection lines", default=False, type=_bool)
+    parser.add_argument("--abstraction", help="inject abstraction guideline lines", default=False, type=_bool)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)

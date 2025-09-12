@@ -77,13 +77,14 @@ source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate 3dmem
 source .env
 
 CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
- /home/hpc/v100dd/v100dd12/code/3D-Mem/src/generate_experience_from_json.py \
-    --input_json /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/replay_step_info.json \
-    --output_json /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/experience_output.json \
-    --output_parent_dir /anvme/workspace/v100dd12-3dmem/openeqa \
-    --exp_name ee_qwen/qwen-exp-168 \
-    --strategy sim \
-    --top_k 1
+  -- \
+  /home/hpc/v100dd/v100dd12/code/3D-Mem/generate_experience_from_json.py \
+  --input_json /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/replay_step_info.json \
+  --output_json /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/experience_output.json \
+  --output_parent_dir /anvme/workspace/v100dd12-3dmem/openeqa \
+  --exp_name ee_qwen/qwen-exp-168 \
+  --captions_only \
+  --experience_json_path /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/experience_output.json
 
 
 echo "[INFO] Debug run finished. Killing vLLM server (PID=$VLLM_PID)..."

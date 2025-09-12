@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=168_experience
+#SBATCH --job-name=168_tuple
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a40:2
+#SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/ee/qwen168-experience-%j.out 
-#SBATCH --partition a40
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/ee/qwen-168-tuple-%j.out 
+#SBATCH --partition a100
 
 
 
@@ -81,8 +81,8 @@ CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/generate_exp
     --output_json /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/experience_output.json \
     --output_parent_dir /anvme/workspace/v100dd12-3dmem/openeqa \
     --exp_name ee_qwen/qwen-exp-168 \
-    --strategy sim \
-    --top_k 1
+    --captions_only \
+    --experience_json_path /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/experience_output.json
 
 
 echo "[INFO] Debug run finished. Killing vLLM server (PID=$VLLM_PID)..."
