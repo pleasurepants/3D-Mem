@@ -212,21 +212,6 @@ def _load_frontier_index(cfg):
         return {}
 
 
-def _load_experience(cfg):
-    root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
-    exp_filename = getattr(cfg, "experience_filename", "experience_output.json")
-    exp_path = os.path.join(root, exp_filename)
-    if not os.path.exists(exp_path):
-        logging.info(f"[SimpleRecall] experience_output.json not found: {exp_path}")
-        return {}
-    try:
-        with open(exp_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except Exception as e:
-        logging.warning(f"[SimpleRecall] load experience failed: {e}")
-        return {}
-
 
 _AEQA_QID2QUESTION = None
 
@@ -702,6 +687,13 @@ def simple_recall_and_aggregate(
             logging.info("[VecRetrieve] vector store not available or no frontiers")
         else:
             try:
+                # 简要记录本次检索的关键信息
+                try:
+                    logging.info(
+                        f"[VecRetrieve][sim] question={_shorten(current_question or '', 160)} | num_frontiers={len(frontier_imgs_b64)}"
+                    )
+                except Exception:
+                    pass
                 dev = _device_auto()
                 from PIL import Image as _Image
                 from io import BytesIO as _BytesIO
@@ -719,6 +711,13 @@ def simple_recall_and_aggregate(
                 if t_emb is None:
                     logging.info("[VecRetrieve] image embedding failed; skip vecimg sim")
                 else:
+                    try:
+                        cshape = getattr(store['png']['emb'], 'shape', None)
+                        logging.info(
+                            f"[VecRetrieve][sim] embeddings: frontiers={tuple(t_emb.shape)} | corpus={tuple(cshape) if cshape else 'N/A'} | model={clip_model}"
+                        )
+                    except Exception:
+                        pass
                     import numpy as _np
                     corpus = store['png']['emb']  # [N, D], 已归一化
                     merged_candidates = []
@@ -775,6 +774,27 @@ def simple_recall_and_aggregate(
                             for cand in merged_unique:
                                 text_scores[(cand.get('question_id'), cand.get('step_key'))] = 0.0
                         text_sorted = sorted(merged_unique, key=lambda x: text_scores[(x.get('question_id'), x.get('step_key'))], reverse=True)
+
+                        # 仅记录 image-only 与 text-only 排名（便于对比与调试）
+                        try:
+                            log_n = min(max(1, top_k), len(image_sorted))
+                            if log_n > 0:
+                                logging.info(f"[VecRetrieve][sim] image-only top {log_n}:")
+                            for rank, cand in enumerate(image_sorted[:log_n], 1):
+                                logging.info(
+                                    f"  #{rank}: clip_sim={cand.get('similarity', 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | filename={cand.get('filename_rel') or 'N/A'}"
+                                )
+                            log_n_t = min(max(1, top_k), len(text_sorted))
+                            if log_n_t > 0:
+                                logging.info(f"[VecRetrieve][sim] text-only top {log_n_t}:")
+                            for rank, cand in enumerate(text_sorted[:log_n_t], 1):
+                                key = (cand.get('question_id'), cand.get('step_key'))
+                                qsim = float(text_scores.get(key, 0.0))
+                                logging.info(
+                                    f"  #{rank}: qsim={qsim:.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | filename={cand.get('filename_rel') or 'N/A'}"
+                                )
+                        except Exception:
+                            pass
                         # RRF 融合
                         rank_img = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(image_sorted) }
                         rank_txt = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(text_sorted) }
@@ -906,31 +926,84 @@ def simple_recall_and_aggregate(
                     selected.append({'question_id': qid, 'step_key': sk, 'level': m.get('level')})
                     if len(selected) >= max(1, top_k):
                         break
-                # 回取 experience
-                exp = _load_experience(cfg)
+                # 使用 exp_tuple_path 拼接 Experience/Critique/Abstraction（与 sim/question-first 分支保持一致）
+                try:
+                    if isinstance(exp_tuple_path, str) and len(exp_tuple_path) > 0 and os.path.exists(exp_tuple_path):
+                        with open(exp_tuple_path, 'r', encoding='utf-8') as _f:
+                            tuple_data = json.load(_f)
+                    else:
+                        tuple_data = None
+                except Exception:
+                    tuple_data = None
+
+                def _fetch_tuple_step(_data, _qid, _step_key):
+                    if not isinstance(_data, dict):
+                        return None
+                    # 顶层 qid
+                    if _qid in _data and isinstance(_data[_qid], dict):
+                        qnode = _data[_qid]
+                    else:
+                        qnode = None
+                        for _, bucket in _data.items():
+                            if isinstance(bucket, dict) and _qid in bucket:
+                                qnode = bucket.get(_qid)
+                                break
+                    if not isinstance(qnode, dict):
+                        return None
+                    q_text = qnode.get('question', '')
+                    steps = qnode.get('steps') if isinstance(qnode.get('steps'), dict) else qnode
+                    step_entry = None
+                    if isinstance(steps, dict):
+                        step_entry = steps.get(_step_key)
+                    if not isinstance(step_entry, dict):
+                        return None
+                    return q_text, step_entry
+
                 texts = []
                 for j, cand in enumerate(selected):
+                    if tuple_data is None:
+                        continue
                     qid = cand.get('question_id')
                     sk = cand.get('step_key')
-                    exp_text = None
-                    try:
-                        for ep_id, qdict in exp.items():
-                            if not isinstance(qdict, dict):
-                                continue
-                            qinfo = qdict.get(qid)
-                            if not isinstance(qinfo, dict):
-                                continue
-                            steps = qinfo.get('steps', {})
-                            if not isinstance(steps, dict):
-                                continue
-                            step_entry = steps.get(sk, {})
-                            if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
-                                exp_text = step_entry['experience']
-                                break
-                        if isinstance(exp_text, str) and exp_text.strip():
-                            texts.append(f"Experience {j}: " + exp_text.strip())
-                    except Exception:
+                    fetched = _fetch_tuple_step(tuple_data, qid, sk)
+                    if not fetched:
                         continue
+                    q_text, step_entry = fetched
+                    cur = step_entry.get('current_step')
+                    tot = step_entry.get('total_step')
+                    caption = step_entry.get('Caption') or step_entry.get('caption') or ''
+                    critique = step_entry.get('Critique') or step_entry.get('critique')
+                    abstraction = step_entry.get('Abstraction') or step_entry.get('abstraction')
+                    bvf = step_entry.get('chosen_BVF')
+                    cvf = step_entry.get('chosen_CVF')
+                    outcome = step_entry.get('final_reward')
+
+                    blocks = []
+                    exp_id = j + 1
+                    if inject_experience:
+                        sentence = f"Experience {exp_id}: \nAt step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                        if caption:
+                            sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                        if (bvf is not None and cvf is not None):
+                            sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                        elif (bvf is not None):
+                            sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                        elif (cvf is not None):
+                            sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                        if outcome is not None:
+                            sentence += f"and the outcome of that trial was {outcome}."
+                        blocks.append(sentence.strip())
+                    else:
+                        blocks.append(f"Experience {exp_id}:")
+
+                    if inject_critique and isinstance(critique, str) and critique.strip():
+                        blocks.append("")
+                        blocks.append(f"Critique: {critique}")
+                    if inject_abstraction and isinstance(abstraction, str) and abstraction.strip():
+                        blocks.append("")
+                        blocks.append(f"Abstraction: {abstraction}")
+                    texts.append("\n".join(blocks))
+
                 return "\n\n".join(texts) if texts else None
             except Exception as e:
                 logging.warning(f"[VecRetrieve][random] failed: {e}")
@@ -938,190 +1011,9 @@ def simple_recall_and_aggregate(
     # 没有其他可用策略，返回 None
         return None
 
-    # 预解码：索引 bits
-    idx_bits = {}
-    idx_meta = {}
-    for rel_key, rec in index_map.items():
-        if not isinstance(rec, dict):
-            continue
-        qid = rec.get('question_id')
-        sk = rec.get('step_key')
-        if not qid or not sk:
-            continue
-        if exclude_question_id and qid == exclude_question_id:
-            continue
-        bits_list = rec.get('bits')
-        if not isinstance(bits_list, list):
-            continue
-        try:
-            bits = np.asarray(bits_list, dtype=np.uint8).reshape(-1)
-        except Exception:
-            continue
-        idx_bits[rel_key] = bits
-        idx_meta[rel_key] = {
-            'episode_id': None,            # 不依赖 episode 过滤，统一从 experience 里回取
-            'question_id': qid,
-            'step_key': sk,
-            'level': rec.get('level'),
-            'filename_rel': os.path.join('frontier', rec.get('filename', '')),
-        }
-
-    # 预解码：目标 bits
-    target_bits_list = []
-    for b64 in frontier_imgs_b64:
-        bits = _pil_bits_from_b64(b64)
-        if bits is not None:
-            target_bits_list.append(bits)
-    if not target_bits_list:
-        return None
-
-    # per-frontier：取去重后的 top-5 (qid, step_key)
-    merged_candidates = []
-    for i, tbits in enumerate(target_bits_list):
-        # 对全索引计算最大相似度（与所有目标 bits 中的最大）
-        per_scores = []
-        for rel_key, cbits in idx_bits.items():
-            try:
-                sim = float(_similarity(cbits, tbits))
-            except Exception:
-                continue
-            meta = idx_meta[rel_key]
-            per_scores.append({
-                'similarity': sim,
-                **meta,
-                'source_frontier_index': i,
-            })
-        if not per_scores:
-            continue
-        per_scores.sort(key=lambda x: x['similarity'], reverse=True)
-        # 去重 top-5
-        seen = set()
-        kept = []
-        for cand in per_scores:
-            key = (cand['question_id'], cand['step_key'])
-            if key in seen:
-                continue
-            seen.add(key)
-            kept.append(cand)
-            if len(kept) >= 5:
-                break
-        merged_candidates.extend(kept)
-
-    if not merged_candidates:
-        return None
-
-    # 全局去重（按 (qid, step) 保留相似度最高的图像分数）
-    best_by_key = {}
-    for cand in merged_candidates:
-        key = (cand['question_id'], cand['step_key'])
-        prev = best_by_key.get(key)
-        if prev is None or float(cand['similarity']) > float(prev['similarity']):
-            best_by_key[key] = cand
-    merged_unique = list(best_by_key.values())
-    # 基于英文问题文本计算文本相似度
-    qid2question = _load_questions_en()
-    image_sorted = sorted(merged_unique, key=lambda x: x['similarity'], reverse=True)
-    text_scores = {}
-    if isinstance(current_question, str) and current_question.strip():
-        for cand in merged_unique:
-            qid = cand.get('question_id')
-            qtext = qid2question.get(qid, '')
-            text_scores[(cand.get('question_id'), cand.get('step_key'))] = _cosine_sim_tokens(current_question, qtext)
-    else:
-        for cand in merged_unique:
-            text_scores[(cand.get('question_id'), cand.get('step_key'))] = 0.0
-
-    text_sorted = sorted(merged_unique, key=lambda x: text_scores[(x.get('question_id'), x.get('step_key'))], reverse=True)
-    # RRF 前的统计日志
-    try:
-        qtext_coverage = sum(1 for cand in merged_unique if qid2question.get(cand.get('question_id')))
-        qsim_values = [text_scores[(c.get('question_id'), c.get('step_key'))] for c in merged_unique]
-        nonzero_qsim = [v for v in qsim_values if v > 0]
-        nz_count = len(nonzero_qsim)
-        nz_mean = (sum(nonzero_qsim) / nz_count) if nz_count > 0 else 0.0
-        nz_max = max(nonzero_qsim) if nz_count > 0 else 0.0
-        logging.info(
-            f"[SimpleRecall][RRF] candidates={len(merged_unique)} | qtext_coverage={qtext_coverage} | nonzero_qsim={nz_count} | qsim_mean={nz_mean:.4f} | qsim_max={nz_max:.4f} | rrf_k={rrf_k}"
-        )
-        # 各自通道的前 top_k 摘要
-        log_n = min(max(1, top_k), len(image_sorted))
-        if log_n > 0:
-            logging.info(f"[SimpleRecall][RRF] image-only ranking (top {log_n}):")
-            for rank, cand in enumerate(image_sorted[:log_n]):
-                logging.info(
-                    f"  #{rank+1}: img_sim={cand.get('similarity', 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')}"
-                )
-            logging.info(f"[SimpleRecall][RRF] text-only ranking (top {log_n}):")
-            for rank, cand in enumerate(text_sorted[:log_n]):
-                key = (cand.get('question_id'), cand.get('step_key'))
-                logging.info(
-                    f"  #{rank+1}: qsim={text_scores.get(key, 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')}"
-                )
-    except Exception:
-        pass
-    # 计算 RRF 分数：score = 1/(k + rank_img) + 1/(k + rank_txt)
-    rank_img = { (c.get('question_id'), c.get('step_key')): i+1 for i, c in enumerate(image_sorted) }
-    rank_txt = { (c.get('question_id'), c.get('step_key')): i+1 for i, c in enumerate(text_sorted) }
-    for cand in merged_unique:
-        key = (cand.get('question_id'), cand.get('step_key'))
-        ri = rank_img.get(key, len(image_sorted) + 1)
-        rt = rank_txt.get(key, len(text_sorted) + 1)
-        cand['rrf_score'] = (1.0 / (rrf_k + ri)) + (1.0 / (rrf_k + rt))
-        cand['qsim'] = text_scores.get(key, 0.0)
-    # 打印融合后排行（仅 top_k）
-    final_sorted = sorted(merged_unique, key=lambda x: x.get('rrf_score', 0.0), reverse=True)
-    try:
-        logging.info(f"[SimpleRecall] final candidate pool size={len(merged_unique)}, strategy={strategy}, request_top_k={top_k}")
-        log_n = min(max(1, top_k), len(final_sorted))
-        if log_n > 0:
-            logging.info(f"[SimpleRecall] fused ranking by RRF (top {log_n}):")
-        for rank, cand in enumerate(final_sorted[:log_n]):
-            logging.info(
-                f"  #{rank+1}: rrf={cand.get('rrf_score', 0.0):.6f} | img_sim={cand.get('similarity', 0.0):.4f} | qsim={cand.get('qsim', 0.0):.4f} | src_idx={cand.get('source_frontier_index')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')}"
-            )
-    except Exception:
-        pass
-
-    if (strategy or 'sim') == 'random':
-        k = min(max(1, top_k), len(merged_unique))
-        final_selected = random.sample(merged_unique, k) if k > 0 else []
-    else:
-        final_selected = final_sorted[: max(1, top_k)]
-
-    # 回取 experience 文本
-    exp = _load_experience(cfg)
-    texts = []
-    for j, cand in enumerate(final_selected):
-        qid = cand.get('question_id')
-        sk = cand.get('step_key')
-        exp_text = None
-        # 不知道 episode_id 时，穷举查找一次（字典层级通常不大）
-        try:
-            for ep_id, qdict in exp.items():
-                if not isinstance(qdict, dict):
-                    continue
-                qinfo = qdict.get(qid)
-                if not isinstance(qinfo, dict):
-                    continue
-                steps = qinfo.get('steps', {})
-                if not isinstance(steps, dict):
-                    continue
-                step_entry = steps.get(sk, {})
-                if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
-                    exp_text = step_entry['experience']
-                    break
-            if isinstance(exp_text, str) and exp_text.strip():
-                texts.append(f"Experience {j}: " + exp_text.strip())
-        except Exception:
-            continue
-        try:
-            logging.info(
-                f"[SimpleRecall] selected #{j+1}: rrf={cand.get('rrf_score', 0.0):.6f} | img_sim={cand.get('similarity', 0.0):.4f} | qsim={cand.get('qsim', 0.0):.4f} | src_idx={cand.get('source_frontier_index')} | qid={qid} | step={sk} | lvl={cand.get('level')}"
-            )
-        except Exception:
-            continue
-
-    return "\n\n".join(texts) if texts else None
+    # 预解码：载入索引并提取 bits（已弃用 ahash 路径；sim 仅使用 CLIP，提前返回）
+    return None
+    
 
 
 def format_explore_prompt(
