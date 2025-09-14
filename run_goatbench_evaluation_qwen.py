@@ -1,4 +1,6 @@
-import os
+import os, json, re
+from typing import Optional, Dict, List
+import uuid
 
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # disable warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -26,12 +28,52 @@ from ultralytics import SAM, YOLOWorld
 
 from src.habitat import pose_habitat_to_tsdf
 from src.geom import get_cam_intr, get_scene_bnds
-from src.tsdf_planner import TSDFPlanner, Frontier, SnapShot
+# from src.tsdf_planner import TSDFPlanner, Frontier, SnapShot
+from src.tsdf_planner_hdbscan import TSDFPlanner, Frontier, SnapShot
 from src.scene_goatbench import Scene
 from src.utils import resize_image, calc_agent_subtask_distance, get_pts_angle_goatbench
 from src.goatbench_utils import prepare_goatbench_navigation_goals
-from src.query_vlm_goatbench import query_vlm_for_response
+# from src.query_vlm_goatbench import query_vlm_for_response
+from src.query_vlm_goatbench_qwen import query_vlm_for_response
 from src.logger_goatbench import Logger
+
+
+def question_room(folder_path, questions_list_path):
+    pass
+
+
+def check_lifelong_memory(lifelong_json_path, lifelong_memory, cfg, question):
+    pass
+
+
+def tuple_step_save(
+    tuple_save_path: str,
+    question_id: str,
+    question: str,
+    cnt_step: int,
+    cfg,
+    lifelong_json_path: str,
+    question_data: Optional[dict] = None,   # may carry {"episode_history": "..."}
+    episode_history_id: Optional[str] = None,  # explicit episode id, if known
+    final_reward: Optional[str] = None  # 'pass' or 'fail'
+):
+    pass
+
+
+def _to_serializable_list(x):
+    pass
+
+
+def append_step_coords_json(
+    output_root_dir: str,
+    question_id: str,
+    step_index: int,
+    agent_position,
+    agent_position_voxel,
+    angle,
+    target_position=None,
+):
+    pass
 
 
 def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
@@ -101,7 +143,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
         )
 
         # selecat the episodes according to the split
-        ## why only one episode?
+        ## why only one episode -> setting in 3d-mem
         scene_data["episodes"] = scene_data["episodes"][split - 1 : split]
         total_episodes = len(scene_data["episodes"])
 
@@ -110,8 +152,8 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
         ]  # obj_id to obj_data, apply for all episodes in this scene
 
         for episode_idx, episode in enumerate(scene_data["episodes"]):
-            logging.info(f"Episode {episode_idx + 1}/{total_episodes}")
-            logging.info(f"Loading scene {scene_id}")
+            # logging.info(f"Episode {episode_idx + 1}/{total_episodes}")
+            logging.info(f"Loading scene {scene_id}, episode {episode_idx + 1}/{total_episodes}")
             episode_id = episode["episode_id"]
 
             all_subtask_goal_types, all_subtask_goals = (
@@ -172,9 +214,12 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
 
             episode_dir, eps_frontier_dir, eps_snapshot_dir = logger.init_episode(
                 episode_id=f"{scene_id}_ep_{episode_id}"
-            )
+            )   # diff w.r.t. aeqa: init_pts_voxel init in init_subtask()
 
             logging.info(f"\n\nScene {scene_id} initialization successful!")
+            
+            ## lifelong-memory
+            #TODO
 
             # run questions in the scene
             global_step = -1    # in the whole episode
@@ -271,11 +316,14 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                                     pts_voxel=tsdf_planner.habitat2voxel(pts),
                                     img_path=obs_file_name,
                                     frame_idx=cnt_step * total_views + view_idx,
+                                    ## the following in goatbench but not in aeqa
                                     semantic_obs=semantic_obs,
                                     gt_target_obj_ids=subtask_metadata["goal_obj_ids"],
+                                    ## the following in aeqa but not in goatbench
+                                    # target_obj_mask=None,
                                 )
                             )
-                            scene.all_observations[obs_file_name] = rgb
+                            scene.all_observations[obs_file_name] = rgb ## in aeqa here already resized
                             rgb_egocentric_views.append(
                                 resize_image(rgb, cfg.prompt_h, cfg.prompt_w)
                             )
@@ -289,6 +337,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                                     os.path.join(eps_snapshot_dir, obs_file_name), rgb
                                 )
                             # update the mapping of hm3d object id to our detected object id
+                            ## goal_obj_ids_mapping not in aeqa
                             for (
                                 gt_goal_id,
                                 det_goal_id,
@@ -300,7 +349,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                         scene.periodic_cleanup_objects(
                             frame_idx=cnt_step * total_views + view_idx,
                             pts=pts,
-                            goal_obj_ids_mapping=goal_obj_ids_mapping,
+                            goal_obj_ids_mapping=goal_obj_ids_mapping,  ## not in aeqa
                         )
 
                         # Update depth map, occupancy map
@@ -348,6 +397,12 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                     )
                     if not update_success:
                         logging.info("Warning! Update frontier map failed!")
+                        ## in aeqa, if the first step fails, we should stop, change question_id to subtask_id?
+                        # if cnt_step == 0:
+                        #     logging.info(
+                        #         f"subtask id {subtask_id} invalid: update_frontier_map failed!"
+                        #     )
+                        #     break
 
                     # (4) Choose the next navigation point by querying the VLM
                     if cfg.choose_every_step:
@@ -368,11 +423,29 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                         target_obj_ids_estimate.append(
                             max(set(det_ids), key=det_ids.count)
                         )
+                        
+                    ## add chosen frontier dir
+                    chosen_frontier_path = os.path.join(episode_dir, 'chosen_frontier')
 
                     if (
                         tsdf_planner.max_point is None
                         and tsdf_planner.target_point is None
                     ):
+                        ## ensure replay_step_info.json exists before VLM query (for context recall)
+                        # tuple_save_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
+                        # try:
+                        #     tuple_step_save(
+                        #         tuple_save_path=tuple_save_path,
+                        #         question_id=question_id,
+                        #         question=question,
+                        #         cnt_step=cnt_step,
+                        #         cfg=cfg,
+                        #         lifelong_json_path=lifelong_json_path,
+                        #         question_data=question_data,
+                        #     )
+                        # except Exception as e:
+                        #     logging.info(f"[ReplaySim] Pre-create replay json failed: {e}")
+                        
                         # query the VLM for the next navigation point, and the reason for the choice
                         vlm_response = query_vlm_for_response(
                             subtask_metadata=subtask_metadata,
@@ -381,6 +454,12 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             rgb_egocentric_views=rgb_egocentric_views,
                             cfg=cfg,
                             verbose=True,
+                            ##
+                            # chosen_frontier_path=chosen_frontier_path,
+                            # step_idx=cnt_step,
+                            # question_id=question_id,
+                            # lifelong_json_path=lifelong_json_path,
+                            
                         )
                         if vlm_response is None:
                             logging.info(
@@ -388,7 +467,20 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             )
                             break
 
-                        max_point_choice, n_filtered_snapshots = vlm_response
+                        # max_point_choice, n_filtered_snapshots = vlm_response
+                        max_point_choice, gpt_answer, n_filtered_snapshots = vlm_response
+                        
+                        ##
+                        # tuple_save_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
+                        # tuple_step_save(
+                        #     tuple_save_path=tuple_save_path,
+                        #     question_id=question_id,
+                        #     question=question,
+                        #     cnt_step=cnt_step,
+                        #     cfg=cfg,
+                        #     lifelong_json_path=lifelong_json_path,
+                        #     question_data=question_data,
+                        # )
 
                         # set the vlm choice as the navigation target
                         update_success = tsdf_planner.set_next_navigation_point(
@@ -403,6 +495,25 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                                 f"Subtask id {subtask_id} invalid: set_next_navigation_point failed!"
                             )
                             break
+                        
+                        ## 
+                        # try:
+                        #     target_pos = None
+                        #     try:
+                        #         target_pos = getattr(max_point_choice, 'position', None)
+                        #     except Exception:
+                        #         target_pos = None
+                        #     append_step_coords_json(
+                        #         output_root_dir=cfg.output_dir,
+                        #         question_id=question_id,
+                        #         step_index=cnt_step,
+                        #         agent_position=pts,
+                        #         agent_position_voxel=tsdf_planner.habitat2voxel(pts)[:2],
+                        #         angle=angle,
+                        #         target_position=target_pos,
+                        #     )
+                        # except Exception as e:
+                        #     logging.info(f"[Coords] Failed to append target position: {e}")
 
                     # (5) Agent navigate to the target point for one step
                     return_values = tsdf_planner.agent_step(
@@ -427,6 +538,20 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                     logging.info(
                         f"Current position: {pts}, {logger.subtask_explore_dist:.3f}"
                     )
+                    
+                    ##
+                    # try:
+                    #     append_step_coords_json(
+                    #         output_root_dir=cfg.output_dir,
+                    #         question_id=question_id,
+                    #         step_index=cnt_step,
+                    #         agent_position=pts,
+                    #         agent_position_voxel=pts_voxel[:2] if hasattr(pts_voxel, '__len__') else pts_voxel,
+                    #         angle=angle,
+                    #         target_position=None,
+                    #     )
+                    # except Exception as e:
+                    #     logging.info(f"[Coords] Failed to append agent pose after step: {e}")
 
                     # sanity check about objects, scene graph, snapshots, ...
                     scene.sanity_check(cfg=cfg)
@@ -447,10 +572,23 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             tsdf_planner=tsdf_planner,
                             max_point_choice=max_point_choice,
                             global_caption=f"{subtask_metadata['question']}\n{subtask_metadata['task_type']}\n{subtask_metadata['class']}",
-                        )
+                        )   ## as an example to adapt aeqa setting to goat-bench
 
                     # (6) Check if the agent has arrived at the target to finish the question
                     if type(max_point_choice) == SnapShot and target_arrived:
+                        
+                        ## 
+                        # tuple_step_save(
+                        #     tuple_save_path=tuple_save_path,
+                        #     question_id=question_id,
+                        #     question=question,
+                        #     cnt_step=cnt_step,
+                        #     cfg=cfg,
+                        #     lifelong_json_path=lifelong_json_path,
+                        #     question_data=question_data,
+                        #     final_reward="pass"
+                        # )
+                        
                         # when the target is a snapshot, and the agent arrives at the target
                         # we consider the subtask is finished, take an observation and save the chosen target snapshot
                         obs, _ = scene.get_observation(pts, angle=angle)
@@ -590,3 +728,12 @@ if __name__ == "__main__":
     # run
     logging.info(f"***** Running {cfg.exp_name} *****")
     main(cfg, start_ratio=args.start_ratio, end_ratio=args.end_ratio, split=args.split)
+
+
+"""
+output_dir: output_parent_dir/exp_name/
+episode_dir: output_dir/episode_id/, episode_id = {scene_id}_ep_{episode_id}
+eps_frontier_dir: episode_dir/frontier/
+eps_snapshot_dir: episode_dir/snapshot/
+subtask_object_observe_dir: output_dir/subtask_id/object_observations/
+"""
