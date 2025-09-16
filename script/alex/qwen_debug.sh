@@ -77,7 +77,7 @@ export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 # -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
 CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
  /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/experience/caption-critique/sim/top-3/cc-s-3-568.yaml \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/eval_aeqa_debug.yaml \
     --replay_mode random \
     --replay_top 3 \
     --use_episodic_context 1 \
@@ -85,8 +85,8 @@ CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client
     --chat_seed 32 \
     --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/exp_tuple_v0.json \
     --caption true \
-    --critique false \
-    --abstraction false
+    --critique true \
+    --abstraction true
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

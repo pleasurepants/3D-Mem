@@ -1,7 +1,7 @@
 # General
 seed: 13
 exp_name: "caption-critique-abstraction/random/top-3/cca-r-3-32"
-output_parent_dir: "/anvme/workspace/v100dd12-3dmem/openeqa/modul"
+output_parent_dir: "/anvme/workspace/v100dd12-3dmem/openeqa/modul_cot_v1"
 scene_dataset_config_path: "/home/hpc/v100dd/v100dd12/code/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/anvme/workspace/v100dd12-3dmem/hm3d/data/3dmem"
 questions_list_path: '/home/hpc/v100dd/v100dd12/code/3D-Mem/data/aeqa_questions-41.json'

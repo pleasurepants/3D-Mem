@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=cca-r-1-568
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a40:2
+#SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=24:00:00 
+#SBATCH --time=15:00:00 
 #SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/caption-critique-abstraction/random/top-1/cca-r-1-568-%j.out
-#SBATCH --partition a40
+#SBATCH --partition a100
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 

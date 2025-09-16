@@ -1175,8 +1175,17 @@ def format_explore_prompt_frontier(
 
     # 5) 最后给出行为指令
     guidance = (
-        f"Now reason in steps and tell me which frontier to select. On the final line, print ONLY '{label_word} i'."
+        f"Now reason in steps before making your choice. "
+        "Step 0: restate the task in your own words and confirm you are choosing exactly one frontier of the given type. "
+        "Step 1: from EPISODIC CONTEXT (if present), briefly state which areas are already explored and which remain unseen. "
+        "Step 2: analyze all EXPERIENCE REPLAY entries (if present). For each, note the chosen frontier, the outcome, and the critique. Then integrate them into 1–2 concise directive rules that give specific, problem-focused guidance for the current question. These rules must directly indicate what kind of frontier to prioritize or avoid in order to find the target more effectively, and should omit any rule that does not provide actionable help. "
+        "Step 3: compare the current frontiers one by one using visual cues, novelty, and alignment with these directive rules, then decide on the best option. "
+        f"On the final line, print ONLY '{label_word} i'."
     )
+
+
+
+
     content.append((guidance,))
 
     return sys_prompt, content
