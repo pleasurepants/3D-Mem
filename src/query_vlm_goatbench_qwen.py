@@ -3,10 +3,50 @@ from typing import Tuple, Optional, Union
 import random
 import numpy as np
 
-from src.eval_utils_gpt_goatbench import explore_step
+from src.eval_utils_gpt_goatbench_qwen import explore_step
 from src.utils import resize_image
 from src.tsdf_planner_hdbscan import TSDFPlanner, SnapShot, Frontier
 from src.scene_goatbench import Scene
+import json
+import os
+
+
+def save_snapshot_objects_with_names(
+    question_id: str,
+    snapshot_objects: dict,
+    object_id_to_name: dict,
+    json_path: str,
+):
+    """
+    将当前step_dict['snapshot_objects']中object id转换为名称，并保存到json，支持增量更新。
+    json_path就是最终的json文件路径。
+    """
+    # 保证路径上的目录存在
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    
+    # 加载历史数据（如果文件已存在）
+    if os.path.exists(json_path):
+        with open(json_path, 'r') as f:
+            all_data = json.load(f)
+    else:
+        all_data = {}
+    
+    # 构建本次数据（把object id转为名称）
+    obj_name_dict = {}
+    for snap_img, obj_ids in snapshot_objects.items():
+        obj_name_dict[snap_img] = [
+            object_id_to_name.get(str(obj_id), object_id_to_name.get(int(obj_id), str(obj_id)))
+            for obj_id in obj_ids
+        ]
+    
+    # 写入/更新该subtask_id的数据
+    all_data[question_id] = obj_name_dict
+    
+    # 保存回json文件
+    with open(json_path, 'w') as f:
+        json.dump(all_data, f, indent=2, ensure_ascii=False)
+        
+    print(f"保存成功：{json_path}")
 
 
 def query_vlm_for_response(
@@ -16,6 +56,9 @@ def query_vlm_for_response(
     rgb_egocentric_views: list,
     cfg,
     verbose: bool = False,
+    chosen_frontier_path: str = None,
+    step_idx: int = 0,
+    lifelong_json_path: Optional[str] = None,
 ) -> Optional[Tuple[Union[SnapShot, Frontier], int]]:
     # prepare input for vlm
     step_dict = {}
@@ -82,6 +125,16 @@ def query_vlm_for_response(
     step_dict["frontier_imgs"] = [
         frontier.feature for frontier in tsdf_planner.frontiers
     ]
+    
+    ##
+    step_dict["frontier_imgs_0"] = [
+        frontier.feature for frontier in tsdf_planner.frontiers_layer0
+    ]
+    step_dict["frontier_imgs_1"] = [
+        frontier.feature for frontier in tsdf_planner.frontiers_layer1
+    ]
+    step_dict["layer0_to_layer1"] = tsdf_planner.layer0_to_layer1  
+    step_dict["layer1_to_layer0"] = tsdf_planner.layer1_to_layer0
 
     # prepare egocentric views
     if cfg.egocentric_views:
@@ -94,6 +147,14 @@ def query_vlm_for_response(
     step_dict["class"] = subtask_metadata["class"]
     step_dict["image"] = subtask_metadata["image"]
 
+    ##
+    save_snapshot_objects_with_names(
+        question_id=subtask_metadata["question_id"],
+        snapshot_objects=step_dict["snapshot_objects"],
+        object_id_to_name=object_id_to_name,
+        json_path=lifelong_json_path,
+    )
+
     # query vlm
     (
         outputs,
@@ -101,7 +162,7 @@ def query_vlm_for_response(
         snapshot_crop_mapping,
         reason,
         n_filtered_snapshots,
-    ) = explore_step(step_dict, cfg, verbose=verbose)
+    ) = explore_step(step_dict, cfg, verbose=verbose, chosen_frontier_path=chosen_frontier_path, step_idx=step_idx)
     if outputs is None:
         logging.error(f"explore_step failed and returned None")
         return None
@@ -171,7 +232,7 @@ def query_vlm_for_response(
             cluster=[pred_target_obj_id],
         )
 
-        return max_point_choice, n_filtered_snapshots
+        return max_point_choice, reason, n_filtered_snapshots
     else:  # target_type == "frontier"
         target_index = int(target_index)
         if target_index < 0 or target_index >= len(tsdf_planner.frontiers):
@@ -183,4 +244,4 @@ def query_vlm_for_response(
         logging.info(f"Next choice: Frontier at {target_point}")
         pred_target_frontier = tsdf_planner.frontiers[target_index]
 
-        return pred_target_frontier, n_filtered_snapshots
+        return pred_target_frontier, reason, n_filtered_snapshots

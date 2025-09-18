@@ -220,6 +220,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
             
             ## lifelong-memory
             #TODO
+            lifelong_json_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, "lifelong_storage.json")
 
             # run questions in the scene
             global_step = -1    # in the whole episode
@@ -323,7 +324,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                                     # target_obj_mask=None,
                                 )
                             )
-                            scene.all_observations[obs_file_name] = rgb ## in aeqa here already resized
+                            scene.all_observations[obs_file_name] = rgb ## already resized in aeqa, resize in query_vlm_for_response
                             rgb_egocentric_views.append(
                                 resize_image(rgb, cfg.prompt_h, cfg.prompt_w)
                             )
@@ -455,11 +456,10 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             cfg=cfg,
                             verbose=True,
                             ##
-                            # chosen_frontier_path=chosen_frontier_path,
-                            # step_idx=cnt_step,
+                            chosen_frontier_path=chosen_frontier_path,
+                            step_idx=cnt_step,
                             # question_id=question_id,
-                            # lifelong_json_path=lifelong_json_path,
-                            
+                            lifelong_json_path=lifelong_json_path,
                         )
                         if vlm_response is None:
                             logging.info(
@@ -525,7 +525,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                         cfg=cfg.planner,
                         path_points=None,
                         save_visualization=cfg.save_visualization,
-                    )
+                    )   # TODO: UserWarning: *c* argument looks like a single numeric RGB or RGBA sequence
                     if return_values[0] is None:
                         logging.info(
                             f"Subtask id {subtask_id} invalid: agent_step failed!"
@@ -683,9 +683,17 @@ if __name__ == "__main__":
     parser.add_argument("--start_ratio", help="start ratio", default=0.0, type=float)
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
     parser.add_argument("--split", help="which episode", default=1, type=int)
+    parser.add_argument("--replay_mode", help="replay selection mode: sim or random", default="sim", type=str)
+    parser.add_argument("--replay_top", help="top-k for replay candidates", default=1, type=int)
+    parser.add_argument("--retrieve_root", help="external retrieve root; expects replay_step_info.json & experience_output.json inside", default="", type=str)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
+    # CLI overrides for replay recall behavior
+    cfg.replay_mode = args.replay_mode
+    cfg.replay_top = args.replay_top
+    if args.retrieve_root:
+        cfg.retrieve_root = args.retrieve_root
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
