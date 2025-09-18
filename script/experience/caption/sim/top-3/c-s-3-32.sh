@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=15:00:00 
+#SBATCH --time=2:00:00 
 #SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/caption/sim/top-3/c-s-3-32-%j.out
 #SBATCH --partition a100
 

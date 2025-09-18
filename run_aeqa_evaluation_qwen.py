@@ -813,9 +813,9 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     question_id=question_id,
                     lifelong_json_path=lifelong_json_path,
                     exp_tuple_path=(args.exp_tuple if isinstance(args.exp_tuple, str) and len(args.exp_tuple) > 0 else None),
-                    inject_experience=bool(args.caption),
-                    inject_critique=bool(args.critique),
-                    inject_abstraction=bool(args.abstraction),
+                    inject_experience=(False if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.caption)),
+                    inject_critique=(False if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.critique)),
+                    inject_abstraction=(True if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.abstraction)),
                     # lifelong_context=lifelong_context,
                 )
                 if vlm_response is None:
@@ -994,7 +994,7 @@ if __name__ == "__main__":
     parser.add_argument("-cf", "--cfg_file", help="cfg file path", default="", type=str)
     parser.add_argument("--start_ratio", help="start ratio", default=0.0, type=float)
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
-    parser.add_argument("--replay_mode", help="replay selection mode: sim or random", default="sim", type=str)
+    parser.add_argument("--replay_mode", help="replay selection mode: sim or random or traj_sim or traj_random", default="sim", type=str)
     parser.add_argument("--replay_top", help="top-k for replay candidates", default=1, type=int)
     parser.add_argument("--retrieve_root", help="external retrieve root; expects replay_step_info.json & experience_output.json inside", default="", type=str)
     parser.add_argument("--use_episodic_context", help="whether to enable episodic context (0/1)", default=1, type=int)
@@ -1005,11 +1005,12 @@ if __name__ == "__main__":
     parser.add_argument("--caption", "--experience", dest="caption", help="inject base caption tuple lines", default=False, type=_bool)
     parser.add_argument("--critique", help="inject critique reflection lines", default=False, type=_bool)
     parser.add_argument("--abstraction", help="inject abstraction guideline lines", default=False, type=_bool)
+    parser.add_argument("--traj_file", help="trajectory json for traj_* modes (qid -> {question, abstraction, thinking_process})", default="", type=str)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
     # CLI overrides for replay recall behavior
-    cfg.replay_mode = args.replay_mode
+    cfg.replay_mode = str(args.replay_mode).strip().lower()
     cfg.replay_top = args.replay_top
     if args.retrieve_root:
         cfg.retrieve_root = args.retrieve_root
@@ -1018,6 +1019,9 @@ if __name__ == "__main__":
     # vLLM per-request seed (independent from cfg.seed)
     if args.chat_seed is not None:
         cfg.chat_seed = int(args.chat_seed)
+    # traj_* external file path
+    if args.traj_file:
+        cfg.traj_file = args.traj_file
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)

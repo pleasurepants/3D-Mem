@@ -482,6 +482,225 @@ def simple_recall_and_aggregate(
     if not frontier_imgs_b64 or top_k <= 0:
         return None
 
+    # 新增策略：traj_exp —— 返回与当前问题相近的最近K个 question 的 abstraction 文本（来自 cfg.traj_file）
+    if (strategy or 'sim') == 'traj_exp':
+        # Backward-compatibility alias: behave exactly like traj_sim
+        return simple_recall_and_aggregate(
+            frontier_imgs_b64=frontier_imgs_b64,
+            cfg=cfg,
+            exclude_question_id=exclude_question_id,
+            top_k=top_k,
+            strategy='traj_sim',
+            current_question=current_question,
+            rrf_k=rrf_k,
+            exp_tuple_path=exp_tuple_path,
+            inject_experience=inject_experience,
+            inject_critique=inject_critique,
+            inject_abstraction=inject_abstraction,
+        )
+
+    if (strategy or 'sim') == 'traj_sim':
+        try:
+            store = _load_vector_store(cfg)
+            traj_path = getattr(cfg, 'traj_file', None)
+            if not store or not isinstance(traj_path, str) or len(traj_path) == 0 or not os.path.exists(traj_path):
+                logging.info("[TrajSim] vector store or traj_file not available")
+                return None
+            # 1) 图像相似：frontier -> corpus PNG
+            dev = _device_auto()
+            from PIL import Image as _Image
+            from io import BytesIO as _BytesIO
+            pil_list = []
+            for b64 in frontier_imgs_b64:
+                try:
+                    img_bytes = base64.b64decode(b64)
+                    pil_list.append(_Image.open(_BytesIO(img_bytes)).convert('RGB'))
+                except Exception:
+                    pil_list.append(_Image.new('RGB', (224, 224), color=(0, 0, 0)))
+            enc = store['png']['enc'] or {}
+            clip_model = str(enc.get('clip_model', 'ViT-B-32'))
+            pretrained = enc.get('open_clip_pretrained') or None
+            t_emb = _embed_images_with_clip(pil_list, model_name=clip_model, pretrained=pretrained, device=dev)
+            if t_emb is None:
+                logging.info("[TrajSim] image embedding failed")
+                return None
+            import numpy as _np
+            corpus = store['png']['emb']
+            merged_candidates = []
+            for i in range(t_emb.shape[0]):
+                v = t_emb[i]
+                sims = corpus @ v.astype(_np.float32)
+                top_idx = _np.argsort(-sims)[: min(2000, max(50, int(top_k) * 50))]
+                per_scores = []
+                for idx in top_idx:
+                    meta = store['png']['meta'][int(idx)]
+                    qid = meta.get('question_id')
+                    if exclude_question_id and qid == exclude_question_id:
+                        continue
+                    per_scores.append({
+                        'similarity': float(sims[int(idx)]),  # clip_sim
+                        'question_id': qid,
+                        'step_key': meta.get('step_key'),
+                        'level': meta.get('level'),
+                        'filename_rel': meta.get('src_rel_path'),
+                        'source_frontier_index': i,
+                    })
+                # 局部去重 top-5
+                seen = set()
+                kept = []
+                for cand in per_scores:
+                    key = (cand['question_id'], cand['step_key'])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    kept.append(cand)
+                    if len(kept) >= 5:
+                        break
+                merged_candidates.extend(kept)
+            if not merged_candidates:
+                logging.info("[TrajSim] no merged candidates")
+                return None
+            # 2) 文本相似（当前问题 -> 训练集问题文本）
+            qid2question = _load_questions_en()
+            for cand in merged_candidates:
+                qid = cand.get('question_id')
+                qtext = qid2question.get(qid, '')
+                cand['qsim'] = _cosine_sim_tokens(current_question or '', qtext)
+            # 3) RRF 融合（在 (qid, step) 层面）
+            image_sorted = sorted(merged_candidates, key=lambda x: x['similarity'], reverse=True)
+            text_sorted = sorted(merged_candidates, key=lambda x: x.get('qsim', 0.0), reverse=True)
+            rank_img = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(image_sorted) }
+            rank_txt = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(text_sorted) }
+            for cand in merged_candidates:
+                key = (cand.get('question_id'), cand.get('step_key'))
+                ri = rank_img.get(key, len(image_sorted) + 1)
+                rt = rank_txt.get(key, len(text_sorted) + 1)
+                cand['rrf_score'] = (1.0 / (rrf_k + ri)) + (1.0 / (rrf_k + rt))
+            fused_sorted = sorted(merged_candidates, key=lambda x: x.get('rrf_score', 0.0), reverse=True)
+            # 4) 按 qid 聚合，取每个 qid 的最佳条目（用于日志 & 排序）
+            best_by_qid = {}
+            for cand in fused_sorted:
+                qid = cand.get('question_id')
+                prev = best_by_qid.get(qid)
+                if prev is None or float(cand.get('rrf_score', 0.0)) > float(prev.get('rrf_score', 0.0)):
+                    best_by_qid[qid] = cand
+            ranked_qids = sorted(best_by_qid.items(), key=lambda x: x[1].get('rrf_score', 0.0), reverse=True)
+            # 5) 选择 top_k 且 traj_file 中有 abstraction 的 qid，不足则从 ranked_qids 继续补齐，再不足随机回填
+            with open(traj_path, 'r', encoding='utf-8') as f:
+                traj_data = json.load(f)
+            selected = []
+            selected_set = set()
+            for qid, cand in ranked_qids:
+                if exclude_question_id and qid == exclude_question_id:
+                    continue
+                node = traj_data.get(qid) if isinstance(traj_data, dict) else None
+                if not isinstance(node, dict):
+                    continue
+                abstraction = node.get('abstraction')
+                if isinstance(abstraction, str) and abstraction.strip():
+                    selected.append((qid, cand))
+                    selected_set.add(qid)
+                    if len(selected) >= int(top_k):
+                        break
+            if len(selected) < int(top_k):
+                # 继续从 ranked_qids 扫描（即使 abstraction 为空也跳过，不会增加）
+                for qid, cand in ranked_qids:
+                    if len(selected) >= int(top_k):
+                        break
+                    if qid in selected_set or (exclude_question_id and qid == exclude_question_id):
+                        continue
+                    node = traj_data.get(qid) if isinstance(traj_data, dict) else None
+                    if not isinstance(node, dict):
+                        continue
+                    abstraction = node.get('abstraction')
+                    if isinstance(abstraction, str) and abstraction.strip():
+                        selected.append((qid, cand))
+                        selected_set.add(qid)
+            if len(selected) < int(top_k) and isinstance(traj_data, dict):
+                # 随机回填（仅 abstraction 非空的）
+                pool = [qid for qid, node in traj_data.items() if qid not in selected_set and isinstance(node, dict) and isinstance(node.get('abstraction'), str) and node.get('abstraction').strip() and (not exclude_question_id or qid != exclude_question_id)]
+                import random as _rnd
+                _rnd.shuffle(pool)
+                for qid in pool:
+                    dummy = {'similarity': 0.0, 'qsim': 0.0, 'rrf_score': 0.0}
+                    selected.append((qid, dummy))
+                    selected_set.add(qid)
+                    if len(selected) >= int(top_k):
+                        break
+            # 6) 日志：仅打印最终选中的 qid 的 clip_sim、qsim、rrf
+            try:
+                logging.info(f"[TrajSim] selected {len(selected)} question(s) (need {int(top_k)}):")
+                for i, (qid, cand) in enumerate(selected, 1):
+                    qtext = _load_questions_en().get(qid, (traj_data.get(qid) or {}).get('question', '')) if isinstance(traj_data, dict) else ''
+                    logging.info(
+                        f"  #{i}: qid={qid} | clip_sim={float(cand.get('similarity', 0.0)):.4f} | qsim={float(cand.get('qsim', 0.0)):.4f} | rrf={float(cand.get('rrf_score', 0.0)):.6f} | question={_shorten(qtext, 180)}"
+                    )
+            except Exception:
+                pass
+            # 7) 生成 TRAJ-ABSTRACTION 文本
+            texts = []
+            for idx, (qid, cand) in enumerate(selected[: int(top_k)], 1):
+                node = traj_data.get(qid) if isinstance(traj_data, dict) else None
+                if not isinstance(node, dict):
+                    continue
+                abstraction = node.get('abstraction') or ''
+                if not (isinstance(abstraction, str) and abstraction.strip()):
+                    continue
+                block = []
+                block.append(f"Traj-Abstraction {idx}:")
+                block.append(abstraction.strip())
+                texts.append("\n".join(block))
+            return "\n\n".join(texts) if texts else None
+        except Exception as e:
+            logging.warning(f"[TrajSim] failed: {e}")
+            return None
+
+    if (strategy or 'sim') == 'traj_random':
+        try:
+            traj_path = getattr(cfg, 'traj_file', None)
+            if not isinstance(traj_path, str) or len(traj_path) == 0 or not os.path.exists(traj_path):
+                logging.info("[TrajRandom] missing traj_file; skip")
+                return None
+            with open(traj_path, 'r', encoding='utf-8') as f:
+                traj_data = json.load(f)
+            candidates = []
+            if isinstance(traj_data, dict):
+                for qid, node in traj_data.items():
+                    if exclude_question_id and qid == exclude_question_id:
+                        continue
+                    if not isinstance(node, dict):
+                        continue
+                    abstraction = node.get('abstraction')
+                    if isinstance(abstraction, str) and abstraction.strip():
+                        candidates.append(qid)
+            import random as _rnd
+            _rnd.shuffle(candidates)
+            picked = candidates[: max(1, int(top_k))]
+            # 日志：展示随机挑选的 qids（question 名称）
+            try:
+                logging.info(f"[VecRetrieve][traj_random] random-picked top {len(picked)} (need {int(top_k)}):")
+                for i, qid in enumerate(picked, 1):
+                    qtext = (traj_data.get(qid) or {}).get('question', '') if isinstance(traj_data, dict) else ''
+                    logging.info(f"  #{i}: qid={qid} | question={_shorten(qtext, 180)}")
+            except Exception:
+                pass
+            texts = []
+            for idx, qid in enumerate(picked, 1):
+                node = traj_data.get(qid) if isinstance(traj_data, dict) else None
+                if not isinstance(node, dict):
+                    continue
+                abstraction = node.get('abstraction') or ''
+                if not (isinstance(abstraction, str) and abstraction.strip()):
+                    continue
+                block = []
+                block.append(f"Traj-Abstraction {idx}:")
+                block.append(abstraction.strip())
+                texts.append("\n".join(block))
+            return "\n\n".join(texts) if texts else None
+        except Exception as e:
+            logging.warning(f"[TrajRandom] failed: {e}")
+            return None
+
     # 'sim' = 图像向量检索（当前BVF/CVF图片 → 训练集PNG向量）+ 文本相似（问题→问题文本）做 RRF 融合；'question-first' = 先召回top-3相似question，再在这些question的PNG中做CLIP检索；'random' 维持不变
     if (strategy or 'sim') == 'question-first':
         # 步骤1: 先用问题相似度召回top-3相似question
@@ -926,6 +1145,16 @@ def simple_recall_and_aggregate(
                     selected.append({'question_id': qid, 'step_key': sk, 'level': m.get('level')})
                     if len(selected) >= max(1, top_k):
                         break
+                # 日志：选用的 question 与 id
+                try:
+                    qmap = _load_questions_en()
+                    logging.info(f"[VecRetrieve][random] chosen {len(selected)} candidate(s):")
+                    for i, cand in enumerate(selected, 1):
+                        qid = cand.get('question_id')
+                        qtext = qmap.get(qid, 'N/A')
+                        logging.info(f"  #{i}: qid={qid} | question={_shorten(qtext, 180)}")
+                except Exception:
+                    pass
                 # 使用 exp_tuple_path 拼接 Experience/Critique/Abstraction（与 sim/question-first 分支保持一致）
                 try:
                     if isinstance(exp_tuple_path, str) and len(exp_tuple_path) > 0 and os.path.exists(exp_tuple_path):
@@ -1102,10 +1331,11 @@ def format_explore_prompt_frontier(
     context=None,       # Experience replay text (cross-episode, similar-scene summaries)
     episodic_con=None,  # Episodic context text (this episode: recent steps/path & seen/unseen summary)
     frontier_type: str = "BVF",  # "BVF" for broad-view (layer0) or "CVF" for closer-view (layer1)
+    use_traj_abstraction: bool = False,  # when True, use TRAJECTORY ABSTRACTION instead of EXPERIENCE REPLAY
 ):
     """
     Frontier-selection prompt with explicit Step 0/1/2/3 and FINAL:
-      - Clear semantics (Frontier / Episodic / Experience).
+      - Clear semantics (Frontier / Episodic / Experience or Trajectory Abstraction).
       - Optional blocks via has_episodic / has_experience.
       - Strict index-only discipline.
       - Reason first, answer last; FINAL line prints only: 'frontier i'.
@@ -1120,6 +1350,19 @@ def format_explore_prompt_frontier(
     # System role & definitions (based on user's template)
     # =========================
     label_word = "BVF" if str(frontier_type).upper() == "BVF" else "CVF"
+    # Context label & description switch
+    context_label = "TRAJECTORY ABSTRACTION" if bool(use_traj_abstraction) else "EXPERIENCE REPLAY"
+    if bool(use_traj_abstraction):
+        context_desc = (
+            "TRAJECTORY ABSTRACTION (if present): High-level, question-specific strategies distilled from past trajectories of similar tasks. "
+            "It provides concise guidance on which areas to prioritize or avoid for effective exploration, without low-level captions or critiques.\n\n"
+        )
+    else:
+        context_desc = (
+            "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, "
+            "which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
+        )
+
     sys_prompt = (
         "You are an embodied agent for exploration in an indoor environment to answer a question. "
         "At each step of exploration, you will be given frontier snapshots of your surrounding environment; your task is to pick EXACTLY ONE frontier to move to for further exploration or solving the question.\n\n"
@@ -1132,7 +1375,7 @@ def format_explore_prompt_frontier(
         "EGOCENTRIC VIEW (if shown): The agent's immediate forward-looking camera view; use it as local context only.\n"
         "EPISODIC CONTEXT (if present): A factual textual summary of the previous steps within THIS episode (visited path, observations, likely-unseen areas). "
         "Use this to avoid redundancy and prefer novel, informative directions. It is evidence, not a command.\n"
-        "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
+        f"{context_desc}"
         "RULES:\n"
         "- You will only be given either BVFs or CVFs at a time (BVF for looking closer; CVF for moving next).\n"
         "- Your reasoning must be concrete and visual. Name specific objects, layouts, textures, lighting, text-bearing surfaces/symbols, and any cues directly relevant to the question.\n"
@@ -1167,10 +1410,9 @@ def format_explore_prompt_frontier(
         content.append(("\nEPISODIC CONTEXT:",))
         content.append((episodic_con.strip(),))
 
-    # 4) EXPERIENCE REPLAY（来自 exp_tuple 或回忆 context）
-    # 优先使用已传入的 context 文本；若后续在 explore_step 中用 exp_tuple 构造，会经由 context 传进来
+    # 4) EXPERIENCE REPLAY 或 TRAJECTORY ABSTRACTION（根据模式选择）
     if has_experience:
-        content.append(("\nEXPERIENCE REPLAY:",))
+        content.append((f"\n{context_label}:",))
         content.append((context.strip(),))
 
     # 5) 最后给出行为指令
@@ -1178,13 +1420,14 @@ def format_explore_prompt_frontier(
         f"Now reason in steps before making your choice. "
         "Step 0: restate the task in your own words and confirm you are choosing exactly one frontier of the given type. "
         "Step 1: from EPISODIC CONTEXT (if present), briefly state which areas are already explored and which remain unseen. "
-        "Step 2: analyze all EXPERIENCE REPLAY entries (if present). For each, note the chosen frontier, the outcome, and the critique. Then integrate them into 1–2 concise directive rules that give specific, problem-focused guidance for the current question. These rules must directly indicate what kind of frontier to prioritize or avoid in order to find the target more effectively, and should omit any rule that does not provide actionable help. "
-        "Step 3: compare the current frontiers one by one using visual cues, novelty, and alignment with these directive rules, then decide on the best option. "
+        + (
+            "Step 2: analyze all TRAJECTORY ABSTRACTION entries (if present). Extract 1–2 concise directive rules that give specific, problem-focused guidance for the current question. "
+            if bool(use_traj_abstraction)
+            else "Step 2: analyze all EXPERIENCE REPLAY entries (if present). For each, note the chosen frontier, the outcome, and the critique. Then integrate them into 1–2 concise directive rules that give specific, problem-focused guidance for the current question. "
+        )
+        + "Step 3: compare the current frontiers one by one using visual cues, novelty, and alignment with these directive rules, then decide on the best option. "
         f"On the final line, print ONLY '{label_word} i'."
     )
-
-
-
 
     content.append((guidance,))
 
@@ -1767,8 +2010,12 @@ def explore_step(
             exclude_question_id=step.get("question_id"),
             top_k=_replay_top,
             strategy=(
-                "random" if getattr(cfg, "replay_mode", "sim") == "random" else (
-                    "question-first" if getattr(cfg, "replay_mode", "sim") == "question-first" else "sim"
+                "traj_random" if str(getattr(cfg, "replay_mode", "sim")).startswith("traj_random") else (
+                    "traj_sim" if str(getattr(cfg, "replay_mode", "sim")).startswith("traj") else (
+                        "random" if getattr(cfg, "replay_mode", "sim") == "random" else (
+                            "question-first" if getattr(cfg, "replay_mode", "sim") == "question-first" else "sim"
+                        )
+                    )
                 )
             ),
             current_question=question,
@@ -1823,6 +2070,7 @@ def explore_step(
         context=(layer0_con if _replay_top > 0 else None),
         episodic_con=(episodic_con if bool(getattr(cfg, "use_episodic_context", True)) else None),
         frontier_type="BVF",
+        use_traj_abstraction=bool(str(getattr(cfg, "replay_mode", "sim")).startswith("traj")),
     )
     if verbose:
         try:
@@ -1914,8 +2162,12 @@ def explore_step(
                 exclude_question_id=step.get("question_id"),
                 top_k=_replay_top,
                 strategy=(
-                    "random" if getattr(cfg, "replay_mode", "sim") == "random" else (
-                        "question-first" if getattr(cfg, "replay_mode", "sim") == "question-first" else "sim"
+                    "traj_random" if str(getattr(cfg, "replay_mode", "sim")).startswith("traj_random") else (
+                        "traj_sim" if str(getattr(cfg, "replay_mode", "sim")).startswith("traj") else (
+                            "random" if getattr(cfg, "replay_mode", "sim") == "random" else (
+                                "question-first" if getattr(cfg, "replay_mode", "sim") == "question-first" else "sim"
+                            )
+                        )
                     )
                 ),
                 current_question=question,
@@ -1941,6 +2193,7 @@ def explore_step(
             context=(layer1_context_text if _replay_top > 0 else None),
             episodic_con=(episodic_con if bool(getattr(cfg, "use_episodic_context", True)) else None),
             frontier_type="CVF",
+            use_traj_abstraction=bool(str(getattr(cfg, "replay_mode", "sim")).startswith("traj")),
         )
         if verbose:
             try:

@@ -1,18 +1,18 @@
 #!/bin/bash
-#SBATCH --job-name=i_h_o_v
-#SBATCH --nodes=1
+#SBATCH --job-name=traj-abs
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/internvl/bash_test-%j.out 
+#SBATCH --time=3:00:00 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/trajectory-abs-32-%j.out
 #SBATCH --partition a40
 
 
 
 # srun --nodes=1 --gres=gpu:a100:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a100 --pty bash
-# srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a40 --pty bash
+# srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=1:00:00 --partition a40 --pty bash
 
+export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 
 unset http_proxy
 unset https_proxy
@@ -34,41 +34,32 @@ else
 fi
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
-# export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib
-echo "[INFO] Starting vLLM (internvl) server on GPU 0..."
+
+echo "[INFO] Starting vLLM (qwen) server on GPU 0..."
 source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate vllm
 
 CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 
-# vllm serve /anvme/workspace/v100dd12-3dmem/model/MiniCPM-V-2_6 \
-#     --served-model-name minicpm \
-#     --port 8000 \
-#     --limit-mm-per-prompt image=20 \
-#     --trust-remote-code &
 
-vllm serve /anvme/workspace/v100dd12-3dmem/model/InternVL3-8B \
-    --served-model-name internvl \
+
+vllm serve /anvme/workspace/v100dd12-3dmem/model/Qwen2.5-VL-7B-Instruct \
+    --served-model-name qwen \
     --port 8000 \
-    --limit-mm-per-prompt '{"image": 20}' \
-    --trust-remote-code &
-
-# vllm serve /anvme/workspace/v100dd12-3dmem/model/Qwen2.5-VL-3B-Instruct \
-#     --served-model-name qwen \
-#     --port 8000 \
-#     --limit-mm-per-prompt image=20 &
+    --max-model-len 100000 \
+    --limit-mm-per-prompt '{"image": 20}' &
 VLLM_PID=$!
 
 
-echo "[INFO] Waiting for vLLM (internvl) server to be ready..."
+echo "[INFO] Waiting for vLLM (qwen) server to be ready..."
 for i in {1..300}; do
     if curl -s http://localhost:8000/v1/models > /dev/null; then
-        echo "[INFO] ✅ internvl API is ready!"
+        echo "[INFO] ✅ qwen API is ready!"
         break
     fi
     echo "  ... waiting ($((i*10))s)"
     sleep 10
     if [ $i -eq 300 ]; then
-        echo "[ERROR] ❌ Timeout: internvl server failed to start."
+        echo "[ERROR] ❌ Timeout: qwen server failed to start."
         if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
             kill "$VLLM_PID"
         fi
@@ -80,10 +71,14 @@ done
 echo "[INFO] Starting AEQA evaluation on GPU 1 (3dmem env)..."
 source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate 3dmem
 source .env
-
-CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
- /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_internvl.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/eval_aeqa_debug.yaml
+# export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+# -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
+CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/generate_abstraction_from_captions.py \
+  --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/exp_tuple_v0.json \
+  --max_steps 10 \
+  --seed 32 \
+  --out /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/traj_abs_single.json
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

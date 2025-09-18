@@ -10,7 +10,7 @@
 
 
 
-# srun --nodes=1 --gres=gpu:a100:2 --ntasks=1 --cpus-per-task=16 --time=1:00:00 --partition a100 --pty bash
+# srun --nodes=1 --gres=gpu:a100:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a100 --pty bash
 # srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=1:00:00 --partition a40 --pty bash
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
@@ -78,10 +78,11 @@ export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
  /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
     -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/eval_aeqa_debug.yaml \
-    --replay_mode random \
+    --replay_mode traj_random \
     --replay_top 3 \
     --use_episodic_context 1 \
     --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168 \
+    --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/traj_abs_single.json \
     --chat_seed 32 \
     --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/exp_tuple_v0.json \
     --caption true \
