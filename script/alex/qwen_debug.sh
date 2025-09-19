@@ -81,11 +81,11 @@ CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client
     --replay_mode traj_random \
     --replay_top 3 \
     --use_episodic_context 1 \
-    --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168 \
-    --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/traj_abs_single.json \
-    --chat_seed 32 \
-    --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/exp_tuple_v0.json \
+    --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set \
+    --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/traj_abs_single.json \
+    --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json \
     --caption true \
+    --chat_seed 32 \
     --critique true \
     --abstraction true
 

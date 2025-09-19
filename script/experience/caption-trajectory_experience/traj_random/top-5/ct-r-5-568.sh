@@ -58,7 +58,7 @@ source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate 3dmem
 source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
-CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/experience/caption-trajectory_experience/traj_random/top-5/ct-r-5-568.yaml --replay_mode traj_random --replay_top 5 --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168 --chat_seed 568 --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/traj_abs_single.json --caption true --critique true --abstraction true --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/exp_tuple_v0.json
+CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/experience/caption-trajectory_experience/traj_random/top-5/ct-r-5-568.yaml --replay_mode traj_random --replay_top 5 --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set --chat_seed 568 --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/traj_abs_single.json --caption true --critique true --abstraction true --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
 if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
