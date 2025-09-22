@@ -1,12 +1,12 @@
 # General
-seed: 88
-exp_name: "baseline_41"
-output_parent_dir: "/home/wiss/zhang/projects/openeqa/aeqa_baseline/qwen"
-scene_dataset_config_path: "/home/wiss/zhang/code/openeqa/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
-scene_data_path: "/nfs/data2/zhang/openeqa/hm3d/data/3dmem"
-questions_list_path: 'data/aeqa_questions-41.json'
+seed: 13
+exp_name: "seed13"
+output_parent_dir: "/anvme/workspace/v100dd12-3dmem/openeqa/pipeline_0/listwise_kmeans_10"
+scene_dataset_config_path: "/home/hpc/v100dd/v100dd12/code/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
+scene_data_path: "/anvme/workspace/v100dd12-3dmem/hm3d/data/3dmem"
+questions_list_path: '/home/hpc/v100dd/v100dd12/code/3D-Mem/data/aeqa_questions-41.json'
 
-concept_graph_config_path: "/home/wiss/zhang/code/openeqa/3D-Mem/cfg/concept_graph_default.yaml"
+concept_graph_config_path: "/home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/concept_graph_default.yaml"
 
 # major settings
 choose_every_step: true  # whether to query vlm at each step, or only after arriving at the navigation target
@@ -15,8 +15,8 @@ prefiltering: true  # whether to use prefiltering (you in fact cannot turn this 
 top_k_categories: 10  # keep the top k relevant categories during prefiltering
 
 # about detection model
-yolo_model_name: yolov8x-world.pt
-sam_model_name: sam_l.pt
+yolo_model_name: /anvme/workspace/v100dd12-3dmem/model/yolov8x-world.pt
+sam_model_name: /anvme/workspace/v100dd12-3dmem/model/sam_l.pt
 class_set: scannet200  # use the 200-class set for yolo-world detector
 
 # about snapshots clustering
@@ -62,12 +62,10 @@ planner:
   frontier_area_min: 8
   frontier_area_max: 9
   min_frontier_area: 20  # the frontier should have at least this many pixels
+  min_frontier_area_layer0: 20  # the first layer of clustering should have at least this many pixels
+  min_frontier_area_layer1: 2  # the second layer of clustering should have
   max_frontier_angle_range_deg: 150  # the angle spanned by the pixels in a frontier should not be larger than this
   region_equal_threshold: 0.95
-  # clustering mode for frontier grouping: 'dbscan' (default) or 'kmeans'
-  cluster_mode: dbscan
-  # when cluster_mode is 'kmeans', the number of frontier clusters (snapshots) to create
-  kmeans_num_frontiers: 10
 
 # about scene graph construction
 scene_graph:

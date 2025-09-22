@@ -382,9 +382,39 @@ if __name__ == "__main__":
     parser.add_argument("-cf", "--cfg_file", help="cfg file path", default="", type=str)
     parser.add_argument("--start_ratio", help="start ratio", default=0.0, type=float)
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
+    # Frontier clustering override via CLI (no YAML change needed)
+    parser.add_argument(
+        "--cluster_mode",
+        help="frontier clustering mode: dbscan (default) or kmeans",
+        choices=["dbscan", "kmeans"],
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
+        "--kmeans_num_frontiers",
+        help="when cluster_mode=kmeans, number of frontier clusters (snapshots)",
+        default=None,
+        type=int,
+    )
+    parser.add_argument(
+        "--chat_seed",
+        help="seed for chat completions (overrides env VLLM_SEED)",
+        default=None,
+        type=int,
+    )
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
+
+    # Override planner clustering from CLI if provided
+    if "planner" not in cfg:
+        cfg.planner = {}
+    if args.cluster_mode is not None:
+        cfg.planner.cluster_mode = args.cluster_mode
+    if args.kmeans_num_frontiers is not None:
+        cfg.planner.kmeans_num_frontiers = int(args.kmeans_num_frontiers)
+    if args.chat_seed is not None:
+        cfg.chat_seed = int(args.chat_seed)
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)

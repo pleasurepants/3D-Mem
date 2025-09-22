@@ -187,68 +187,103 @@ class TSDFPlanner(TSDFPlannerBase):
             return False
 
         # cluster frontier regions
-        db = DBSCAN(eps=cfg.eps, min_samples=2).fit(frontier_areas)
-        labels = db.labels_
-        # get one point from each cluster
+        cluster_mode = getattr(cfg, "cluster_mode", "dbscan")
         valid_ft_angles = []
-        for label in np.unique(labels):
-            if label == -1:
-                continue
-            cluster = frontier_areas[labels == label]
 
-            # filter out small frontiers
-            area = len(cluster)
-            if area < cfg.min_frontier_area:
-                continue
+        if str(cluster_mode).lower() == "kmeans":
+            # KMeans on angular space to produce a fixed number of frontiers (default 10)
+            # Compute angles of all frontier pixels relative to current position
+            all_angles = np.asarray([
+                np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in frontier_areas
+            ])
+            # Use unit circle embedding to avoid angle wrap-around issues
+            feats = np.stack([np.cos(all_angles), np.sin(all_angles)], axis=1)
 
-            # convert the cluster from voxel coordinates to polar angle coordinates
-            angle_cluster = np.asarray(
-                [
-                    np.arctan2(
-                        cluster[i, 1] - cur_point[1], cluster[i, 0] - cur_point[0]
-                    )
-                    for i in range(len(cluster))
-                ]
-            )  # range from -pi to pi
+            kmeans_num = int(getattr(cfg, "kmeans_num_frontiers", 10))
+            kmeans_num = max(1, min(kmeans_num, len(frontier_areas)))
 
-            # get the range of the angles
-            angle_range = get_angle_span(angle_cluster)
-            warping_gap = get_warping_gap(
-                angle_cluster
-            )  # add 2pi to angles that smaller than this to avoid angles crossing -pi/pi line
-            if warping_gap is not None:
-                angle_cluster[angle_cluster < warping_gap] += 2 * np.pi
+            km = KMeans(n_clusters=kmeans_num)
+            k_labels = km.fit_predict(feats)
 
-            if angle_range > cfg.max_frontier_angle_range_deg * np.pi / 180:
-                # cluster again on the angle, ie, split the frontier
-                num_clusters = (
-                    int(angle_range / (cfg.max_frontier_angle_range_deg * np.pi / 180))
-                    + 1
-                )
-                db_angle = KMeans(n_clusters=num_clusters).fit(angle_cluster[..., None])
-                labels_angle = db_angle.labels_
-                for label_angle in np.unique(labels_angle):
-                    if label_angle == -1:
-                        continue
-                    ft_angle = np.mean(angle_cluster[labels_angle == label_angle])
-                    valid_ft_angles.append(
-                        {
-                            "angle": (
-                                ft_angle - 2 * np.pi if ft_angle > np.pi else ft_angle
-                            ),
-                            "region": self.get_frontier_region_map(
-                                cluster[labels_angle == label_angle]
-                            ),
-                        }
-                    )
-            else:
-                ft_angle = np.mean(angle_cluster)
+            for k in range(kmeans_num):
+                cluster = frontier_areas[k_labels == k]
+                if len(cluster) == 0:
+                    continue
+
+                # Mean angle via vector averaging to handle wrap-around
+                c_angles = np.asarray([
+                    np.arctan2(c[1] - cur_point[1], c[0] - cur_point[0]) for c in cluster
+                ])
+                mean_angle = np.arctan2(np.mean(np.sin(c_angles)), np.mean(np.cos(c_angles)))
+
                 valid_ft_angles.append(
                     {
-                        "angle": ft_angle - 2 * np.pi if ft_angle > np.pi else ft_angle,
+                        "angle": mean_angle,
                         "region": self.get_frontier_region_map(cluster),
                     }
                 )
+        else:
+            # Default behavior: DBSCAN clustering with optional angle splitting
+            db = DBSCAN(eps=cfg.eps, min_samples=2).fit(frontier_areas)
+            labels = db.labels_
+            for label in np.unique(labels):
+                if label == -1:
+                    continue
+                cluster = frontier_areas[labels == label]
+
+                # filter out small frontiers
+                area = len(cluster)
+                if area < cfg.min_frontier_area:
+                    continue
+
+                # convert the cluster from voxel coordinates to polar angle coordinates
+                angle_cluster = np.asarray(
+                    [
+                        np.arctan2(
+                            cluster[i, 1] - cur_point[1], cluster[i, 0] - cur_point[0]
+                        )
+                        for i in range(len(cluster))
+                    ]
+                )  # range from -pi to pi
+
+                # get the range of the angles
+                angle_range = get_angle_span(angle_cluster)
+                warping_gap = get_warping_gap(
+                    angle_cluster
+                )  # add 2pi to angles that smaller than this to avoid angles crossing -pi/pi line
+                if warping_gap is not None:
+                    angle_cluster[angle_cluster < warping_gap] += 2 * np.pi
+
+                if angle_range > cfg.max_frontier_angle_range_deg * np.pi / 180:
+                    # cluster again on the angle, ie, split the frontier
+                    num_clusters = (
+                        int(angle_range / (cfg.max_frontier_angle_range_deg * np.pi / 180))
+                        + 1
+                    )
+                    db_angle = KMeans(n_clusters=num_clusters).fit(angle_cluster[..., None])
+                    labels_angle = db_angle.labels_
+                    for label_angle in np.unique(labels_angle):
+                        if label_angle == -1:
+                            continue
+                        ft_angle = np.mean(angle_cluster[labels_angle == label_angle])
+                        valid_ft_angles.append(
+                            {
+                                "angle": (
+                                    ft_angle - 2 * np.pi if ft_angle > np.pi else ft_angle
+                                ),
+                                "region": self.get_frontier_region_map(
+                                    cluster[labels_angle == label_angle]
+                                ),
+                            }
+                        )
+                else:
+                    ft_angle = np.mean(angle_cluster)
+                    valid_ft_angles.append(
+                        {
+                            "angle": ft_angle - 2 * np.pi if ft_angle > np.pi else ft_angle,
+                            "region": self.get_frontier_region_map(cluster),
+                        }
+                    )
 
         # remove frontiers that have been changed
         filtered_frontiers = []
