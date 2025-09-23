@@ -84,8 +84,9 @@ CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client
     --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set \
     --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/traj_abs_single.json \
     --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json \
-    --caption true \
+    --exp_at cvf \
     --chat_seed 32 \
+    --caption true \
     --critique true \
     --abstraction true
 

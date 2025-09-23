@@ -1006,6 +1006,9 @@ if __name__ == "__main__":
     parser.add_argument("--critique", help="inject critique reflection lines", default=False, type=_bool)
     parser.add_argument("--abstraction", help="inject abstraction guideline lines", default=False, type=_bool)
     parser.add_argument("--traj_file", help="trajectory json for traj_* modes (qid -> {question, abstraction, thinking_process})", default="", type=str)
+    # replay injection stage control
+    # preferred flag: --exp_at; aliases: --replay_at / --inject_stage for backward compatibility
+    parser.add_argument("--exp_at", "--replay_at", "--inject_stage", dest="exp_at", help="limit replay injection stage: '' (default, both), 'bvf' (layer0 only), 'cvf' (layer1 only)", default="", type=str)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
@@ -1022,6 +1025,26 @@ if __name__ == "__main__":
     # traj_* external file path
     if args.traj_file:
         cfg.traj_file = args.traj_file
+
+    # normalize inject_stage into cfg (empty -> None)
+    # normalize stage flag (exp_at preferred)
+    try:
+        _stage = str(args.exp_at).strip().lower()
+        if _stage in ("bvf", "cvf"):
+            cfg.exp_at = _stage
+        else:
+            cfg.exp_at = None
+    except Exception:
+        cfg.exp_at = None
+    # backward compatibility mirrors
+    try:
+        cfg.replay_at = cfg.exp_at
+    except Exception:
+        pass
+    try:
+        cfg.inject_stage = cfg.exp_at
+    except Exception:
+        pass
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)

@@ -2002,7 +2002,21 @@ def explore_step(
 
     # ==== (NEW) Layer-0 回忆与聚合（只对初始方向层做） ====
     _replay_top = int(getattr(cfg, "replay_top", 1))
-    if _replay_top > 0:
+    # 注入阶段开关：""/None → 两层都注入；"bvf" → 仅 layer0；"cvf" → 仅 layer1
+    try:
+        # prefer cfg.exp_at; fallback to cfg.replay_at -> cfg.inject_stage for compatibility
+        _stage_flag = getattr(cfg, "exp_at", None)
+        if _stage_flag is None or (isinstance(_stage_flag, str) and _stage_flag.strip() == ""):
+            _stage_flag = getattr(cfg, "replay_at", None)
+        if _stage_flag is None or (isinstance(_stage_flag, str) and _stage_flag.strip() == ""):
+            _stage_flag = getattr(cfg, "inject_stage", "")
+        _stage_flag = str(_stage_flag or "").strip().lower()
+    except Exception:
+        _stage_flag = ""
+    _inject_layer0 = (_stage_flag in ("", "bvf"))
+    _inject_layer1 = (_stage_flag in ("", "cvf"))
+
+    if _replay_top > 0 and _inject_layer0:
         # 使用本文件中的最简实现（不依赖 context_generator）
         step["replay_layer0_aggregated_context"] = simple_recall_and_aggregate(
             frontier_imgs_b64=frontier_imgs_0,
@@ -2026,7 +2040,10 @@ def explore_step(
         )
     else:
         step["replay_layer0_aggregated_context"] = None
-        logging.info("[ReplayCtx] replay_top=0; skip layer0 recall and env context injection.")
+        if _replay_top <= 0:
+            logging.info("[ReplayCtx] replay_top=0; skip layer0 recall and env context injection.")
+        elif not _inject_layer0:
+            logging.info("[ReplayCtx] replay_at=cvf; skip layer0 (BVF) env context injection.")
 
 
     episodic_con = None
@@ -2049,8 +2066,8 @@ def explore_step(
 
 
 
-    # 当 _replay_top=0 时，不注入任何 experience（env recall）
-    layer0_con = step.get("replay_layer0_aggregated_context") if _replay_top > 0 else None
+    # 当 _replay_top=0 或禁用 layer0 注入时，不注入任何 experience（env recall）
+    layer0_con = step.get("replay_layer0_aggregated_context") if (_replay_top > 0 and _inject_layer0) else None
     try:
         logging.info(f"[ReplayCtx] layer0 aggregated context len: {len(layer0_con) if isinstance(layer0_con, str) else 'None'}")
     except Exception:
@@ -2153,7 +2170,7 @@ def explore_step(
 
 
         # ==== (NEW) 对该方向的更近处子集做回忆与聚合 ====
-        if _replay_top > 0:
+        if _replay_top > 0 and _inject_layer1:
             # 根据选择的大簇子集做同样的最简实现
             subgroup_b64 = [frontier_imgs_1[i] for i in layer1_indices]
             layer1_context_text = simple_recall_and_aggregate(
@@ -2178,7 +2195,10 @@ def explore_step(
             )
         else:
             layer1_context_text = None
-            logging.info("[ReplayCtx] replay_top=0; skip layer1 subgroup recall and env context injection.")
+            if _replay_top <= 0:
+                logging.info("[ReplayCtx] replay_top=0; skip layer1 subgroup recall and env context injection.")
+            elif not _inject_layer1:
+                logging.info("[ReplayCtx] replay_at=bvf; skip layer1 (CVF) env context injection.")
 
 
         sys_prompt, content = format_explore_prompt_frontier(
@@ -2190,7 +2210,7 @@ def explore_step(
             egocentric_view=step.get("use_egocentric_views", False),
             use_snapshot_class=True,
             image_goal=image_goal,
-            context=(layer1_context_text if _replay_top > 0 else None),
+            context=(layer1_context_text if (_replay_top > 0 and _inject_layer1) else None),
             episodic_con=(episodic_con if bool(getattr(cfg, "use_episodic_context", True)) else None),
             frontier_type="CVF",
             use_traj_abstraction=bool(str(getattr(cfg, "replay_mode", "sim")).startswith("traj")),
