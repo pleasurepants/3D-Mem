@@ -31,6 +31,8 @@ def render_cfg(base_text: str, exp_name: str, seed_value: int) -> str:
     text = re.sub(r'^output_parent_dir:\s*".*?"\s*$', f'output_parent_dir: "{OUTPUT_PARENT_DIR}"', text, flags=re.MULTILINE)
     # seed is fixed to 13 regardless of chat_seed used in scripts
     text = re.sub(r'^seed:\s*\d+\s*$', 'seed: 13', text, flags=re.MULTILINE)
+    # override questions_list_path
+    text = re.sub(r"^questions_list_path:\s*.*$", "questions_list_path: '/home/hpc/v100dd/v100dd12/code/3D-Mem/data/aeqa_questions-41.json'", text, flags=re.MULTILINE)
     return text
 
 
