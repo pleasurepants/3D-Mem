@@ -239,16 +239,7 @@ def format_final_trajectory_abstraction_prompt(
     segments: List[str],
     task_outcome: Optional[str] = None,
 ) -> Tuple[str, List[Tuple[str, str]]]:
-    """
-    基于多个分段（由前一阶段从 captions 汇总得到的段落）做 CoT 风格整合：先按步骤思考，再输出最终 Abstraction。
-    输出格式（严格）：
-      Step 1 (Trajectory): 2–4 句，总结整个问题的全局轨迹与段落之间的衔接（仅区域/地标/路径用词，不含视角/BVF/CVF/图片/ID）
-      Step 2 (Env–Object Associations): 1–2 句，总结关键类别与区域的关联先验
-      Step 3 (Strategy × Question Type): 1–2 句，给出不同问题类型的策略匹配（位置/属性-状态/计数-关系/读文本）
-      Step 4 (Directional Priors & Avoidance): 1–2 句，指出哪些方向/线索常有帮助/常无效
-      Step 5 (Anti-patterns): 1–2 句，指出常见失败模式
-      Abstraction: 以 'Abstraction: ' 开头的一段话（16–20 句），把以上要点整合为可执行、可迁移的总体指导；无需也不得出现视角/BVF/CVF/图片/ID
-    """
+
     sys_prompt = (
         "You are to synthesize a final trajectory-level abstraction for an embodied exploration agent. "
         "INPUT: several trajectory paragraphs, each summarizing a short segment for the SAME question. "
