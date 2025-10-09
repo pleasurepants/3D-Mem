@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=list-kmeans-13
+#SBATCH --job-name=kmeans10-qwen-568
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=12:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/qwen/list-kmeans/13-%j.out 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/qwen/list-kmeans/kmeans10-568-%j.out
 #SBATCH --partition a100
 
 
@@ -81,10 +81,10 @@ export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/script/alex/kmeans/qwen_13.yaml \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/script/alex/kmeans_10/qwen_568.yaml \
     --cluster_mode kmeans \
     --kmeans_num_frontiers 10 \
-    --chat_seed 13
+    --chat_seed 568
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

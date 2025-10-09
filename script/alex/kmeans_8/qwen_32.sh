@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=list-kmeans-32
+#SBATCH --job-name=kmeans8-qwen-32
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=12:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/qwen/list-kmeans/32-%j.out 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/qwen/list-kmeans/kmeans8-32-%j.out
 #SBATCH --partition a100
 
 
@@ -81,9 +81,9 @@ export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/script/alex/kmeans/qwen_32.yaml \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/script/alex/kmeans_8/qwen_32.yaml \
     --cluster_mode kmeans \
-    --kmeans_num_frontiers 10 \
+    --kmeans_num_frontiers 8 \
     --chat_seed 32
 
 

@@ -777,7 +777,7 @@ class ObjectClasses:
 
         elif self.class_set == "scannet200":
             # load scannet 200 class
-            self.classes_file_path = Path("data/scannet200_classes.txt")
+            self.classes_file_path = Path("/home/hpc/v100dd/v100dd12/code/3D-Mem/data/scannet200_classes.txt")
             with open(self.classes_file_path, "r") as f:
                 all_lines = [cls.strip() for cls in f.readlines()]
                 all_classes = list(set(all_lines))
