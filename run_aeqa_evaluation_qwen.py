@@ -35,7 +35,7 @@ from src.logger_aeqa import Logger
 from src.const import *
 
 
-def main(cfg, start_ratio=0.0, end_ratio=1.0):
+def main(cfg, start_ratio=0.0, end_ratio=1.0, hierarchy_mode=False, layer2_num=3):
     # load the default concept graph config
     cfg_cg = OmegaConf.load(cfg.concept_graph_config_path)
     OmegaConf.resolve(cfg_cg)
@@ -242,6 +242,8 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                 save_frontier_image=cfg.save_visualization,
                 eps_frontier_dir=eps_frontier_dir,
                 prompt_img_size=(cfg.prompt_h, cfg.prompt_w),
+                hierarchy_mode=hierarchy_mode,
+                layer2_num=layer2_num,
             )
             if not update_success:
                 logging.info("Warning! Update frontier map failed!")
@@ -380,9 +382,19 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
 if __name__ == "__main__":
     # Get config path
     parser = argparse.ArgumentParser()
+    def str2bool(v):
+        if isinstance(v, bool):
+            return v
+        v_lower = v.lower()
+        if v_lower in ("yes", "true", "t", "y", "1"): return True
+        if v_lower in ("no", "false", "f", "n", "0"): return False
+        raise argparse.ArgumentTypeError("boolean value expected")
     parser.add_argument("-cf", "--cfg_file", help="cfg file path", default="", type=str)
     parser.add_argument("--start_ratio", help="start ratio", default=0.0, type=float)
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
+    parser.add_argument("--chat_seed", help="seed for chat completions", default=None, type=int)
+    parser.add_argument("--hierarchy_mode", help="enable 2-layer KMeans frontier hierarchy", default=False, type=str2bool)
+    parser.add_argument("--layer2_num", help="number of directions for layer-2 KMeans", default=3, type=int)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
@@ -425,5 +437,11 @@ if __name__ == "__main__":
         handler.setFormatter(formatter)
 
     # run
+    # inject chat_seed into cfg for downstream use
+    try:
+        cfg.chat_seed = args.chat_seed
+    except Exception:
+        pass
+
     logging.info(f"***** Running {cfg.exp_name} *****")
-    main(cfg, args.start_ratio, args.end_ratio)
+    main(cfg, args.start_ratio, args.end_ratio, args.hierarchy_mode, args.layer2_num)

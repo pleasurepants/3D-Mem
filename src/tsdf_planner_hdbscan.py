@@ -138,6 +138,8 @@ class TSDFPlanner(TSDFPlannerBase):
         save_frontier_image: bool = False,
         eps_frontier_dir=None,
         prompt_img_size: Tuple[int, int] = (320, 320),
+        hierarchy_mode: bool = False,
+        layer2_num: int = 3,
     ) -> bool:
         pts_habitat = pts.copy()
         pts = pos_habitat_to_normal(pts)
@@ -190,103 +192,164 @@ class TSDFPlanner(TSDFPlannerBase):
         
         
 
-        # =========== 两层hdbscan分层聚类 ===========
+        # =========== 两层聚类：当 hierarchy_mode=True 使用 KMeans，否则沿用 HDBSCAN ==========
+        if hierarchy_mode:
+            # ---------- KMeans 两层：第一层固定3类、第二层 layer2_num ----------
+            self.frontiers_layer0 = []
+            self.frontiers_layer1 = []
 
-        # === adaptive min_cluster_size 聚类 ===
-        def adaptive_hdbscan(data, min_cluster_size, min_limit=2):
-            while min_cluster_size >= min_limit:
-                db = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size).fit(data)
-                labels = db.labels_
-                n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-                if n_clusters > 0:
-                    return labels
-                min_cluster_size -= 1
-            return labels  # 最后即使全-1也返回
-
-        labels_coarse = adaptive_hdbscan(frontier_areas, cfg.min_frontier_area_layer0, min_limit=2)
-        labels_fine = adaptive_hdbscan(frontier_areas, cfg.min_frontier_area_layer1, min_limit=2)
-        # db_coarse = hdbscan.HDBSCAN(min_cluster_size=cfg.min_frontier_area_layer0).fit(frontier_areas)
-        # labels_coarse = db_coarse.labels_
-
-        # db_fine = hdbscan.HDBSCAN(min_cluster_size=cfg.min_frontier_area_layer1).fit(frontier_areas)
-        # labels_fine = db_fine.labels_
-
-        # 1. 粗层Frontier对象生成
-        self.frontiers_layer0 = []
-        coarse_centers = {}  # 用于最近大簇归属
-        for coarse_label in np.unique(labels_coarse):
-            if coarse_label == -1:
-                continue
-            idxs = np.where(labels_coarse == coarse_label)[0]
-            cluster = frontier_areas[idxs]
-            if len(cluster) < cfg.min_frontier_area_layer0:
-                continue
-            coarse_centers[coarse_label] = np.mean(cluster, axis=0)
-            angle_cluster = np.asarray([
-                np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
-            ])
-            ft_angle = np.mean(angle_cluster)
-            region = self.get_frontier_region_map(cluster)
-            ft_data = {"angle": ft_angle, "region": region}
-            frontier = self.create_frontier(
-                ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
-            )
-            frontier.layer0_label = coarse_label
-            self.frontiers_layer0.append(frontier)
-
-        # 2. 细层Frontier对象生成+父子映射
-        coarse2fine = defaultdict(list)
-        fine_parent_map = {}  # fine_label -> parent_label
-        for fine_label in np.unique(labels_fine):
-            if fine_label == -1:
-                continue
-            idxs = np.where(labels_fine == fine_label)[0]
-            parent_labels = np.unique(labels_coarse[idxs])
-            valid_parents = [l for l in parent_labels if l != -1]
-            if valid_parents:
-                parent_label = valid_parents[0]  # 多个时取数量最多的
+            # 第一层（方向=3）
+            k0 = min(3, len(frontier_areas))
+            if k0 <= 0:
+                return False
+            if k0 == 1:
+                labels_coarse = np.zeros(len(frontier_areas), dtype=int)
             else:
-                # 归属最近大簇
-                center = np.mean(frontier_areas[idxs], axis=0)
-                parent_label = min(
-                    coarse_centers.keys(),
-                    key=lambda l: np.linalg.norm(center - coarse_centers[l])
+                km0 = KMeans(n_clusters=k0, n_init=10).fit(frontier_areas)
+                labels_coarse = km0.labels_
+
+            for coarse_label in np.unique(labels_coarse):
+                idxs = np.where(labels_coarse == coarse_label)[0]
+                cluster = frontier_areas[idxs]
+                if len(cluster) == 0:
+                    continue
+                angle_cluster = np.asarray([
+                    np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
+                ])
+                ft_angle = np.mean(angle_cluster)
+                region = self.get_frontier_region_map(cluster)
+                ft_data = {"angle": ft_angle, "region": region}
+                frontier = self.create_frontier(
+                    ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
                 )
-            coarse2fine[parent_label].append(fine_label)
-            fine_parent_map[fine_label] = parent_label
+                frontier.layer0_label = int(coarse_label)
+                self.frontiers_layer0.append(frontier)
 
-        # 2.2 coarse下的细簇编号本地化
-        fine_label_map = dict()  # (coarse, fine) -> 子簇局部编号
-        for coarse_label, fine_labels in coarse2fine.items():
-            for local_id, fine_label in enumerate(sorted(fine_labels)):
-                fine_label_map[(coarse_label, fine_label)] = local_id
+            # 第二层（每个第一层簇中再分 layer2_num 类）
+            for coarse_label in np.unique(labels_coarse):
+                idxs = np.where(labels_coarse == coarse_label)[0]
+                cluster_points = frontier_areas[idxs]
+                if len(cluster_points) == 0:
+                    continue
+                k1 = min(int(max(1, layer2_num)), len(cluster_points))
+                if k1 == 1:
+                    fine_labels = np.zeros(len(cluster_points), dtype=int)
+                else:
+                    km1 = KMeans(n_clusters=k1, n_init=10).fit(cluster_points)
+                    fine_labels = km1.labels_
 
-        # 2.3 细层Frontier对象及父子局部ID赋值
-        self.frontiers_layer1 = []
-        for fine_label in np.unique(labels_fine):
-            if fine_label == -1:
-                continue
-            idx = np.where(labels_fine == fine_label)[0]
-            cluster = frontier_areas[idx]
-            if len(cluster) < cfg.min_frontier_area_layer1:
-                continue
-            angle_cluster = np.asarray([
-                np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
-            ])
-            ft_angle = np.mean(angle_cluster)
-            region = self.get_frontier_region_map(cluster)
-            parent_label = fine_parent_map[fine_label]
-            local_child = fine_label_map[(parent_label, fine_label)]
-            ft_data = {"angle": ft_angle, "region": region}
-            frontier = self.create_frontier(
-                ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
-            )
-            frontier.layer1_label = f"{parent_label}_{str(len(self.frontiers_layer1))}"  # 父ID_子ID格式
-            frontier.parent_layer0 = parent_label
-            self.frontiers_layer1.append(frontier)
+                for fine_label in np.unique(fine_labels):
+                    idx_local = np.where(fine_labels == fine_label)[0]
+                    sub_cluster = cluster_points[idx_local]
+                    if len(sub_cluster) == 0:
+                        continue
+                    angle_cluster = np.asarray([
+                        np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in sub_cluster
+                    ])
+                    ft_angle = np.mean(angle_cluster)
+                    region = self.get_frontier_region_map(sub_cluster)
+                    ft_data = {"angle": ft_angle, "region": region}
+                    frontier = self.create_frontier(
+                        ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
+                    )
+                    frontier.layer1_label = f"{int(coarse_label)}_{str(len(self.frontiers_layer1))}"
+                    frontier.parent_layer0 = int(coarse_label)
+                    self.frontiers_layer1.append(frontier)
 
-        # 3. 默认细层用于self.frontiers
-        self.frontiers = self.frontiers_layer0 + self.frontiers_layer1
+            self.frontiers = self.frontiers_layer0 + self.frontiers_layer1
+        else:
+            # =========== 两层hdbscan分层聚类 ==========
+
+            # === adaptive min_cluster_size 聚类 ===
+            def adaptive_hdbscan(data, min_cluster_size, min_limit=2):
+                while min_cluster_size >= min_limit:
+                    db = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size).fit(data)
+                    labels = db.labels_
+                    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+                    if n_clusters > 0:
+                        return labels
+                    min_cluster_size -= 1
+                return labels  # 最后即使全-1也返回
+
+            labels_coarse = adaptive_hdbscan(frontier_areas, cfg.min_frontier_area_layer0, min_limit=2)
+            labels_fine = adaptive_hdbscan(frontier_areas, cfg.min_frontier_area_layer1, min_limit=2)
+
+            # 1. 粗层Frontier对象生成
+            self.frontiers_layer0 = []
+            coarse_centers = {}  # 用于最近大簇归属
+            for coarse_label in np.unique(labels_coarse):
+                if coarse_label == -1:
+                    continue
+                idxs = np.where(labels_coarse == coarse_label)[0]
+                cluster = frontier_areas[idxs]
+                if len(cluster) < cfg.min_frontier_area_layer0:
+                    continue
+                coarse_centers[coarse_label] = np.mean(cluster, axis=0)
+                angle_cluster = np.asarray([
+                    np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
+                ])
+                ft_angle = np.mean(angle_cluster)
+                region = self.get_frontier_region_map(cluster)
+                ft_data = {"angle": ft_angle, "region": region}
+                frontier = self.create_frontier(
+                    ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
+                )
+                frontier.layer0_label = coarse_label
+                self.frontiers_layer0.append(frontier)
+
+            # 2. 细层Frontier对象生成+父子映射
+            coarse2fine = defaultdict(list)
+            fine_parent_map = {}  # fine_label -> parent_label
+            for fine_label in np.unique(labels_fine):
+                if fine_label == -1:
+                    continue
+                idxs = np.where(labels_fine == fine_label)[0]
+                parent_labels = np.unique(labels_coarse[idxs])
+                valid_parents = [l for l in parent_labels if l != -1]
+                if valid_parents:
+                    parent_label = valid_parents[0]  # 多个时取数量最多的
+                else:
+                    # 归属最近大簇
+                    center = np.mean(frontier_areas[idxs], axis=0)
+                    parent_label = min(
+                        coarse_centers.keys(),
+                        key=lambda l: np.linalg.norm(center - coarse_centers[l])
+                    )
+                coarse2fine[parent_label].append(fine_label)
+                fine_parent_map[fine_label] = parent_label
+
+            # 2.2 coarse下的细簇编号本地化
+            fine_label_map = dict()  # (coarse, fine) -> 子簇局部编号
+            for coarse_label, fine_labels in coarse2fine.items():
+                for local_id, fine_label in enumerate(sorted(fine_labels)):
+                    fine_label_map[(coarse_label, fine_label)] = local_id
+
+            # 2.3 细层Frontier对象及父子局部ID赋值
+            self.frontiers_layer1 = []
+            for fine_label in np.unique(labels_fine):
+                if fine_label == -1:
+                    continue
+                idx = np.where(labels_fine == fine_label)[0]
+                cluster = frontier_areas[idx]
+                if len(cluster) < cfg.min_frontier_area_layer1:
+                    continue
+                angle_cluster = np.asarray([
+                    np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
+                ])
+                ft_angle = np.mean(angle_cluster)
+                region = self.get_frontier_region_map(cluster)
+                parent_label = fine_parent_map[fine_label]
+                local_child = fine_label_map[(parent_label, fine_label)]
+                ft_data = {"angle": ft_angle, "region": region}
+                frontier = self.create_frontier(
+                    ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
+                )
+                frontier.layer1_label = f"{parent_label}_{str(len(self.frontiers_layer1))}"  # 父ID_子ID格式
+                frontier.parent_layer0 = parent_label
+                self.frontiers_layer1.append(frontier)
+
+            # 3. 默认细层用于self.frontiers
+            self.frontiers = self.frontiers_layer0 + self.frontiers_layer1
 
         # =========== 两层frontier都生成图片/feature ===========
         for i, frontier in enumerate(self.frontiers_layer0):

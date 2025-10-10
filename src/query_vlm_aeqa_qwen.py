@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Tuple, Optional, Union
 
 from src.eval_utils_gpt_aeqa_qwen import explore_step
@@ -53,6 +54,13 @@ def query_vlm_for_response(
     step_dict["question"] = question
 
     # query vlm
+    # 将 chat_seed 写入环境变量供 call_openai_api 使用（或模块内直接读取 cfg.chat_seed）
+    try:
+        if getattr(cfg, "chat_seed", None) is not None:
+            os.environ["VLLM_SEED"] = str(int(cfg.chat_seed))
+    except Exception:
+        pass
+
     outputs, snapshot_id_mapping, reason, n_filtered_snapshots = explore_step(
         step_dict, cfg, verbose=verbose
     )

@@ -37,8 +37,8 @@ def format_content(contents):
 
 
 
-# send information to openai
-def call_openai_api(sys_prompt, contents) -> Optional[str]:
+# send information to openai (support seed)
+def call_openai_api(sys_prompt, contents, seed: Optional[int] = None) -> Optional[str]:
     max_tries = 5
     retry_count = 0
     formated_content = format_content(contents)
@@ -48,14 +48,27 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     ]
     while retry_count < max_tries:
         try:
+            # 支持从参数或环境变量注入 seed（优先参数，其次 VLLM_SEED）
+            _seed_env = None
+            try:
+                _seed_env = int(os.getenv("VLLM_SEED")) if os.getenv("VLLM_SEED") is not None else None
+            except Exception:
+                _seed_env = None
+            _seed = seed if seed is not None else _seed_env
+            try:
+                logging.info(f"[ChatSeed] using seed={_seed}")
+            except Exception:
+                pass
+
             completion = client.chat.completions.create(
-                model="qwen",  # gpt-4o-internvl-minicpm
+                model="qwen",  # gpt-4o
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
                 top_p=0.95,
                 frequency_penalty=0,
                 presence_penalty=0,
+                **({"seed": int(_seed)} if _seed is not None else {}),
             )
             return completion.choices[0].message.content
         except openai.RateLimitError as e:
@@ -868,9 +881,7 @@ def explore_step(step, cfg, verbose=False):
 
     idx0 = None
     for _ in range(retry_bound):
-        # full_response = call_openai_api_vote(sys_prompt, content)
-        # full_response = call_openai_api(sys_prompt, content)
-        full_response = call_openai_api_score(sys_prompt, content)
+        full_response = call_openai_api(sys_prompt, content)
         if full_response is None:
             print("call_openai_api (frontier layer0) returns None, retrying")
             continue
@@ -931,9 +942,8 @@ def explore_step(step, cfg, verbose=False):
         idx1_in_subgroup = None
         final_reason = ""
         for _ in range(retry_bound):
-            # full_response = call_openai_api_vote(sys_prompt, content)
-            # full_response = call_openai_api(sys_prompt, content)
-            full_response = call_openai_api_score(sys_prompt, content)
+
+            full_response = call_openai_api(sys_prompt, content)
             if full_response is None:
                 print("call_openai_api (frontier layer1) returns None, retrying")
                 continue
