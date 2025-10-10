@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=q_bl
+#SBATCH --job-name=list-cot
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=10-00:00:00
 #SBATCH --exclude=worker-minor-1,worker-minor-3,worker-minor-4,worker-minor-5,worker-minor-6,worker-3,worker-4,worker-8,worker-9,worker-1,worker-2
-#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/qwen/baseline-%j.out
+#SBATCH --output=/home/wiss/zhang/code/openeqa/3D-Mem/slurm/qwen/list-cot-%j.out
 #SBATCH --partition all
 
 echo "=== JOB START ==="
@@ -30,11 +30,11 @@ echo "[INFO] Starting vLLM (qwen) server on GPU 0..."
 source /home/wiss/zhang/anaconda3/bin/activate vllm
 
 CUDA_VISIBLE_DEVICES=0 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-vllm serve Qwen/Qwen2-VL-7B-Instruct \
+vllm serve Qwen/Qwen2.5-VL-7B-Instruct \
     --served-model-name qwen \
     --port 8000 \
-    --limit-mm-per-prompt image=20 &
-    # --trust-remote-code &
+    --max-model-len 100000 \
+    --limit-mm-per-prompt '{"image": 20}' &
 VLLM_PID=$!
 
 

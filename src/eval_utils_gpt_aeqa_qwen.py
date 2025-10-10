@@ -878,15 +878,15 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
     context = ''
 
-    if not os.path.exists(chosen_frontier_path):
-        os.makedirs(chosen_frontier_path, exist_ok=True)
+    # if not os.path.exists(chosen_frontier_path):
+    #     os.makedirs(chosen_frontier_path, exist_ok=True)
 
-    png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
-    if len(png_files) > 0:
-        sys_prompt, content = frontier_context(chosen_frontier_path)
-        context = call_openai_api(sys_prompt, content)
-    else:
-        pass
+    # png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
+    # if len(png_files) > 0:
+    #     sys_prompt, content = frontier_context(chosen_frontier_path)
+    #     context = call_openai_api(sys_prompt, content)
+    # else:
+    #     pass
 
     if len(frontier_imgs) == 1: 
         idx0 = 0
