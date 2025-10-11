@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=k15-13
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a100:2
+#SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=12:00:00
 #SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/qwen/hierarchy/kmeans_15/k15-13-%j.out
-#SBATCH --partition a100
+#SBATCH --partition a40
 
 # srun --nodes=1 --gres=gpu:a100:2 --ntasks=1 --cpus-per-task=16 --time=1:00:00 --partition a100 --pty bash
 # srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a40 --pty bash
