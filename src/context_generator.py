@@ -33,6 +33,9 @@ class FrontierSimilaritySearcher:
         # aHash 索引缓存
         self._index = None
         self._index_path = None
+        # ppl_rank 过滤相关
+        self._ppl_rank_qids = None
+        self._load_ppl_rank_filter()
 
     # ---------- index helpers ----------
     def _ensure_index_loaded(self):
@@ -117,6 +120,45 @@ class FrontierSimilaritySearcher:
         except Exception as e:
             logging.info(f"[ReplaySim] build exp index failed: {e}")
 
+    # ---------- ppl_rank filter ----------
+    def _load_ppl_rank_filter(self):
+        """加载 ppl_rank 过滤配置"""
+        ppl_rank_category = getattr(self.cfg, "ppl_rank", None)
+        if not ppl_rank_category:
+            self._ppl_rank_qids = None
+            return
+        
+        ppl_rank_file = getattr(self.cfg, "ppl_rank_file", "/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json")
+        
+        if not os.path.exists(ppl_rank_file):
+            logging.warning(f"[PPL_RANK] File not found: {ppl_rank_file}, filter disabled")
+            self._ppl_rank_qids = None
+            return
+        
+        try:
+            with open(ppl_rank_file, 'r', encoding='utf-8') as f:
+                ppl_data = json.load(f)
+            
+            # 标准化类别名称: low/medium/high -> Low/Medium/High
+            category_key = ppl_rank_category.capitalize()
+            
+            if category_key not in ppl_data:
+                logging.warning(f"[PPL_RANK] Category '{category_key}' not found in {ppl_rank_file}, available: {list(ppl_data.keys())}")
+                self._ppl_rank_qids = None
+                return
+            
+            # 获取该类别下的所有 question_id
+            category_dict = ppl_data[category_key]
+            if isinstance(category_dict, dict):
+                self._ppl_rank_qids = set(category_dict.keys())
+                logging.info(f"[PPL_RANK] Loaded {len(self._ppl_rank_qids)} question_ids for category '{category_key}'")
+            else:
+                logging.warning(f"[PPL_RANK] Invalid data format for category '{category_key}'")
+                self._ppl_rank_qids = None
+        except Exception as e:
+            logging.warning(f"[PPL_RANK] Failed to load ppl_rank filter: {e}")
+            self._ppl_rank_qids = None
+
     # ---------- episode resolve ----------
     def resolve_episode_id(self, question_id: str) -> Optional[str]:
         """优先从 questions_list_path 查找，找不到则从 replay_json 扫描"""
@@ -162,6 +204,11 @@ class FrontierSimilaritySearcher:
                 qid = rec.get("question_id")
                 if exclude_qid and qid == exclude_qid:
                     continue
+                
+                # ppl_rank 过滤: 如果启用了过滤且当前 qid 不在允许列表中，则跳过
+                if self._ppl_rank_qids is not None and qid not in self._ppl_rank_qids:
+                    continue
+                
                 epi_of_q = self._qid2episode_from_experience.get(qid)
                 if episode_id and epi_of_q and epi_of_q != episode_id:
                     continue
@@ -259,6 +306,11 @@ class FrontierSimilaritySearcher:
             qid = rec.get("question_id")
             if exclude_question_id and qid == exclude_question_id:
                 continue
+            
+            # ppl_rank 过滤: 如果启用了过滤且当前 qid 不在允许列表中，则跳过
+            if self._ppl_rank_qids is not None and qid not in self._ppl_rank_qids:
+                continue
+            
             epi_of_q = self._qid2episode_from_experience.get(qid)
             if episode_id and epi_of_q and epi_of_q != episode_id:
                 continue

@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=q-ee-sim-top3-13
+#SBATCH --job-name=ppl-top3-medium-568
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/ee/qwen-sim-top3-13-%j.out
+#SBATCH --time=12:00:00
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/ppl/medium/seed_568-%j.out
 #SBATCH --partition a40
 
 
 
-# srun --nodes=1 --gres=gpu:a100:2 --ntasks=1 --cpus-per-task=16 --time=1:00:00 --partition a100 --pty bash
+# srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=1:00:00 --partition a40 --pty bash
 # srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=0:30:00 --partition a40 --pty bash
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
@@ -76,17 +76,17 @@ source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 # -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/qwen_debug.yaml \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/script/ppl/top3/medium/config_568.yaml \
     --replay_mode traj_sim \
     --replay_top 3 \
     --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set \
-    --chat_seed 13 \
+    --chat_seed 568 \
     --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/traj_abs_format.json \
     --caption true \
     --critique true \
     --abstraction true \
     --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json \
-    --ppl_rank high \
+    --ppl_rank medium \
     --ppl_rank_file /home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json
 
 
@@ -98,3 +98,4 @@ else
 fi
 
 echo "=== JOB END ==="
+

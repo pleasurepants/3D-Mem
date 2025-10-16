@@ -21,6 +21,43 @@ client = OpenAI(
 
 
 
+def _load_ppl_rank_qids(cfg):
+    """加载 ppl_rank 过滤的 question_id 集合"""
+    ppl_rank_category = getattr(cfg, "ppl_rank", None)
+    if not ppl_rank_category:
+        return None
+    
+    ppl_rank_file = getattr(cfg, "ppl_rank_file", "/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json")
+    
+    if not os.path.exists(ppl_rank_file):
+        logging.warning(f"[PPL_RANK] File not found: {ppl_rank_file}, filter disabled")
+        return None
+    
+    try:
+        with open(ppl_rank_file, 'r', encoding='utf-8') as f:
+            ppl_data = json.load(f)
+        
+        # 标准化类别名称: low/medium/high -> Low/Medium/High
+        category_key = ppl_rank_category.capitalize()
+        
+        if category_key not in ppl_data:
+            logging.warning(f"[PPL_RANK] Category '{category_key}' not found in {ppl_rank_file}, available: {list(ppl_data.keys())}")
+            return None
+        
+        # 获取该类别下的所有 question_id
+        category_dict = ppl_data[category_key]
+        if isinstance(category_dict, dict):
+            ppl_rank_qids = set(category_dict.keys())
+            logging.info(f"[PPL_RANK] Loaded {len(ppl_rank_qids)} question_ids for category '{category_key}'")
+            return ppl_rank_qids
+        else:
+            logging.warning(f"[PPL_RANK] Invalid data format for category '{category_key}'")
+            return None
+    except Exception as e:
+        logging.warning(f"[PPL_RANK] Failed to load ppl_rank filter: {e}")
+        return None
+
+
 def format_content(contents):
     formated_content = []
     for c in contents:
@@ -506,6 +543,10 @@ def simple_recall_and_aggregate(
             if not store or not isinstance(traj_path, str) or len(traj_path) == 0 or not os.path.exists(traj_path):
                 logging.info("[TrajSim] vector store or traj_file not available")
                 return None
+            
+            # 加载 ppl_rank 过滤设置
+            ppl_rank_qids = _load_ppl_rank_qids(cfg)
+            
             # 1) 图像相似：frontier -> corpus PNG
             dev = _device_auto()
             from PIL import Image as _Image
@@ -537,6 +578,11 @@ def simple_recall_and_aggregate(
                     qid = meta.get('question_id')
                     if exclude_question_id and qid == exclude_question_id:
                         continue
+                    
+                    # ppl_rank 过滤: 如果启用了过滤且当前 qid 不在允许列表中，则跳过
+                    if ppl_rank_qids is not None and qid not in ppl_rank_qids:
+                        continue
+                    
                     per_scores.append({
                         'similarity': float(sims[int(idx)]),  # clip_sim
                         'question_id': qid,
@@ -618,7 +664,7 @@ def simple_recall_and_aggregate(
                         selected_set.add(qid)
             if len(selected) < int(top_k) and isinstance(traj_data, dict):
                 # 随机回填（仅 abstraction 非空的）
-                pool = [qid for qid, node in traj_data.items() if qid not in selected_set and isinstance(node, dict) and isinstance(node.get('abstraction'), str) and node.get('abstraction').strip() and (not exclude_question_id or qid != exclude_question_id)]
+                pool = [qid for qid, node in traj_data.items() if qid not in selected_set and isinstance(node, dict) and isinstance(node.get('abstraction'), str) and node.get('abstraction').strip() and (not exclude_question_id or qid != exclude_question_id) and (ppl_rank_qids is None or qid in ppl_rank_qids)]
                 import random as _rnd
                 _rnd.shuffle(pool)
                 for qid in pool:
@@ -661,6 +707,10 @@ def simple_recall_and_aggregate(
             if not isinstance(traj_path, str) or len(traj_path) == 0 or not os.path.exists(traj_path):
                 logging.info("[TrajRandom] missing traj_file; skip")
                 return None
+            
+            # 加载 ppl_rank 过滤设置
+            ppl_rank_qids = _load_ppl_rank_qids(cfg)
+            
             with open(traj_path, 'r', encoding='utf-8') as f:
                 traj_data = json.load(f)
             candidates = []
@@ -668,6 +718,11 @@ def simple_recall_and_aggregate(
                 for qid, node in traj_data.items():
                     if exclude_question_id and qid == exclude_question_id:
                         continue
+                    
+                    # ppl_rank 过滤: 如果启用了过滤且当前 qid 不在允许列表中，则跳过
+                    if ppl_rank_qids is not None and qid not in ppl_rank_qids:
+                        continue
+                    
                     if not isinstance(node, dict):
                         continue
                     abstraction = node.get('abstraction')

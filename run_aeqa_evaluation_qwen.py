@@ -1009,6 +1009,9 @@ if __name__ == "__main__":
     # replay injection stage control
     # preferred flag: --exp_at; aliases: --replay_at / --inject_stage for backward compatibility
     parser.add_argument("--exp_at", "--replay_at", "--inject_stage", dest="exp_at", help="limit replay injection stage: '' (default, both), 'bvf' (layer0 only), 'cvf' (layer1 only)", default="", type=str)
+    # ppl_rank mode parameter
+    parser.add_argument("--ppl_rank", help="perplexity rank category for filtering: 'low', 'medium', or 'high' (case-insensitive)", default="", type=str)
+    parser.add_argument("--ppl_rank_file", help="path to ppl_rank json file", default="/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json", type=str)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
@@ -1025,6 +1028,12 @@ if __name__ == "__main__":
     # traj_* external file path
     if args.traj_file:
         cfg.traj_file = args.traj_file
+    
+    # ppl_rank parameters
+    if args.ppl_rank:
+        cfg.ppl_rank = str(args.ppl_rank).strip().lower()
+        cfg.ppl_rank_file = args.ppl_rank_file
+        logging.info(f"[PPL_RANK] Mode enabled: category={cfg.ppl_rank}, file={cfg.ppl_rank_file}")
 
     # normalize inject_stage into cfg (empty -> None)
     # normalize stage flag (exp_at preferred)
