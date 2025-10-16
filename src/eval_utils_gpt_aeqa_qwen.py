@@ -1355,7 +1355,10 @@ def format_explore_prompt_frontier(
     if bool(use_traj_abstraction):
         context_desc = (
             "TRAJECTORY ABSTRACTION (if present): High-level, question-specific strategies distilled from past trajectories of similar tasks. "
-            "It provides concise guidance on which areas to prioritize or avoid for effective exploration, without low-level captions or critiques.\n\n"
+            "It provides concise guidance on which areas to prioritize or avoid for effective exploration, without low-level captions or critiques. "
+            "Each abstraction consists of two parts: (1) Environment Dynamics—describes the spatial layout, key regions, and physical structure of the environment; "
+            "(2) Decision-making Skills—provides actionable strategies and heuristics for navigating and making effective decisions in that specific environment type. "
+            "Use Environment Dynamics to understand the scene structure, and apply Decision-making Skills as guiding principles for frontier selection.\n\n"
         )
     else:
         context_desc = (
