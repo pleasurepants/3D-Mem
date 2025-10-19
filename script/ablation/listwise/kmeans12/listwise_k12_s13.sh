@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=q-nocon-44
+#SBATCH --job-name=lw-k12-s13
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a100:2
+#SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=24:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/cot/qwen/nocon-44-%j.out 
-#SBATCH --partition a100
+#SBATCH --time=9:00:00 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/ablation/listwise/kmeans12/lw-k12-s13-%j.out 
+#SBATCH --partition a40
 
 
 
-# srun --nodes=1 --gres=gpu:a100:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a100 --pty bash
+# srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a40 --pty bash
 # srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a40 --pty bash
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
@@ -72,11 +72,11 @@ source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate 3dmem
 source .env
 # export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
-#  -m debugpy --listen 0.0.0.0:8798 --wait-for-client 
-CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/qwen-nocon.yaml \
-    --base_mode hierarchy \
-    --kmeans 13 \
+
+CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/ablation/listwise/kmeans12/listwise_k12_s13.yaml \
+    --base_mode listwise \
+    --kmeans 12 \
     --episodic_context \
     --chat_seed 13
 

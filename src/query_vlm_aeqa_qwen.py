@@ -41,6 +41,8 @@ def query_vlm_for_response(
     step_dict["frontier_imgs_1"] = [
         frontier.feature for frontier in tsdf_planner.frontiers_layer1
     ]
+    
+    logging.info(f"[query_vlm] Prepared frontiers - total: {len(tsdf_planner.frontiers)}, layer0: {len(tsdf_planner.frontiers_layer0)}, layer1: {len(tsdf_planner.frontiers_layer1)}")
 
     step_dict["layer0_to_layer1"] = tsdf_planner.layer0_to_layer1  
     step_dict["layer1_to_layer0"] = tsdf_planner.layer1_to_layer0

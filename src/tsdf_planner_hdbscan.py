@@ -1,4 +1,6 @@
 import os.path
+import logging
+import random
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -212,182 +214,270 @@ class TSDFPlanner(TSDFPlannerBase):
         if n_points == 0:
             self.frontiers = []
             return False
-        if n_points == 1:
-            labels_coarse = np.zeros(1, dtype=int)
-        elif n_points == 2:
-            labels_coarse = np.array([0, 1])  # 直接分成两簇
-        else:
-            best_n_clusters = 2
-            best_score = -1
-            best_labels = None
-            for n_clusters in [2, 3]:
-                if n_points < n_clusters:
+        
+        # Get base_mode and kmeans from config
+        base_mode = cfg.get('base_mode', 'hierarchy')
+        total_kmeans = cfg.get('kmeans', 12)
+        
+        if base_mode == 'listwise':
+            # Listwise mode: directly cluster into kmeans clusters, no hierarchy
+            logging.info(f"[Listwise Mode] Clustering into {total_kmeans} clusters from {n_points} frontier points")
+            n_clusters = min(total_kmeans, n_points)
+            
+            if n_points == 1:
+                labels = np.zeros(1, dtype=int)
+            elif n_points == 2:
+                labels = np.array([0, 1])
+            else:
+                kmeans_model = KMeans(n_clusters=n_clusters, n_init=10, random_state=42).fit(frontier_areas)
+                labels = kmeans_model.labels_
+            
+            logging.info(f"[Listwise Mode] KMeans produced {len(np.unique(labels))} unique labels")
+            
+            # Generate all frontiers as a single flat list
+            # For listwise mode, use a lower threshold to ensure we get the target number
+            min_area_threshold = max(1, cfg.min_frontier_area_layer1)  # Use layer1 threshold (smaller)
+            
+            self.frontiers = []
+            filtered_count = 0
+            for label in np.unique(labels):
+                if label == -1:
                     continue
-                kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42).fit(frontier_areas)
-                labels = kmeans.labels_
-                # silhouette_score需要每簇至少有2个点，否则会报错
-                try:
-                    score = silhouette_score(frontier_areas, labels)
-                except Exception:
-                    score = -1
-                if score > best_score:
-                    best_score = score
-                    best_n_clusters = n_clusters
-                    best_labels = labels
-            labels_coarse = best_labels
-
-        # 1. 粗层Frontier对象生成
-        self.frontiers_layer0 = []
-        coarse_centers = {}  # 用于最近大簇归属
-        for coarse_label in np.unique(labels_coarse):
-            if coarse_label == -1:
-                continue
-            idxs = np.where(labels_coarse == coarse_label)[0]
-            cluster = frontier_areas[idxs]
-            if len(cluster) < cfg.min_frontier_area_layer0:
-                continue
-            coarse_centers[coarse_label] = np.mean(cluster, axis=0)
-            angle_cluster = np.asarray([
-                np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
-            ])
-            ft_angle = np.mean(angle_cluster)
-            region = self.get_frontier_region_map(cluster)
-            ft_data = {"angle": ft_angle, "region": region}
-            frontier = self.create_frontier(
-                ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
-            )
-            frontier.layer0_label = coarse_label
-            self.frontiers_layer0.append(frontier)
-
-        # 2. 粗簇内根据视角均匀三等分为细簇
-        self.frontiers_layer1 = []
-        for coarse_label in np.unique(labels_coarse):
-            if coarse_label == -1:
-                continue
-            idxs = np.where(labels_coarse == coarse_label)[0]
-            cluster = frontier_areas[idxs]
-            if len(cluster) < 3:
-                # 少于3个点直接生成一个细frontier
-                ft_angle = np.mean([
+                idxs = np.where(labels == label)[0]
+                cluster = frontier_areas[idxs]
+                if len(cluster) < min_area_threshold:
+                    filtered_count += 1
+                    logging.debug(f"[Listwise Mode] Filtered out cluster {label} with {len(cluster)} points (< {min_area_threshold})")
+                    continue
+                angle_cluster = np.asarray([
                     np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
                 ])
+                ft_angle = np.mean(angle_cluster)
                 region = self.get_frontier_region_map(cluster)
                 ft_data = {"angle": ft_angle, "region": region}
                 frontier = self.create_frontier(
                     ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
                 )
-                frontier.layer1_label = f"{coarse_label}_0"
-                frontier.parent_layer0 = coarse_label
-                self.frontiers_layer1.append(frontier)
-                continue
+                self.frontiers.append(frontier)
+            
+            # For listwise mode, no layer0/layer1 distinction
+            self.frontiers_layer0 = []
+            self.frontiers_layer1 = []
+            self.layer0_to_layer1 = {}
+            self.layer1_to_layer0 = []
+            
+            logging.info(f"[Listwise Mode] Generated {len(self.frontiers)} frontiers (filtered out {filtered_count} small clusters, target was {total_kmeans})")
+            
+            # Debug: print all frontier info
+            for idx, f in enumerate(self.frontiers):
+                logging.debug(f"[Listwise] Frontier {idx}: {f.image if hasattr(f, 'image') else 'no image'}")
+            
+        else:
+            # Hierarchy mode: two-layer clustering
+            logging.info(f"[Hierarchy Mode] Layer0: 3 clusters, Total target: {total_kmeans}")
+            
+            if n_points == 1:
+                labels_coarse = np.zeros(1, dtype=int)
+            elif n_points == 2:
+                labels_coarse = np.array([0, 1])
+            else:
+                # For hierarchy mode, always use 3 clusters for layer0
+                n_clusters_layer0 = min(3, n_points)
+                kmeans = KMeans(n_clusters=n_clusters_layer0, n_init=10, random_state=42).fit(frontier_areas)
+                labels_coarse = kmeans.labels_
 
-            # kmeans
-            relative_vecs = cluster - cur_point[:2]
-            angles = np.arctan2(relative_vecs[:, 1], relative_vecs[:, 0])
-            angles = (angles + 2 * np.pi) % (2 * np.pi)  # 保证在0~2pi
-            # 把角度映射到单位圆上
-            angle_points = np.stack([np.cos(angles), np.sin(angles)], axis=1)
-            n_clusters = min(3, len(cluster))
-            kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42).fit(angle_points)
-            for i in range(n_clusters):
-                split_idx = np.where(kmeans.labels_ == i)[0]
-                if len(split_idx) == 0:
+            # 1. 粗层Frontier对象生成
+            self.frontiers_layer0 = []
+            coarse_centers = {}  # 用于最近大簇归属
+            for coarse_label in np.unique(labels_coarse):
+                if coarse_label == -1:
                     continue
-                sub_cluster = cluster[split_idx]
-                sub_angles = angles[split_idx]
-                ft_angle = np.mean(sub_angles)
-                region = self.get_frontier_region_map(sub_cluster)
+                idxs = np.where(labels_coarse == coarse_label)[0]
+                cluster = frontier_areas[idxs]
+                if len(cluster) < cfg.min_frontier_area_layer0:
+                    continue
+                coarse_centers[coarse_label] = np.mean(cluster, axis=0)
+                angle_cluster = np.asarray([
+                    np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
+                ])
+                ft_angle = np.mean(angle_cluster)
+                region = self.get_frontier_region_map(cluster)
                 ft_data = {"angle": ft_angle, "region": region}
                 frontier = self.create_frontier(
                     ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
                 )
-                frontier.layer1_label = f"{coarse_label}_{i}"
-                frontier.parent_layer0 = coarse_label
-                self.frontiers_layer1.append(frontier)
+                frontier.layer0_label = coarse_label
+                self.frontiers_layer0.append(frontier)
+
+            # 2. 粗簇内根据视角均匀三等分为细簇
+            # 根据kmeans参数动态分配每个layer0簇的layer1数量
+            num_layer0_clusters = len(np.unique(labels_coarse[labels_coarse != -1]))
             
-
-
-        # 3. 默认细层用于self.frontiers
-        self.frontiers = self.frontiers_layer0 + self.frontiers_layer1
-
-        # =========== 两层frontier都生成图片/feature ===========
-        for i, frontier in enumerate(self.frontiers_layer0):
-            pos_habitat = self.voxel2habitat(frontier.position)
-            if frontier.image is None:
-                view_frontier_direction = np.array([
-                    pos_habitat[0] - pts_habitat[0],
-                    0.0,
-                    pos_habitat[2] - pts_habitat[2],
-                ])
-                obs = scene.get_frontier_observation(pts_habitat, view_frontier_direction)
-                frontier_obs = obs["color_sensor"]
-
-                if save_frontier_image:
-                    assert os.path.exists(eps_frontier_dir)
-                    plt.imsave(
-                        os.path.join(eps_frontier_dir, f"{cnt_step}-layer0-{frontier.layer0_label}.png"),
-                        frontier_obs,
+            # 计算每个layer0簇应该分出多少个layer1细簇
+            base_count = total_kmeans // num_layer0_clusters if num_layer0_clusters > 0 else 1
+            remainder = total_kmeans % num_layer0_clusters if num_layer0_clusters > 0 else 0
+            
+            # 随机分配额外的细簇
+            layer0_labels = sorted(np.unique(labels_coarse[labels_coarse != -1]))
+            extra_assignments = random.sample(layer0_labels, min(remainder, len(layer0_labels)))
+            n_clusters_per_layer0 = {label: base_count for label in layer0_labels}
+            for label in extra_assignments:
+                n_clusters_per_layer0[label] += 1
+            
+            logging.info(f"[Hierarchy Mode] Layer0 clusters: {num_layer0_clusters}, Distribution: {n_clusters_per_layer0}")
+            
+            self.frontiers_layer1 = []
+            for coarse_label in layer0_labels:
+                if coarse_label == -1:
+                    continue
+                idxs = np.where(labels_coarse == coarse_label)[0]
+                cluster = frontier_areas[idxs]
+                
+                target_n_clusters = n_clusters_per_layer0[coarse_label]
+                
+                if len(cluster) < target_n_clusters:
+                    # 如果点数少于目标细簇数，直接生成一个细frontier
+                    ft_angle = np.mean([
+                        np.arctan2(p[1] - cur_point[1], p[0] - cur_point[0]) for p in cluster
+                    ])
+                    region = self.get_frontier_region_map(cluster)
+                    ft_data = {"angle": ft_angle, "region": region}
+                    frontier = self.create_frontier(
+                        ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
                     )
-                processed_rgb = resize_image(
-                    frontier_obs, prompt_img_size[0], prompt_img_size[1]
-                )
-                frontier.image = f"{cnt_step}-layer0-{frontier.layer0_label}.png"
-                frontier.feature = processed_rgb
+                    frontier.layer1_label = f"{coarse_label}_0"
+                    frontier.parent_layer0 = coarse_label
+                    self.frontiers_layer1.append(frontier)
+                    continue
 
-        for frontier in self.frontiers_layer1:
-            pos_habitat = self.voxel2habitat(frontier.position)
-            if frontier.image is None:
-                view_frontier_direction = np.array([
-                    pos_habitat[0] - pts_habitat[0],
-                    0.0,
-                    pos_habitat[2] - pts_habitat[2],
-                ])
-                obs = scene.get_frontier_observation(pts_habitat, view_frontier_direction)
-                frontier_obs = obs["color_sensor"]
-
-                if save_frontier_image:
-                    assert os.path.exists(eps_frontier_dir)
-                    plt.imsave(
-                        os.path.join(eps_frontier_dir, f"{cnt_step}-layer1-{frontier.layer1_label}.png"),
-                        frontier_obs,
+                # kmeans
+                relative_vecs = cluster - cur_point[:2]
+                angles = np.arctan2(relative_vecs[:, 1], relative_vecs[:, 0])
+                angles = (angles + 2 * np.pi) % (2 * np.pi)  # 保证在0~2pi
+                # 把角度映射到单位圆上
+                angle_points = np.stack([np.cos(angles), np.sin(angles)], axis=1)
+                n_clusters = min(target_n_clusters, len(cluster))
+                kmeans_model = KMeans(n_clusters=n_clusters, n_init=10, random_state=42).fit(angle_points)
+                for i in range(n_clusters):
+                    split_idx = np.where(kmeans_model.labels_ == i)[0]
+                    if len(split_idx) == 0:
+                        continue
+                    sub_cluster = cluster[split_idx]
+                    sub_angles = angles[split_idx]
+                    ft_angle = np.mean(sub_angles)
+                    region = self.get_frontier_region_map(sub_cluster)
+                    ft_data = {"angle": ft_angle, "region": region}
+                    frontier = self.create_frontier(
+                        ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point
                     )
-                processed_rgb = resize_image(
-                    frontier_obs, prompt_img_size[0], prompt_img_size[1]
-                )
-                frontier.image = f"{cnt_step}-layer1-{frontier.layer1_label}.png"
-                frontier.feature = processed_rgb
+                    frontier.layer1_label = f"{coarse_label}_{i}"
+                    frontier.parent_layer0 = coarse_label
+                    self.frontiers_layer1.append(frontier)
+                
 
 
-        # 1. layer0聚类label到下标
-        layer0_label2idx = {frontier.layer0_label: i for i, frontier in enumerate(self.frontiers_layer0)}
+            # 3. 默认细层用于self.frontiers
+            self.frontiers = self.frontiers_layer0 + self.frontiers_layer1
 
-        # 2. 每个layer1归属哪个layer0的下标
-        # self.layer1_to_layer0 = []
-        # for frontier in self.frontiers_layer1:
-        #     parent_label = frontier.parent_layer0
-        #     parent_idx = layer0_label2idx[parent_label]
-        #     self.layer1_to_layer0.append(parent_idx)
+        # =========== 生成frontier的图片/feature ===========
+        if base_mode == 'listwise':
+            # Listwise mode: generate images for all frontiers in a flat list
+            logging.info(f"[Listwise Mode] About to generate images for {len(self.frontiers)} frontiers")
+            for i, frontier in enumerate(self.frontiers):
+                pos_habitat = self.voxel2habitat(frontier.position)
+                if frontier.image is None:
+                    view_frontier_direction = np.array([
+                        pos_habitat[0] - pts_habitat[0],
+                        0.0,
+                        pos_habitat[2] - pts_habitat[2],
+                    ])
+                    obs = scene.get_frontier_observation(pts_habitat, view_frontier_direction)
+                    frontier_obs = obs["color_sensor"]
 
+                    if save_frontier_image:
+                        assert os.path.exists(eps_frontier_dir)
+                        plt.imsave(
+                            os.path.join(eps_frontier_dir, f"{cnt_step}-listwise-{i}.png"),
+                            frontier_obs,
+                        )
+                    processed_rgb = resize_image(
+                        frontier_obs, prompt_img_size[0], prompt_img_size[1]
+                    )
+                    frontier.image = f"{cnt_step}-listwise-{i}.png"
+                    frontier.feature = processed_rgb
+            logging.info(f"[Listwise Mode] Finished generating images, final frontier count: {len(self.frontiers)}")
+        else:
+            # Hierarchy mode: generate images for layer0 and layer1
+            for i, frontier in enumerate(self.frontiers_layer0):
+                pos_habitat = self.voxel2habitat(frontier.position)
+                if frontier.image is None:
+                    view_frontier_direction = np.array([
+                        pos_habitat[0] - pts_habitat[0],
+                        0.0,
+                        pos_habitat[2] - pts_habitat[2],
+                    ])
+                    obs = scene.get_frontier_observation(pts_habitat, view_frontier_direction)
+                    frontier_obs = obs["color_sensor"]
 
-        self.layer1_to_layer0 = []
-        for frontier in self.frontiers_layer1:
-            parent_label = frontier.parent_layer0
-            # 如果parent_label丢失，归类到最近的大簇
-            if parent_label not in layer0_label2idx:
-                # 归到最近的coarse
-                pos = frontier.position
-                nearest_label = min(
-                    layer0_label2idx.keys(),
-                    key=lambda l: np.linalg.norm(pos - self.frontiers_layer0[layer0_label2idx[l]].position)
-                )
-                logging.warning(f"parent_label {parent_label} not in layer0_label2idx, reassign to nearest {nearest_label}")
-                parent_label = nearest_label
-            parent_idx = layer0_label2idx[parent_label]
-            self.layer1_to_layer0.append(parent_idx)
-        layer0_to_layer1 = defaultdict(list)
-        for idx1, parent_idx0 in enumerate(self.layer1_to_layer0):
-            layer0_to_layer1[parent_idx0].append(idx1)
-        self.layer0_to_layer1 = dict(layer0_to_layer1)
+                    if save_frontier_image:
+                        assert os.path.exists(eps_frontier_dir)
+                        plt.imsave(
+                            os.path.join(eps_frontier_dir, f"{cnt_step}-layer0-{frontier.layer0_label}.png"),
+                            frontier_obs,
+                        )
+                    processed_rgb = resize_image(
+                        frontier_obs, prompt_img_size[0], prompt_img_size[1]
+                    )
+                    frontier.image = f"{cnt_step}-layer0-{frontier.layer0_label}.png"
+                    frontier.feature = processed_rgb
+
+            for frontier in self.frontiers_layer1:
+                pos_habitat = self.voxel2habitat(frontier.position)
+                if frontier.image is None:
+                    view_frontier_direction = np.array([
+                        pos_habitat[0] - pts_habitat[0],
+                        0.0,
+                        pos_habitat[2] - pts_habitat[2],
+                    ])
+                    obs = scene.get_frontier_observation(pts_habitat, view_frontier_direction)
+                    frontier_obs = obs["color_sensor"]
+
+                    if save_frontier_image:
+                        assert os.path.exists(eps_frontier_dir)
+                        plt.imsave(
+                            os.path.join(eps_frontier_dir, f"{cnt_step}-layer1-{frontier.layer1_label}.png"),
+                            frontier_obs,
+                        )
+                    processed_rgb = resize_image(
+                        frontier_obs, prompt_img_size[0], prompt_img_size[1]
+                    )
+                    frontier.image = f"{cnt_step}-layer1-{frontier.layer1_label}.png"
+                    frontier.feature = processed_rgb
+
+            # Build layer0 to layer1 mapping (only for hierarchy mode)
+            # 1. layer0聚类label到下标
+            layer0_label2idx = {frontier.layer0_label: i for i, frontier in enumerate(self.frontiers_layer0)}
+
+            # 2. 每个layer1归属哪个layer0的下标
+            self.layer1_to_layer0 = []
+            for frontier in self.frontiers_layer1:
+                parent_label = frontier.parent_layer0
+                # 如果parent_label丢失，归类到最近的大簇
+                if parent_label not in layer0_label2idx:
+                    # 归到最近的coarse
+                    pos = frontier.position
+                    nearest_label = min(
+                        layer0_label2idx.keys(),
+                        key=lambda l: np.linalg.norm(pos - self.frontiers_layer0[layer0_label2idx[l]].position)
+                    )
+                    logging.warning(f"parent_label {parent_label} not in layer0_label2idx, reassign to nearest {nearest_label}")
+                    parent_label = nearest_label
+                parent_idx = layer0_label2idx[parent_label]
+                self.layer1_to_layer0.append(parent_idx)
+            layer0_to_layer1 = defaultdict(list)
+            for idx1, parent_idx0 in enumerate(self.layer1_to_layer0):
+                layer0_to_layer1[parent_idx0].append(idx1)
+            self.layer0_to_layer1 = dict(layer0_to_layer1)
 
         return True
 

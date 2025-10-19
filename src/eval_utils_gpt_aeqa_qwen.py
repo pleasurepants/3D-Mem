@@ -38,7 +38,7 @@ def format_content(contents):
 
 
 # send information to openai
-def call_openai_api(sys_prompt, contents) -> Optional[str]:
+def call_openai_api(sys_prompt, contents, seed: Optional[int] = None) -> Optional[str]:
     max_tries = 5
     retry_count = 0
     formated_content = format_content(contents)
@@ -48,14 +48,27 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     ]
     while retry_count < max_tries:
         try:
+            # 支持从参数或环境变量注入 seed（优先参数，其次 VLLM_SEED）
+            # 读取优先级：参数 seed > cfg.chat_seed（经外层传入）> 环境变量 VLLM_SEED
+            _seed_env = None
+            try:
+                _seed_env = int(os.getenv("VLLM_SEED")) if os.getenv("VLLM_SEED") is not None else None
+            except Exception:
+                _seed_env = None
+            _seed = seed if seed is not None else _seed_env
+            try:
+                logging.info(f"[ChatSeed] using seed={_seed}")
+            except Exception:
+                pass
             completion = client.chat.completions.create(
-                model="qwen",  # gpt-4o-internvl-glm-qwen
+                model="qwen",  # gpt-4o-internvl-minicpm-qwen
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o
                 top_p=0.95,
                 frequency_penalty=0,
                 presence_penalty=0,
+                **({"seed": int(_seed)} if _seed is not None else {}),
             )
             return completion.choices[0].message.content
         except openai.RateLimitError as e:
@@ -140,6 +153,7 @@ def get_step_info(step, verbose=False):
             step["top_k_categories"],
             image_goal,
             verbose,
+            seed=step.get("chat_seed", None),
         )
         snapshot_imgs = [snapshot_imgs[i] for i in keep_index]
         if verbose:
@@ -452,7 +466,7 @@ import random
 import re
 import logging
 
-def call_openai_api_vote(sys_prompt, content, num_trials=5, max_tiebreak_rounds=5):
+def call_openai_api_vote(sys_prompt, content, num_trials=5, max_tiebreak_rounds=5, seed=None):
     """
     Only for 'frontier' voting. Returns the most voted 'frontier <idx> ...' response.
     Minimal logging: only frontier index count and final chosen index.
@@ -463,7 +477,7 @@ def call_openai_api_vote(sys_prompt, content, num_trials=5, max_tiebreak_rounds=
         responses = []
         raw_indices = []
         for _ in range(num_trials):
-            resp = call_openai_api(sys_prompt, content)
+            resp = call_openai_api(sys_prompt, content, seed=seed)
             if resp is not None:
                 resp = resp.strip()
                 m = re.match(r"frontier\s+(\d+)", resp.lower())
@@ -542,7 +556,7 @@ def format_prefiltering_prompt(question, class_list, top_k=10, image_goal=None):
     return sys_prompt, content
 
 
-def get_prefiltering_classes(question, seen_classes, top_k=10, image_goal=None):
+def get_prefiltering_classes(question, seen_classes, top_k=10, image_goal=None, seed=None):
     prefiltering_sys, prefiltering_content = format_prefiltering_prompt(
         question, sorted(list(seen_classes)), top_k=top_k, image_goal=image_goal
     )
@@ -552,7 +566,7 @@ def get_prefiltering_classes(question, seen_classes, top_k=10, image_goal=None):
         message += c[0]
         if len(c) == 2:
             message += f": image {c[1][:10]}..."
-    response = call_openai_api(prefiltering_sys, prefiltering_content)
+    response = call_openai_api(prefiltering_sys, prefiltering_content, seed=seed)
     if response is None:
         return []
 
@@ -566,10 +580,10 @@ def get_prefiltering_classes(question, seen_classes, top_k=10, image_goal=None):
 
 
 def prefiltering(
-    question, snapshot_classes, seen_classes, top_k=10, image_goal=None, verbose=False
+    question, snapshot_classes, seen_classes, top_k=10, image_goal=None, verbose=False, seed=None
 ):
     selected_classes = get_prefiltering_classes(
-        question, seen_classes, top_k, image_goal
+        question, seen_classes, top_k, image_goal, seed=seed
     )
     if verbose:
         logging.info(f"Prefiltering selected classes: {selected_classes}")
@@ -727,6 +741,14 @@ def frontier_context(
 def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
+    
+    # Get base_mode parameter from config
+    base_mode = cfg.get('base_mode', 'hierarchy')  # default to 'hierarchy'
+    chat_seed = cfg.get('chat_seed', None)  # Get chat_seed from config
+    step["chat_seed"] = chat_seed  # Pass to get_step_info for prefiltering
+    
+    logging.info(f"[explore_step] base_mode={base_mode}, kmeans={cfg.get('kmeans', 'not set')}, chat_seed={chat_seed}")
+    
     (
         question,
         image_goal,
@@ -738,6 +760,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         snapshot_classes,
         snapshot_id_mapping,
     ) = get_step_info(step, verbose)
+    
+    logging.info(f"[explore_step] frontier_imgs count: {len(frontier_imgs)}, frontier_imgs_0: {len(frontier_imgs_0)}, frontier_imgs_1: {len(frontier_imgs_1)}")
 
     # ==== Step 1: snapshot prompt ====
     sys_prompt, content = format_explore_prompt_snapshot(
@@ -767,7 +791,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         print(f"Snapshot images available: {len(snapshot_imgs)}")
         retry_bound = 3
         for _ in range(retry_bound):
-            full_response = call_openai_api(sys_prompt, content)
+            full_response = call_openai_api(sys_prompt, content, seed=chat_seed)
             # full_response = glm_answer(full_response)  # 处理glm的输出格式
             if full_response is None:
                 print("call_openai_api (snapshot) returns None, retrying")
@@ -802,113 +826,96 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 continue
 
 
-    # ==== Step 2: two-stage frontier prompt ====
+    # ==== Step 2: frontier prompt (listwise or two-stage) ====
     retry_bound = 3
-
-    # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
-
 
     context = None
     
-    if "froncon" in cfg.exp_name:
+    # Check if episodic context is enabled
+    use_episodic_context = cfg.get('episodic_context', False) or "froncon" in cfg.exp_name
+    
+    if use_episodic_context:
         if not os.path.exists(chosen_frontier_path):
             os.makedirs(chosen_frontier_path, exist_ok=True)
 
         png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
         if len(png_files) > 0:
             sys_prompt, content = frontier_context(chosen_frontier_path)
-            context = call_openai_api(sys_prompt, content)
-            logging.info(f"Froncon label: {context}")
-
+            context = call_openai_api(sys_prompt, content, seed=chat_seed)
+            logging.info(f"[Episodic Context] Generated context summary: {context}")
         else:
-            pass
+            logging.info(f"[Episodic Context] No previous frontiers yet, skipping context generation")
 
-    
-
-
-    sys_prompt, content = format_explore_prompt_frontier(
-        question,
-        egocentric_imgs,
-        frontier_imgs_0,   # layer0候选
-        snapshot_imgs,
-        snapshot_classes, 
-        egocentric_view=step.get("use_egocentric_views", False),
-        use_snapshot_class=True,
-        image_goal=image_goal,
-        context=context,
-    )
-    if verbose:
-        logging.info(f"Input prompt (frontier layer0):")
-        message = sys_prompt
-        for c in content:
-            message += c[0]
-            if len(c) == 2:
-                message += f"[{c[1][:10]}...]"
-        logging.info(message)
-
-    idx0 = None
-    for _ in range(retry_bound):
-        # full_response = call_openai_api_vote(sys_prompt, content)
-        full_response = call_openai_api(sys_prompt, content)
-        if full_response is None:
-            print("call_openai_api (frontier layer0) returns None, retrying")
-            continue
-        if isinstance(full_response, list):
-            full_response = " ".join(full_response)
-        full_response = full_response.strip().lower()
-        try:
-            reason, idx0 = parse_frontier_index(full_response)
-            if 0 <= idx0 < len(frontier_imgs_0):
-                break
-            else:
-                print(f"Layer0 index out of range: {idx0}")
-        except Exception as e:
-            print(f"Layer0 format error: {full_response} | {e}")
-    # 如果idx0仍然是None，说明解析失败
-
-    if idx0 is None:
-        # return None, snapshot_id_mapping, None, len(snapshot_imgs)
-        idx_random = random.choice(frontier_imgs_0)
-        response = f'frontier {idx_random}'
-        reason = f"Randomly selected index {idx_random} due to parsing failure."
-        return response, snapshot_id_mapping, reason, len(snapshot_imgs)
-    
-
-    logging.info(f"[Layer0] VLM selected index: {idx0}")
-    logging.info(f"reason for layer0 selection: {reason}")
-    for k, v in step['layer0_to_layer1'].items():
-        logging.info(f"  Layer0 {k}: {v}")
-    # ------- Step 2.2: 在选中的layer0大簇下所有layer1细簇中选 -------
-    full_response_layer0 = full_response.strip().lower()
-    if idx0 not in step['layer0_to_layer1']:
-        response = f"frontier {idx0}"
-        final_reason = full_response.lower()
-        logging.info(f"[Layer0] Layer0 index {idx0} has no corresponding layer1 subclusters. Directly returning layer0 as the frontier (global index: {idx0})")
-        return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
-    else:
-        layer1_indices = step['layer0_to_layer1'][idx0]   # 例如 [1, 2]
-        frontier_imgs_subgroup = [frontier_imgs_1[i] for i in layer1_indices]
-        if len(layer1_indices) == 1:
-            final_layer1_idx = layer1_indices[0]
-            global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
-            response = f"frontier {global_frontier_idx}"
-            final_reason = "Only one candidate in this subcluster, selected by default."
-            logging.info(f"[Layer1] Only one candidate ({global_frontier_idx}), selected by default.")
-            save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
-            return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+    # Check if using listwise mode
+    if base_mode == "listwise":
+        # Listwise mode: directly use all frontiers without hierarchy
+        logging.info("[Listwise Mode] Using all frontiers without hierarchy")
+        
         sys_prompt, content = format_explore_prompt_frontier(
             question,
             egocentric_imgs,
-            frontier_imgs_subgroup,    # 只给当前大簇下的所有layer1细簇
+            frontier_imgs,   # All frontiers (layer0 + layer1)
             snapshot_imgs,
-            snapshot_classes,
+            snapshot_classes, 
+            egocentric_view=step.get("use_egocentric_views", False),
+            use_snapshot_class=True,
+            image_goal=image_goal,
+            context=context,
+        )
+        
+        if verbose:
+            logging.info(f"Input prompt (frontier listwise):")
+            message = sys_prompt
+            for c in content:
+                message += c[0]
+                if len(c) == 2:
+                    message += f"[{c[1][:10]}...]"
+            logging.info(message)
+        
+        idx_final = None
+        for _ in range(retry_bound):
+            full_response = call_openai_api(sys_prompt, content, seed=chat_seed)
+            if full_response is None:
+                print("call_openai_api (frontier listwise) returns None, retrying")
+                continue
+            if isinstance(full_response, list):
+                full_response = " ".join(full_response)
+            full_response = full_response.strip().lower()
+            try:
+                reason, idx_final = parse_frontier_index(full_response)
+                if 0 <= idx_final < len(frontier_imgs):
+                    response = f"frontier {idx_final}"
+                    if chosen_frontier_path and os.path.exists(chosen_frontier_path):
+                        save_base64_to_png(frontier_imgs[idx_final], chosen_frontier_path, step_idx, idx_final)
+                    return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+                else:
+                    print(f"Listwise frontier index out of range: {idx_final}")
+            except Exception as e:
+                print(f"Listwise frontier format error: {full_response} | {e}")
+        
+        # If parsing failed, random selection
+        if idx_final is None or idx_final >= len(frontier_imgs):
+            idx_random = random.randint(0, len(frontier_imgs) - 1)
+            response = f'frontier {idx_random}'
+            reason = f"Randomly selected index {idx_random} due to parsing failure."
+            return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+    
+    else:
+        # Hierarchy mode: two-stage frontier selection
+        # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
+        sys_prompt, content = format_explore_prompt_frontier(
+            question,
+            egocentric_imgs,
+            frontier_imgs_0,   # layer0候选
+            snapshot_imgs,
+            snapshot_classes, 
             egocentric_view=step.get("use_egocentric_views", False),
             use_snapshot_class=True,
             image_goal=image_goal,
             context=context,
         )
         if verbose:
-            logging.info(f"Input prompt (frontier layer1):")
+            logging.info(f"Input prompt (frontier layer0):")
             message = sys_prompt
             for c in content:
                 message += c[0]
@@ -916,59 +923,129 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                     message += f"[{c[1][:10]}...]"
             logging.info(message)
 
-        idx1_in_subgroup = None
-        final_reason = ""
-        
-
-        idx1_in_subgroup = None
-        final_reason = ""
+        idx0 = None
         for _ in range(retry_bound):
-            full_response = call_openai_api(sys_prompt, content)
             # full_response = call_openai_api_vote(sys_prompt, content)
-            
+            full_response = call_openai_api(sys_prompt, content, seed=chat_seed)
             if full_response is None:
-                print("call_openai_api (frontier layer1) returns None, retrying")
+                print("call_openai_api (frontier layer0) returns None, retrying")
                 continue
             if isinstance(full_response, list):
                 full_response = " ".join(full_response)
             full_response = full_response.strip().lower()
             try:
-                reason, idx1_in_subgroup = parse_frontier_index(full_response)
-                if 0 <= idx1_in_subgroup < len(frontier_imgs_subgroup):
-                    # 可以顺便保留推理部分（比如取出最后一行前的内容，作为reason）
-                    # 这里你原来是用 group(2) 取 reason，可以保留
-                    lines = [line.strip() for line in full_response.strip().split('\n') if line.strip()]
-                    if len(lines) > 1:
-                        final_reason = "\n".join(lines[:-1])
-                    else:
-                        final_reason = ""
+                reason, idx0 = parse_frontier_index(full_response)
+                if 0 <= idx0 < len(frontier_imgs_0):
                     break
                 else:
-                    print(f"Layer1 index out of range: {idx1_in_subgroup}")
+                    print(f"Layer0 index out of range: {idx0}")
             except Exception as e:
-                print(f"Layer1 format error: {full_response} | {e}")
-                
+                print(f"Layer0 format error: {full_response} | {e}")
+        # 如果idx0仍然是None，说明解析失败
 
-        if idx1_in_subgroup is None:
-            idx_random = random.choice(frontier_imgs_subgroup)
+        if idx0 is None:
+            # return None, snapshot_id_mapping, None, len(snapshot_imgs)
+            idx_random = random.randint(0, len(frontier_imgs_0) - 1)
             response = f'frontier {idx_random}'
             reason = f"Randomly selected index {idx_random} due to parsing failure."
             return response, snapshot_id_mapping, reason, len(snapshot_imgs)
         
-        elif idx1_in_subgroup >= len(layer1_indices):
-            logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
+
+        logging.info(f"[Layer0] VLM selected index: {idx0}")
+        logging.info(f"reason for layer0 selection: {reason}")
+        for k, v in step['layer0_to_layer1'].items():
+            logging.info(f"  Layer0 {k}: {v}")
+        # ------- Step 2.2: 在选中的layer0大簇下所有layer1细簇中选 -------
+        full_response_layer0 = full_response.strip().lower()
+        if idx0 not in step['layer0_to_layer1']:
             response = f"frontier {idx0}"
-            final_reason = full_response_layer0
-            return response, snapshot_id_mapping, full_response_layer0, len(snapshot_imgs)
+            final_reason = full_response.lower()
+            logging.info(f"[Layer0] Layer0 index {idx0} has no corresponding layer1 subclusters. Directly returning layer0 as the frontier (global index: {idx0})")
+            return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+        else:
+            layer1_indices = step['layer0_to_layer1'][idx0]   # 例如 [1, 2]
+            frontier_imgs_subgroup = [frontier_imgs_1[i] for i in layer1_indices]
+            if len(layer1_indices) == 1:
+                final_layer1_idx = layer1_indices[0]
+                global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
+                response = f"frontier {global_frontier_idx}"
+                final_reason = "Only one candidate in this subcluster, selected by default."
+                logging.info(f"[Layer1] Only one candidate ({global_frontier_idx}), selected by default.")
+                save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
+                return response, snapshot_id_mapping, final_reason, len(snapshot_imgs)
+            sys_prompt, content = format_explore_prompt_frontier(
+                question,
+                egocentric_imgs,
+                frontier_imgs_subgroup,    # 只给当前大簇下的所有layer1细簇
+                snapshot_imgs,
+                snapshot_classes,
+                egocentric_view=step.get("use_egocentric_views", False),
+                use_snapshot_class=True,
+                image_goal=image_goal,
+                context=context,
+            )
+            if verbose:
+                logging.info(f"Input prompt (frontier layer1):")
+                message = sys_prompt
+                for c in content:
+                    message += c[0]
+                    if len(c) == 2:
+                        message += f"[{c[1][:10]}...]"
+                logging.info(message)
 
-        final_layer1_idx = layer1_indices[idx1_in_subgroup]
-        # frontier index = len(self.frontiers_layer0) + final_layer1_idx
-        global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
-        response = f"frontier {global_frontier_idx}"
-        logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
-        logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx} (global index: {global_frontier_idx})")
+            idx1_in_subgroup = None
+            final_reason = ""
+            
 
-        save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
+            idx1_in_subgroup = None
+            final_reason = ""
+            for _ in range(retry_bound):
+                full_response = call_openai_api(sys_prompt, content, seed=chat_seed)
+                # full_response = call_openai_api_vote(sys_prompt, content)
+                
+                if full_response is None:
+                    print("call_openai_api (frontier layer1) returns None, retrying")
+                    continue
+                if isinstance(full_response, list):
+                    full_response = " ".join(full_response)
+                full_response = full_response.strip().lower()
+                try:
+                    reason, idx1_in_subgroup = parse_frontier_index(full_response)
+                    if 0 <= idx1_in_subgroup < len(frontier_imgs_subgroup):
+                        # 可以顺便保留推理部分（比如取出最后一行前的内容，作为reason）
+                        # 这里你原来是用 group(2) 取 reason，可以保留
+                        lines = [line.strip() for line in full_response.strip().split('\n') if line.strip()]
+                        if len(lines) > 1:
+                            final_reason = "\n".join(lines[:-1])
+                        else:
+                            final_reason = ""
+                        break
+                    else:
+                        print(f"Layer1 index out of range: {idx1_in_subgroup}")
+                except Exception as e:
+                    print(f"Layer1 format error: {full_response} | {e}")
+                    
 
-        return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+            if idx1_in_subgroup is None:
+                idx_random = random.randint(0, len(frontier_imgs_subgroup) - 1)
+                response = f'frontier {idx_random}'
+                reason = f"Randomly selected index {idx_random} due to parsing failure."
+                return response, snapshot_id_mapping, reason, len(snapshot_imgs)
+            
+            elif idx1_in_subgroup >= len(layer1_indices):
+                logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
+                response = f"frontier {idx0}"
+                final_reason = full_response_layer0
+                return response, snapshot_id_mapping, full_response_layer0, len(snapshot_imgs)
+
+            final_layer1_idx = layer1_indices[idx1_in_subgroup]
+            # frontier index = len(self.frontiers_layer0) + final_layer1_idx
+            global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
+            response = f"frontier {global_frontier_idx}"
+            logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
+            logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx} (global index: {global_frontier_idx})")
+
+            save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
+
+            return response, snapshot_id_mapping, reason, len(snapshot_imgs)
 
