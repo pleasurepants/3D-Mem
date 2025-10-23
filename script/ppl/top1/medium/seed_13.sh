@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=ppl-top1-medium-13
+#SBATCH --job-name=llm-top1-medium-13
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=12:00:00
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/ppl/medium/seed_13-%j.out
+#SBATCH --time=15:00:00
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/llm_score/top1/medium/seed_13-%j.out
 #SBATCH --partition a40
 
 
@@ -87,7 +87,7 @@ CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_eva
     --abstraction true \
     --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json \
     --ppl_rank medium \
-    --ppl_rank_file /home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json
+    --ppl_rank_file /home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/score/traj_abs_format_score_structured.json
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

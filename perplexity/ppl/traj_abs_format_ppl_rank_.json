@@ -1,0 +1,78 @@
+{
+  "statistics": {
+    "mean": 9.687761540793202,
+    "median": 9.454056739807129,
+    "std": 1.945782047932152,
+    "min": 5.562148094177246,
+    "max": 17.800477981567383,
+    "total_entries": 163
+  },
+  "results": {
+    "025257b6-8b7e-4f6f-aacc-1788069cbfad": {
+      "abstraction": "Environment Dynamics:\nThe environment consists of distinct regions including a cluttered garage and a more organized indoor area. The garage contains numerous items such as bicycles, bags, and boxes, often scattered, which serves as a storage and utility zone. Entryways lead directly into this space, offering limited visibility beyond the immediate area. In contrast, the indoor area features a room with a dresser, a window, and a cluttered arrangement of items like bags and tools. This room provides a more confined space with fewer distractions compared to the garage. Both areas are connected by corridors, facilitating movement between them. Utility corners near windows and dressers hold cleaning supplies, and near the walls, bins for recycling and waste disposal are positioned, with labels indicating their use. The agent primarily navigates these corridors to locate bins and examines the contents of various containers.\n\nDecision-making Skills:\nWhen searching for the correct bin, the agent should first explore the most likely locations based on previous experience. If a yellow bin is spotted near a dresser or a window, it should be inspected closely for contents and labels. When entering a cluttered garage, the agent should quickly scan for bins and ensure they are clearly marked for recycling or waste. Avoid focusing on non-recycling bins, such as those filled with non-paper items like food waste or textiles. If a bin contains papers, confirm its label for recyclables and place the paper inside. Pivot away from bins that are incorrectly labeled or filled with incorrect items. If no suitable bin is immediately apparent, return to the room and re-examine the yellow bin marked for recycling, as it may contain papers hidden amidst other items. Always verify the contents before placing paper, ensuring the bin is indeed designated for recycling.",
+      "perplexity": 10.247810363769531,
+      "rank": "High"
+    },
+    "04c770eb-c1a7-44c4-b91f-8aa24e2dbed9": {
+      "abstraction": "Environment Dynamics:\nThe environment consists of distinct regions including a living room, hallway, children's playroom, bedroom, and bathroom. The living room is illuminated by natural light and contains furniture such as a sofa and a chalkboard. The hallway serves as a connector between different areas, particularly leading to bedrooms. The children's playroom features bunk beds and a toy kitchen set, indicative of its function for child activities. The bedroom is equipped with a bed, bedside lamps, and other furnishings, suggesting it is used for rest and personal care. The bathroom is a functional space with fixtures like a bathtub and sink, and is typically dimly lit. Each room has its own unique cues and affordances that help in navigation and decision-making.\n\nDecision-making Skills:\nWhen exploring to determine the state of the lamps, the agent begins by assessing the first visible room, such as the living room or a hallway, to establish initial lighting conditions. If the agent is uncertain about the status of lamps in subsequent rooms, they should first re-enter the hallway to reassess lighting from the previous area. When approaching a room containing a bed or nightstand with a lamp, the agent should focus on the presence or absence of light from these lamps, confirming their status. To avoid missing critical evidence, the agent should systematically check all relevant areas, including bedrooms and bathrooms. Additionally, if the agent encounters any inconsistencies or misdirection (e.g., a lamp appearing to be off when expected to be on), they should retrace steps and re-examine the area carefully.",
+      "perplexity": 7.638510704040527,
+      "rank": "Low"
+    },
+    "06c9b25c-b117-4b8f-a052-6fd71b2bb043": {
+      "abstraction": "Environment Dynamics:\nThe environment consists of distinct regions tailored for specific activities. The bedroom serves as a personal space with a bed, dresser, and mirror, providing comfort and a place to rest. The hallway acts as a connector, facilitating movement between different areas such as the living room and the entrance. The living room is a social and entertainment zone, equipped with a sofa, piano, television, and decorative elements. The entrance, marked by signage and containers, introduces the area. The utility area near the sink holds cleaning tools and supplies, functioning as a maintenance and care zone. The agent's exploration primarily revolves around these zones, using the mirror to verify clothing details and adjusting their path based on the need to gather more information or switch focus.\n\nDecision-making Skills:\nWhen approaching the bedroom, the agent examines the dresser and mirror to verify clothing details, avoiding direct interaction with objects unrelated to the task. Upon entering the hallway, the agent observes doors and corridors, choosing to explore areas that might contain relevant clues. In the living room, the agent focuses on the sofa, piano, and television, pivoting to different sections when no direct cues are present. If no evidence of the man’s attire is found, the agent avoids unnecessary movements to unrelated areas. To avoid missteps, the agent should refrain from touching items that are not directly related to the task, ensuring that the exploration remains focused and efficient.",
+      "perplexity": 9.57534408569336,
+      "rank": "Medium"
+    }
+  },
+  "group_statistics": {
+    "Low": {
+      "count": 55,
+      "percentage": 33.74233128834356,
+      "statistics": {
+        "count": 55,
+        "mean": 7.706394975835627,
+        "std": 0.7466599927375669,
+        "min": 5.562148094177246,
+        "max": 8.866782188415527,
+        "range": 3.3046340942382812,
+        "median": 7.801229000091553
+      }
+    },
+    "Medium": {
+      "count": 54,
+      "percentage": 33.12883435582822,
+      "statistics": {
+        "count": 54,
+        "mean": 9.54089487923516,
+        "std": 0.3880658658451903,
+        "min": 8.874730110168457,
+        "max": 10.209583282470703,
+        "range": 1.334853172302246,
+        "median": 9.473222255706787
+      }
+    },
+    "High": {
+      "count": 54,
+      "percentage": 33.12883435582822,
+      "statistics": {
+        "count": 54,
+        "mean": 11.85268674073396,
+        "std": 1.4152422734177776,
+        "min": 10.247810363769531,
+        "max": 17.800477981567383,
+        "range": 7.552667617797852,
+        "median": 11.525346279144287
+      }
+    }
+  },
+  "split_info": {
+    "strategy_used": "equal_count",
+    "strategy_name": "Equal Count Split",
+    "total_samples": 163,
+    "groups": [
+      "Low",
+      "Medium",
+      "High"
+    ]
+  }
+}

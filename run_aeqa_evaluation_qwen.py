@@ -535,9 +535,12 @@ def append_step_coords_json(
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def main(cfg, start_ratio=0.0, end_ratio=1.0):
+    logging.info("[DEBUG] Starting main function...")
     # load the default concept graph config
+    logging.info("[DEBUG] Loading concept graph config...")
     cfg_cg = OmegaConf.load(cfg.concept_graph_config_path)
     OmegaConf.resolve(cfg_cg)
+    logging.info("[DEBUG] Concept graph config loaded successfully")
 
     img_height = cfg.img_height
     img_width = cfg.img_width
@@ -547,6 +550,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
     np.random.seed(cfg.seed)
 
     # Load dataset
+    logging.info("[DEBUG] Loading questions dataset...")
     questions_list = json.load(open(cfg.questions_list_path, "r"))
     total_questions = len(questions_list)
     # sort the data according to the question id
@@ -558,19 +562,24 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
     ]
     logging.info(f"number of questions after splitting: {len(questions_list)}")
     logging.info(f"question path: {cfg.questions_list_path}")
+    logging.info("[DEBUG] Questions dataset loaded successfully")
 
     # load detection and segmentation models
+    logging.info("[DEBUG] Loading YOLO model...")
     detection_model = YOLOWorld(cfg.yolo_model_name)
     logging.info(f"Load YOLO model {cfg.yolo_model_name} successful!")
 
+    logging.info("[DEBUG] Loading SAM model...")
     sam_predictor = SAM(cfg.sam_model_name)  # UltraLytics SAM
     logging.info(f"Load SAM model {cfg.sam_model_name} successful!")
 
+    logging.info("[DEBUG] Loading CLIP model...")
     clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
         "ViT-H-14", pretrained="/anvme/workspace/v100dd12-3dmem/model/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin"  # "ViT-H-14", "laion2b_s32b_b79k"
     )
     clip_tokenizer = open_clip.get_tokenizer("ViT-B-32")
     logging.info(f"Load CLIP model successful!")
+    logging.info("[DEBUG] All models loaded successfully")
 
     # Initialize the logger
     logger = Logger(
@@ -582,6 +591,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
     )
 
     # Run all questions
+    logging.info(f"[DEBUG] Starting to process {len(questions_list)} questions...")
     for question_idx, question_data in enumerate(questions_list):
         question_id = question_data["question_id"]
         scene_id = question_data["episode_history"]
@@ -1033,7 +1043,6 @@ if __name__ == "__main__":
     if args.ppl_rank:
         cfg.ppl_rank = str(args.ppl_rank).strip().lower()
         cfg.ppl_rank_file = args.ppl_rank_file
-        logging.info(f"[PPL_RANK] Mode enabled: category={cfg.ppl_rank}, file={cfg.ppl_rank_file}")
 
     # normalize inject_stage into cfg (empty -> None)
     # normalize stage flag (exp_at preferred)
@@ -1091,6 +1100,10 @@ if __name__ == "__main__":
     # Set the custom formatter
     for handler in logging.getLogger().handlers:
         handler.setFormatter(formatter)
+
+    # ppl_rank logging (moved after logging setup)
+    if args.ppl_rank:
+        logging.info(f"[PPL_RANK] Mode enabled: category={cfg.ppl_rank}, file={cfg.ppl_rank_file}")
 
     # If chat_seed is provided, propagate to environment so all API calls (even without explicit seed) use it
     try:
