@@ -50,30 +50,230 @@ def tuple_step_save(
     tuple_save_path: str,
     question_id: str,
     question: str,
-    cnt_step: int,
+    cnt_step: int,  # TODO: varify consistency
     cfg,
     lifelong_json_path: str,
-    question_data: Optional[dict] = None,   # may carry {"episode_history": "..."}
-    episode_history_id: Optional[str] = None,  # explicit episode id, if known
+    subtask_metadata: dict,
+    # question_data: Optional[dict] = None,   # may carry {"episode_history": "..."}
+    # episode_history_id: Optional[str] = None,  # explicit episode id, if known
     final_reward: Optional[str] = None  # 'pass' or 'fail'
 ):
-    pass
+    # ---------- load or init ----------
+    if os.path.exists(tuple_save_path):
+        with open(tuple_save_path, 'r', encoding='utf-8') as f:
+            saved_result = json.load(f)
+    else:
+        saved_result = {}
+
+    def is_new_schema(data: dict) -> bool:
+        # Heuristic: new schema has top-level episodes (strings) each mapping to dicts of question_ids
+        # Old schema had top-level question_ids mapping to {"question":..., "steps":...}
+        if not data:
+            return True
+        # If any top-level value is a dict whose keys look like "step_*" or has "question" -> likely old
+        for k, v in data.items():
+            if isinstance(v, dict) and ("steps" in v or "question" in v):
+                return False
+        return True
+
+    def migrate_old_schema_if_needed(data: dict) -> dict:
+        if not data:
+            return data
+        if is_new_schema(data):
+            return data
+        # Move all top-level question_ids under a new generated episode
+        new_episode = f"episode-{uuid.uuid4().hex[:8]}"
+        migrated = {new_episode: {}}
+        for qid, qcontent in data.items():
+            migrated[new_episode][qid] = qcontent
+            # drop any leftover "episode_history" key if present
+            if isinstance(qcontent, dict) and "episode_history" in qcontent:
+                qcontent.pop("episode_history", None)
+        return migrated
+
+    saved_result = migrate_old_schema_if_needed(saved_result)
+
+    # ---------- resolve episode_id for this question ----------
+    def find_existing_episode_for_question(data: dict, qid: str) -> Optional[str]:
+        for ep_id, ep_bucket in data.items():
+            if isinstance(ep_bucket, dict) and qid in ep_bucket:
+                return ep_id
+        return None
+
+    existing_ep = find_existing_episode_for_question(saved_result, question_id)
+
+    # priority: existing > explicit param > question_data > auto-generate
+    # ep_id = (
+    #     existing_ep
+    #     or episode_history_id
+    #     or (question_data.get("episode_history") if question_data else None)
+    #     or f"episode-{uuid.uuid4().hex[:8]}"
+    # )
+    ep_id = question_id.split("_")[0]
+
+    if ep_id not in saved_result:
+        saved_result[ep_id] = {}
+
+    # init question bucket under this episode
+    if question_id not in saved_result[ep_id]:
+        saved_result[ep_id][question_id] = {"question": question, "steps": {}}
+    else:
+        # keep existing question text if already stored; otherwise set it
+        saved_result[ep_id][question_id].setdefault("question", question)
+        saved_result[ep_id][question_id].setdefault("steps", {})
+        # saved_result[ep_id][question_id].setdefault("subtask_metadata", subtask_metadata)
+
+    step_key = f"step_{cnt_step}"
+    saved_result[ep_id][question_id]["steps"][step_key] = {}
+
+    # --- dirs ---
+    q_root = os.path.join(cfg.output_parent_dir, cfg.exp_name, question_id)
+    frontier_dir = os.path.join(q_root, 'frontier')
+    chosen_dir = os.path.join(q_root, 'chosen_frontier')
+
+    def rel_frontier_path(fname: str) -> str:
+        return f"frontier/{fname}"
+
+    # -------- frontier (two layers) -> flattened mapping --------
+    layer0_prefix = f"{cnt_step}-layer0-"
+    layer1_prefix = f"{cnt_step}-layer1-"
+
+    layer0_files: List[str] = []
+    layer1_files: List[str] = []
+
+    if os.path.exists(frontier_dir):
+        for fn in os.listdir(frontier_dir):
+            if fn.endswith(".png"):
+                if fn.startswith(layer0_prefix):
+                    layer0_files.append(fn)
+                elif fn.startswith(layer1_prefix):
+                    layer1_files.append(fn)
+
+    layer0_files.sort()
+    layer1_files.sort()
+
+    layer0_map: Dict[str, List[str]] = {}
+    for l0 in layer0_files:
+        m = re.match(rf"^{cnt_step}-layer0-(\d+)\.png$", l0)
+        if not m:
+            continue
+        x = m.group(1)
+        children = [
+            rel_frontier_path(fn)
+            for fn in layer1_files
+            if fn.startswith(f"{cnt_step}-layer1-{x}_")
+        ]
+        layer0_map[l0] = children
+
+    saved_result[ep_id][question_id]["steps"][step_key]["frontier"] = layer0_map
+
+    # -------- chosen_frontier (parse -> frontier paths) --------
+    chosen_l0_path = None
+    chosen_l1_path = None
+    if os.path.exists(chosen_dir):
+        chosen_candidates = sorted(
+            [fn for fn in os.listdir(chosen_dir) if fn.startswith(f"{cnt_step}-frontier") and fn.endswith(".png")]
+        )
+        if chosen_candidates:
+            last_fn = chosen_candidates[-1]
+            m = re.match(rf"^{cnt_step}-frontier(\d+)_(\d+)\.png$", last_fn)
+            if m:
+                l0_idx, l1_idx = m.group(1), m.group(2)
+                chosen_l0_path = rel_frontier_path(f"{cnt_step}-layer0-{l0_idx}.png")
+                chosen_l1_path = rel_frontier_path(f"{cnt_step}-layer1-{l0_idx}_{l1_idx}.png")
+
+    saved_result[ep_id][question_id]["steps"][step_key]["chosen_frontier"] = {
+        "layer0": chosen_l0_path,
+        "layer1": chosen_l1_path
+    }
+
+    # -------- memory_snapshots --------
+    memory_snapshots = {}
+    if os.path.exists(lifelong_json_path):
+        with open(lifelong_json_path, 'r', encoding='utf-8') as f:
+            lifelong_data = json.load(f)
+        # lifelong_data expected: {question_id: {img_name: obj_list, ...}, ...}
+        if question_id in lifelong_data:
+            img2objs = lifelong_data[question_id]
+            for img_name, obj_list in img2objs.items():
+                if img_name.startswith(f"{cnt_step}-"):
+                    memory_snapshots[img_name] = obj_list
+
+    saved_result[ep_id][question_id]["steps"][step_key]["memory_snapshots"] = memory_snapshots
+
+    # -------- final_reward (per question) --------
+    q_bucket = saved_result[ep_id][question_id]
+    if "final_reward" not in q_bucket:
+        q_bucket["final_reward"] = "fail"
+    if final_reward is not None:
+        q_bucket["final_reward"] = final_reward
+
+    # -------- write back --------
+    with open(tuple_save_path, 'w', encoding='utf-8') as f:
+        json.dump(saved_result, f, indent=2, ensure_ascii=False)
 
 
 def _to_serializable_list(x):
-    pass
+    try:
+        # numpy arrays / tensors
+        if hasattr(x, 'tolist'):
+            return x.tolist()
+    except Exception:
+        pass
+    # tuples -> lists
+    if isinstance(x, tuple):
+        return list(x)
+    return x
 
 
 def append_step_coords_json(
     output_root_dir: str,
     question_id: str,
-    step_index: int,
+    step_index: int,  # TODO: varify consistency
     agent_position,
     agent_position_voxel,
     angle,
     target_position=None,
 ):
-    pass
+    """
+    将所有问题的坐标统一增量写入实验根目录的 coords_all.json：
+      {
+        "<question_id>": {
+          "step_0": {"agent_position": [x,y,z], "agent_position_voxel": [i,j], "angle": a, "target_position": [x,y,z] | null},
+          "step_1": { ... }
+        },
+        ...
+      }
+    """
+    os.makedirs(output_root_dir, exist_ok=True)
+    save_path = os.path.join(output_root_dir, 'coords_all.json')
+
+    if os.path.exists(save_path):
+        try:
+            with open(save_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+    else:
+        data = {}
+
+    q_bucket = data.get(question_id) or {}
+    key = f"step_{step_index}"
+    prev = q_bucket.get(key) or {}
+    record = {
+        "agent_position": _to_serializable_list(agent_position),
+        "agent_position_voxel": _to_serializable_list(agent_position_voxel),
+        "angle": float(angle) if isinstance(angle, (int, float)) or hasattr(angle, "__float__") else _to_serializable_list(angle),
+        "target_position": _to_serializable_list(target_position) if target_position is not None else None,
+    }
+    # 若本次未提供 target_position，则保留已存在的非空 target_position，避免被覆盖为 null
+    if record["target_position"] is None and isinstance(prev, dict) and prev.get("target_position") is not None:
+        record["target_position"] = prev.get("target_position")
+    q_bucket[key] = record
+    data[question_id] = q_bucket
+
+    with open(save_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
@@ -110,7 +310,10 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
     #     cfg.scene_data_path + "/val"
     # )
 
-    all_scene_ids = os.listdir(cfg.scene_data_path + "/val")  # only use the val scenes
+    if 'train' in cfg.test_data_dir:
+        all_scene_ids = os.listdir(cfg.scene_data_path + "/train")
+    else:
+        all_scene_ids = os.listdir(cfg.scene_data_path + "/val")
 
 
 
@@ -433,19 +636,19 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                         and tsdf_planner.target_point is None
                     ):
                         ## ensure replay_step_info.json exists before VLM query (for context recall)
-                        # tuple_save_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
-                        # try:
-                        #     tuple_step_save(
-                        #         tuple_save_path=tuple_save_path,
-                        #         question_id=question_id,
-                        #         question=question,
-                        #         cnt_step=cnt_step,
-                        #         cfg=cfg,
-                        #         lifelong_json_path=lifelong_json_path,
-                        #         question_data=question_data,
-                        #     )
-                        # except Exception as e:
-                        #     logging.info(f"[ReplaySim] Pre-create replay json failed: {e}")
+                        tuple_save_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
+                        try:
+                            tuple_step_save(
+                                tuple_save_path=tuple_save_path,
+                                question_id=subtask_metadata["question_id"],
+                                question=subtask_metadata["question"],
+                                cnt_step=cnt_step,
+                                cfg=cfg,
+                                lifelong_json_path=lifelong_json_path,
+                                subtask_metadata=subtask_metadata,
+                            )
+                        except Exception as e:
+                            logging.info(f"[ReplaySim] Pre-create replay json failed: {e}")
                         
                         # query the VLM for the next navigation point, and the reason for the choice
                         vlm_response = query_vlm_for_response(
@@ -457,7 +660,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             verbose=True,
                             ##
                             chosen_frontier_path=chosen_frontier_path,
-                            step_idx=cnt_step,
+                            step_idx=f"task-{subtask_idx}_step-{cnt_step}", # TODO
                             # question_id=question_id,
                             lifelong_json_path=lifelong_json_path,
                         )
@@ -468,19 +671,19 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             break
 
                         # max_point_choice, n_filtered_snapshots = vlm_response
-                        max_point_choice, gpt_answer, n_filtered_snapshots = vlm_response
+                        max_point_choice, gpt_answer, n_filtered_snapshots = vlm_response   # TODO: save mllm response
                         
                         ##
-                        # tuple_save_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
-                        # tuple_step_save(
-                        #     tuple_save_path=tuple_save_path,
-                        #     question_id=question_id,
-                        #     question=question,
-                        #     cnt_step=cnt_step,
-                        #     cfg=cfg,
-                        #     lifelong_json_path=lifelong_json_path,
-                        #     question_data=question_data,
-                        # )
+                        tuple_save_path = os.path.join(cfg.output_parent_dir, cfg.exp_name, 'replay_step_info.json')
+                        tuple_step_save(
+                            tuple_save_path=tuple_save_path,
+                            question_id=subtask_metadata["question_id"],
+                            question=subtask_metadata["question"],
+                            cnt_step=cnt_step,
+                            cfg=cfg,
+                            lifelong_json_path=lifelong_json_path,
+                            subtask_metadata=subtask_metadata,
+                        )
 
                         # set the vlm choice as the navigation target
                         update_success = tsdf_planner.set_next_navigation_point(
@@ -497,23 +700,23 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             break
                         
                         ## 
-                        # try:
-                        #     target_pos = None
-                        #     try:
-                        #         target_pos = getattr(max_point_choice, 'position', None)
-                        #     except Exception:
-                        #         target_pos = None
-                        #     append_step_coords_json(
-                        #         output_root_dir=cfg.output_dir,
-                        #         question_id=question_id,
-                        #         step_index=cnt_step,
-                        #         agent_position=pts,
-                        #         agent_position_voxel=tsdf_planner.habitat2voxel(pts)[:2],
-                        #         angle=angle,
-                        #         target_position=target_pos,
-                        #     )
-                        # except Exception as e:
-                        #     logging.info(f"[Coords] Failed to append target position: {e}")
+                        try:
+                            target_pos = None
+                            try:
+                                target_pos = getattr(max_point_choice, 'position', None)
+                            except Exception:
+                                target_pos = None
+                            append_step_coords_json(
+                                output_root_dir=cfg.output_dir,
+                                question_id=subtask_metadata["question_id"],
+                                step_index=cnt_step,
+                                agent_position=pts,
+                                agent_position_voxel=tsdf_planner.habitat2voxel(pts)[:2],
+                                angle=angle,
+                                target_position=target_pos,
+                            )
+                        except Exception as e:
+                            logging.info(f"[Coords] Failed to append target position: {e}")
 
                     # (5) Agent navigate to the target point for one step
                     return_values = tsdf_planner.agent_step(
@@ -540,18 +743,18 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                     )
                     
                     ##
-                    # try:
-                    #     append_step_coords_json(
-                    #         output_root_dir=cfg.output_dir,
-                    #         question_id=question_id,
-                    #         step_index=cnt_step,
-                    #         agent_position=pts,
-                    #         agent_position_voxel=pts_voxel[:2] if hasattr(pts_voxel, '__len__') else pts_voxel,
-                    #         angle=angle,
-                    #         target_position=None,
-                    #     )
-                    # except Exception as e:
-                    #     logging.info(f"[Coords] Failed to append agent pose after step: {e}")
+                    try:
+                        append_step_coords_json(
+                            output_root_dir=cfg.output_dir,
+                            question_id=subtask_metadata["question_id"],
+                            step_index=cnt_step,
+                            agent_position=pts,
+                            agent_position_voxel=pts_voxel[:2] if hasattr(pts_voxel, '__len__') else pts_voxel,
+                            angle=angle,
+                            target_position=None,
+                        )
+                    except Exception as e:
+                        logging.info(f"[Coords] Failed to append agent pose after step: {e}")
 
                     # sanity check about objects, scene graph, snapshots, ...
                     scene.sanity_check(cfg=cfg)
@@ -577,17 +780,17 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                     # (6) Check if the agent has arrived at the target to finish the question
                     if type(max_point_choice) == SnapShot and target_arrived:
                         
-                        ## 
-                        # tuple_step_save(
-                        #     tuple_save_path=tuple_save_path,
-                        #     question_id=question_id,
-                        #     question=question,
-                        #     cnt_step=cnt_step,
-                        #     cfg=cfg,
-                        #     lifelong_json_path=lifelong_json_path,
-                        #     question_data=question_data,
-                        #     final_reward="pass"
-                        # )
+                        # 
+                        tuple_step_save(
+                            tuple_save_path=tuple_save_path,
+                            question_id=subtask_metadata["question_id"],
+                            question=subtask_metadata["question"],
+                            cnt_step=cnt_step,
+                            cfg=cfg,
+                            lifelong_json_path=lifelong_json_path,
+                            subtask_metadata=subtask_metadata,
+                            final_reward="pass"
+                        )
                         
                         # when the target is a snapshot, and the agent arrives at the target
                         # we consider the subtask is finished, take an observation and save the chosen target snapshot

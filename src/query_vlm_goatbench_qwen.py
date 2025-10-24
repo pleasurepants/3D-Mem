@@ -57,7 +57,7 @@ def query_vlm_for_response(
     cfg,
     verbose: bool = False,
     chosen_frontier_path: str = None,
-    step_idx: int = 0,
+    step_idx: str = "",
     lifelong_json_path: Optional[str] = None,
 ) -> Optional[Tuple[Union[SnapShot, Frontier], int]]:
     # prepare input for vlm
@@ -126,7 +126,7 @@ def query_vlm_for_response(
         frontier.feature for frontier in tsdf_planner.frontiers
     ]
     
-    ##
+    ## tsdf_planner shared between aeqa and goatbench
     step_dict["frontier_imgs_0"] = [
         frontier.feature for frontier in tsdf_planner.frontiers_layer0
     ]
@@ -163,6 +163,7 @@ def query_vlm_for_response(
         reason,
         n_filtered_snapshots,
     ) = explore_step(step_dict, cfg, verbose=verbose, chosen_frontier_path=chosen_frontier_path, step_idx=step_idx)
+    # step_idx: task-{subtask_idx}_step-{cnt_step}
     if outputs is None:
         logging.error(f"explore_step failed and returned None")
         return None

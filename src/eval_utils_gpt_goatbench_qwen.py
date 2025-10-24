@@ -622,8 +622,81 @@ def save_base64_to_png_layer1(b64_str, save_dir, step_idx, idx, idx0):
     return save_path
 
 
-def frontier_context(chosen_frontier_path):
-    pass
+def frontier_context(
+    folder,
+    question="Please summarize the agent's exploration so far.",
+    max_num=5
+):
+    files = [f for f in os.listdir(folder) if f.endswith('.png')]
+    if not files:
+        recent_imgs = []
+    else:
+        def extract_step_idx(f):
+            name = os.path.splitext(f)[0]
+            # parts = name.split('-')
+            # step = int(parts[0])
+            # fidx = '-'.join(parts[1:])  # 保留为字符串
+            # return (step, fidx)
+            pattern = r'task-(\d+)_step-(\d+)_?(.*)'
+            match = re.match(pattern, name)
+            if match:
+                subtask_id = int(match.group(1))
+                step = int(match.group(2))
+                fidx = match.group(3)
+                return (subtask_id, step, fidx)
+        files = sorted(files, key=extract_step_idx, reverse=True)[:max_num]
+        files = sorted(files, key=extract_step_idx)
+        recent_imgs = []
+        for f in files:
+            with open(os.path.join(folder, f), 'rb') as imgf:
+                img_b64 = base64.b64encode(imgf.read()).decode('utf-8')
+            recent_imgs.append( (f, img_b64) )
+    
+    # ===== sys_prompt 一行一行拼接 =====
+    sys_prompt = ""
+    sys_prompt += "You are an agent navigating an indoor environment. "
+    sys_prompt += "The following images represent the sequence of directions or regions the agent has chosen to explore, in order. "
+    sys_prompt += "Your job is to write a concise context summary that describes: "
+    sys_prompt += "(1) Which areas or room types the agent has already explored (based on the sequence); "
+    sys_prompt += "(2) Which areas or directions may remain unexplored or uncertain; "
+    sys_prompt += "(3) Any useful patterns or observations about the current state. "
+    sys_prompt += "Do NOT make a decision for the next move. Do NOT output action suggestions. "
+    sys_prompt += "The output should be a short, objective summary paragraph for use as context in later decision-making. "
+    sys_prompt += "Please pay attention to the order of the images, as they represent the exploration path."
+    
+    content = []
+    
+    # 1. 问题描述
+    text = ""
+    text += "Exploration summary request: "
+    text += question
+    content.append((text,))
+    
+    # 2. Example/example output
+    text = ""
+    text += "Example: "
+    text += "The agent has explored a kitchen area and a hallway leading to a living room. "
+    text += "The bathroom and a side room to the right have not been explored yet. "
+    text += "Most of the agent's trajectory has covered open spaces, with some doors and closed areas remaining unexplored."
+    content.append((text,))
+
+    # 3. 图片有序拼接
+    text = ""
+    text += "Below are the most recent selected exploration directions, in order (earliest to latest): "
+    content.append((text,))
+
+    for i, (fname, img_b64) in enumerate(recent_imgs):
+        text = ""
+        text += f"Step {i+1}: chosen direction ({fname}). "
+        content.append((text, img_b64))
+
+    # 4. 明确只输出context summary，不要建议
+    text = ""
+    text += "Please output ONLY a single paragraph context summary, similar to the example above. "
+    text += "Do NOT make suggestions or give next-step decisions."
+    content.append((text,))
+
+    return sys_prompt, content
 
 
 def parse_frontier_index(output: str):
@@ -868,13 +941,13 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
     if not os.path.exists(chosen_frontier_path):
         os.makedirs(chosen_frontier_path, exist_ok=True)
 
-    # png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
-    # if len(png_files) > 0:
-    #     sys_prompt, content = frontier_context(chosen_frontier_path)
-    #     episodic_con = call_openai_api(sys_prompt, content)
-    #     logging.info(f"Froncon label: {episodic_con}")
-    # else:
-    #     pass
+    png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
+    if len(png_files) > 0:
+        sys_prompt, content = frontier_context(chosen_frontier_path)
+        episodic_con = call_openai_api(sys_prompt, content)
+        logging.info(f"Froncon label: {episodic_con}")
+    else:
+        pass
     
     layer0_con = step.get("replay_layer0_aggregated_context") if _replay_top > 0 else None
     try:
