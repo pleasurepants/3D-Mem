@@ -838,7 +838,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                         # 返回或保存结果
                         return final_response, snapshot_id_mapping, snapshot_crop_mapping, final_reason, len(snapshot_full_imgs)
                     else:
-                        print(f"Snapshot index out of range: {snapshot_idx}")
+                        print(f"Snapshot index out of range: {snapshot_idx} (length: {len(snapshot_full_imgs)})")
                         continue
                 else:
                     print(f"Snapshot response format error: {full_response}")
@@ -998,7 +998,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             if 0 <= idx0 < len(frontier_imgs_0):
                 break
             else:
-                print(f"Layer0 index out of range: {idx0}")
+                print(f"Layer0 index out of range: {idx0} (length: {len(frontier_imgs_0)})")
         except Exception as e:
             print(f"Layer0 format error: {full_response} | {e}")
     
@@ -1111,7 +1111,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                         final_reason = ""
                     break
                 else:
-                    print(f"Layer1 index out of range: {idx1_in_subgroup}")
+                    print(f"Layer1 index out of range: {idx1_in_subgroup} (length: {len(frontier_imgs_subgroup)})")
             except Exception as e:
                 print(f"Layer1 format error: {full_response} | {e}")
     
