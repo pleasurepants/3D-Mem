@@ -807,8 +807,8 @@ class Scene:
 
         # Denoising
         if processing_needed(
-            self.cfg_cg["denoise_interval"],
-            self.cfg_cg["run_denoise_final_frame"],
+            self.cfg_cg["denoise_interval"],    # 12
+            self.cfg_cg["run_denoise_final_frame"],    # True
             frame_idx,
             is_final_frame=False,
         ):

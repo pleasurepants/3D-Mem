@@ -68,6 +68,7 @@ class SnapShot:
     )  # object id to confidence
     cluster: List[int] = field(default_factory=list)
     position: np.ndarray = None
+    # visual_prompt: sv.Detections(xyxy, class_id)
 
     def __eq__(self, other):
         raise NotImplementedError("Cannot compare SnapShot objects.")
@@ -135,7 +136,8 @@ class TSDFPlanner(TSDFPlannerBase):
         pts,
         cfg,
         scene,
-        cnt_step: int,
+        # cnt_step: int,
+        cnt_step: str,  # "task-{subtask_idx}_step-{cnt_step}"
         save_frontier_image: bool = False,
         eps_frontier_dir=None,
         prompt_img_size: Tuple[int, int] = (320, 320),

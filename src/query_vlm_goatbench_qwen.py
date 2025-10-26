@@ -72,7 +72,7 @@ def query_vlm_for_response(
     step_dict["snapshot_objects"] = {}
     step_dict["snapshot_imgs"] = {}
     step_dict["use_full_obj_list"] = cfg.use_full_obj_list
-    for rgb_id, snapshot in scene.snapshots.items():
+    for rgb_id, snapshot in scene.snapshots.items():    # all snapshots in episode, across subtasks
         resized_rgb = resize_image(
             scene.all_observations[rgb_id], cfg.prompt_h, cfg.prompt_w
         )   # why no resizing in aeqa?
@@ -148,12 +148,12 @@ def query_vlm_for_response(
     step_dict["image"] = subtask_metadata["image"]
 
     ##
-    save_snapshot_objects_with_names(
-        question_id=subtask_metadata["question_id"],
-        snapshot_objects=step_dict["snapshot_objects"],
-        object_id_to_name=object_id_to_name,
-        json_path=lifelong_json_path,
-    )
+    # save_snapshot_objects_with_names(
+    #     question_id=subtask_metadata["question_id"],
+    #     snapshot_objects=step_dict["snapshot_objects"],
+    #     object_id_to_name=object_id_to_name,
+    #     json_path=lifelong_json_path,
+    # )
 
     # query vlm
     (

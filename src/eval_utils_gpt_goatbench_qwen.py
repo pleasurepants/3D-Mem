@@ -614,7 +614,7 @@ def save_base64_to_png(b64_str, save_dir, step_idx, idx):
 
 def save_base64_to_png_layer1(b64_str, save_dir, step_idx, idx, idx0):
     os.makedirs(save_dir, exist_ok=True)
-    idx = idx%3
+    idx = idx%3 # less than 3 clusters in one layer1
     save_path = os.path.join(save_dir, f"{step_idx}-frontier{idx0}_{idx}.png")
     img_bytes = base64.b64decode(b64_str)
     img = Image.open(BytesIO(img_bytes))
@@ -752,7 +752,7 @@ def aggregate_recall_contexts_for_layer(
     
 
 def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
-    step["use_prefiltering"] = cfg.prefiltering
+    step["use_prefiltering"] = cfg.prefiltering # true
     step["top_k_categories"] = cfg.top_k_categories
     (
         question,
@@ -965,8 +965,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         egocentric_view=step.get("use_egocentric_views", False),
         use_snapshot_class=True,
         image_goal=image_goal,
-        context=layer0_con,
-        episodic_con=episodic_con,
+        context=layer0_con, # TODO: !!!
+        episodic_con=episodic_con,  # TODO: !!!
         frontier_type="BVF",
     )
     if verbose:
@@ -1020,7 +1020,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         logging.info(f"[Layer0] Layer0 index {idx0} has no corresponding layer1 subclusters. Directly returning layer0 as the frontier (global index: {idx0})")
         return response, snapshot_id_mapping, snapshot_crop_mapping, final_reason, len(snapshot_full_imgs)
     else:
-        layer1_indices = step['layer0_to_layer1'][idx0]   # 例如 [1, 2]
+        layer1_indices = step['layer0_to_layer1'][idx0]   # 例如 [1, 2], can be like [5,6,7], but in prompt changed to [0,1,2]
         frontier_imgs_subgroup = [frontier_imgs_1[i] for i in layer1_indices]
         if len(layer1_indices) == 1:
             final_layer1_idx = layer1_indices[0]
@@ -1028,11 +1028,12 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             response = f"frontier {global_frontier_idx}"
             final_reason = "Only one candidate in this subcluster, selected by default."
             logging.info(f"[Layer1] Only one candidate ({global_frontier_idx}), selected by default.")
-            save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
+            # save_base64_to_png(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx)
+            save_base64_to_png_layer1(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx, idx0)
             return response, snapshot_id_mapping, snapshot_crop_mapping, final_reason, len(snapshot_full_imgs)
         
         ## ==== 对该方向下的“更近处视角”子集做聚合（indices 为全局 layer1 索引） ====
-        layer1_texts_all = step.get("replay_context_text_per_frontier", {}).get("layer1", [])
+        layer1_texts_all = step.get("replay_context_text_per_frontier", {}).get("layer1", [])   # TODO: no such key
         layer1_context_text = None
         if layer1_texts_all and isinstance(layer1_indices, list) and len(layer1_indices) > 0:
             layer1_context_text = aggregate_recall_contexts_for_layer(
