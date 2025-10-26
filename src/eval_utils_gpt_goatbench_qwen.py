@@ -705,7 +705,8 @@ def parse_frontier_index(output: str):
     支持全文任意位置的frontier index格式
     """
     # 支持 'frontier i'、'bvf i'、'cvf i' 三种格式（取最后一个命中）
-    matches = list(re.finditer(r'(?:frontier|bvf|cvf)\s*(\d+)', output, re.IGNORECASE))
+    # matches = list(re.finditer(r'(?:frontier|bvf|cvf)\s*(\d+)', output, re.IGNORECASE))
+    matches = list(re.finditer(r'(?:frontier|bvf|cvf|bfv|cfv)\s*(\d+)', output, re.IGNORECASE))
     if matches:
         last_match = matches[-1]
         index = int(last_match.group(1))
