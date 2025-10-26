@@ -46,7 +46,7 @@ def save_snapshot_objects_with_names(
     with open(json_path, 'w') as f:
         json.dump(all_data, f, indent=2, ensure_ascii=False)
         
-    print(f"保存成功：{json_path}")
+    # print(f"保存成功：{json_path}")
 
 
 def query_vlm_for_response(

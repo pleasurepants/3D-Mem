@@ -800,7 +800,7 @@ def filter_objects(
     objects: MapObjectDict,
     pts: np.ndarray,
 ):
-    print("Before filtering:", len(objects))
+    # print("Before filtering:", len(objects))
     objects_to_keep = MapObjectDict()
 
     # Identify which objects to keep
@@ -818,7 +818,8 @@ def filter_objects(
         else:
             objects_to_keep[obj_id] = obj
 
-    print("After filtering:", len(objects_to_keep))
+    # print("After filtering:", len(objects_to_keep))
+    logging.info(f"Before filtering: {len(objects)}, after filtering: {len(objects_to_keep)}")
 
     return objects_to_keep
 
@@ -848,7 +849,8 @@ def merge_objects(
         objects_b=None,
         downsample_voxel_size=downsample_voxel_size,
     )
-    print("Before merging:", len(objects))
+    # print("Before merging:", len(objects))
+    pre_length = len(objects)
     # old_objects = copy.deepcopy(objects)
     # Pass all necessary configuration parameters to merge_overlap_objects
     objects = merge_overlap_objects(
@@ -865,7 +867,9 @@ def merge_objects(
         device=device,
         goal_obj_ids_mapping=goal_obj_ids_mapping,
     )
-    print("After merging:", len(objects))
+    # print("After merging:", len(objects))
+    post_length = len(objects)
+    logging.info(f"Before merging: {pre_length}, after merging: {post_length}")
 
     return objects
 

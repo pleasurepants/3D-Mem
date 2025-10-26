@@ -224,7 +224,7 @@ def tuple_step_save(
     #     if question_id in lifelong_data:
     #         img2objs = lifelong_data[question_id]
     #         for img_name, obj_list in img2objs.items():
-    #             if img_name.startswith(f"{cnt_step}-"): # TODO
+    #             if img_name.startswith(f"{cnt_step}-"): # TODO: save snapshot objects, save_snapshot_objects_with_names()
     #                 memory_snapshots[img_name] = obj_list
 
     # saved_result[ep_id][question_id]["steps"][step_key]["memory_snapshots"] = memory_snapshots
