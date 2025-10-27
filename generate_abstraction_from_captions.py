@@ -135,69 +135,7 @@ def build_abstraction_for_question(*args, **kwargs):
     raise NotImplementedError("Deprecated in favor of two-stage pipeline (captions->critiques->abstraction).")
 
 
-def format_grouped_critique_from_step_critiques_prompt(
-    question_text: str,
-    critiques_by_steps: List[Tuple[str, str]],  # list of (step_key, critique_text)
-) -> Tuple[str, List[Tuple[str, str]]]:
-    """
-    Summarize a group of existing step-level Critiques into ONE consolidated Critique paragraph.
-    Output must be a single line starting with 'Critique:'.
-    """
-    sys_prompt = (
-        "You are consolidating step-level critiques for an embodied exploration agent. "
-        "You will be given a question and multiple critiques, each evaluating a single step's frontier decision (what was chosen, why, what it led to, and its effect on progress/outcome). "
-        "Your task is to synthesize these critiques into ONE consolidated critique that captures recurring decision patterns, strengths, mistakes, missed opportunities, and their impact on progress and final outcome. Treat the policy of choosing a broader direction and then a closer view as a fixed baseline (not up for debate); avoid restating or judging that baseline. Focus on whether the chosen path progressed toward the goal. "
-        "Begin with a brief prelude (2–3 sentences) analyzing the exploration trajectory across these steps based on the prior choices (as a sequence of decisions). "
-        "Then, critique this trajectory segment by focusing on: whether the sequence prioritized exploration vs immediate answering; how the sequence of selections affected subsequent exploration; how the timing within this trajectory segment shaped impact; how this sequence influenced the final outcome; and whether better alternatives for this segment existed and why. "
-    )
-    sys_prompt += (
-        "\nRULE: Your output must be ONE single paragraph (12–16 sentences), past tense, precise and objective. "
-        "Begin with the exact words 'Critique:' and continue concisely. Base your writing only on the provided critiques; do not invent new details. Avoid symbolic indices and do not mention internal sub-choice labels. \n\n"
-        "Output in the following format:\n"
-        "Critique: <one paragraph>"
-    )
 
-    content: List[Tuple[str, str]] = []
-    content.append((f"Question: {question_text or '(unknown)'}",))
-    content.append(("Below are the step critiques to review:",))
-    for step_key, ct in critiques_by_steps:
-        if isinstance(ct, str) and ct.strip():
-            content.append((f"{step_key}: {ct.strip()}",))
-    content.append(("Now produce the consolidated single-line critique as specified.",))
-    return sys_prompt, content
-
-
-def format_abstraction_from_critiques_prompt(
-    question_text: str,
-    critiques: List[str],
-) -> Tuple[str, List[Tuple[str, str]]]:
-    """
-    Build a prompt that aggregates multiple critiques into ONE trajectory-level Abstraction.
-    Output must be a single line starting with 'Abstraction:'.
-    """
-    sys_prompt = (
-        "You are to synthesize trajectory-level guidance (traj-abstraction) for an embodied exploration agent. "
-        "INPUT: a question and multiple critiques; each critique is itself a condensed evaluation of multiple steps within a short trajectory segment (what was chosen, why, what it led to, and its effect on progress/outcome). "
-        "GOAL: produce decision-useful, generalizable guidance that applies across similar scenes and tasks. Prefer category/region words and cues over instance-specific nouns. Avoid empty slogans and avoid step IDs or internal labels. Do NOT mention or discuss 'BVF', 'CVF', 'view', 'snapshot', 'image', or camera operations—focus on strategy and environment–object/task mappings only.\n\n"
-        "OUTPUT FORMAT (print all steps explicitly, then the final one-paragraph abstraction):\n"
-        "Step 1 (Trajectory): 2–4 sentences summarizing the exploration trajectory as a decision sequence for THIS question (no IDs; do not mention views).\n"
-        "Step 2 (Env–Object Associations): 1–2 sentences distilling where typical categories are likely found (generalized; e.g., storage/cleaning near utility areas; signage near entrances/hubs).\n"
-        "Step 3 (Strategy × Question Type): 1–2 sentences giving concrete, non-generic guidance per question type (location: use region priors to shortlist areas; attribute/state: prioritize proximity checks of the target category using functional cues; counting/relationship: first gain coverage to enumerate, then verify local relations; text-reading: seek signage/labels/panels).\n"
-        "Step 4 (Directional Priors & Avoidance): 1–2 sentences on which directions/cues tend to help vs derail (e.g., connectors/hubs vs dead-end clutter; signage-bearing corridors vs closed, textureless corners).\n"
-        "Step 5 (Anti-patterns): 1–2 sentences describing common failure modes to avoid for similar tasks (e.g., fixating on decor or tool clutter when the question targets containers/appliances; roaming without leveraging region priors).\n"
-        "FINAL Abstraction: Start the line with 'Abstraction: ' and then VERBATIM concatenate all sentences you printed in Steps 1–5 into a single paragraph (keep the exact wording; do not add, remove, or paraphrase any words; do not introduce new content; do not mention views/BVF/CVF)."
-    )
-
-    content: List[Tuple[str, str]] = []
-    content.append((f"Question: {question_text or '(unknown)'}",))
-    content.append(("Here are the step-level condensed critiques to synthesize:",))
-    for i, c in enumerate(critiques, start=1):
-        if isinstance(c, str) and c.strip():
-            content.append((f"Critique {i}: {c.strip()}",))
-    content.append((
-        "Now print the steps exactly in the specified order (Step 1 .. Step 5), and then print FINAL Abstraction by copying (verbatim) all sentences from Steps 1–5 into one paragraph prefixed with 'Abstraction: '. Do not use step IDs or internal labels.",
-    ))
-    return sys_prompt, content
 
 
 def format_trajectory_from_captions_prompt(
