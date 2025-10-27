@@ -210,7 +210,7 @@ def query_vlm_for_response(
         if object_choice_id < 0 or object_choice_id >= len(
             snapshot_crop_mapping[pred_target_snapshot_id]
         ):
-            logging.info(f"Object choice out of range: {object_choice_id}, failed!")
+            logging.info(f"Object choice out of range: {object_choice_id}, failed! (length: {len(snapshot_crop_mapping[pred_target_snapshot_id])})")
             return None
         object_choice_id = snapshot_crop_mapping[pred_target_snapshot_id][
             object_choice_id
@@ -238,7 +238,7 @@ def query_vlm_for_response(
         target_index = int(target_index)
         if target_index < 0 or target_index >= len(tsdf_planner.frontiers):
             logging.info(
-                f"Predicted frontier target index out of range: {target_index}, failed!"
+                f"Predicted frontier target index out of range: {target_index}, failed! (length: {len(tsdf_planner.frontiers)})"
             )
             return None
         target_point = tsdf_planner.frontiers[target_index].position
