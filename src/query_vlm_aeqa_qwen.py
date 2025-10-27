@@ -57,6 +57,10 @@ def query_vlm_for_response(
     step_idx: int = 0,
     question_id: Optional[str] = None,
     lifelong_json_path: Optional[str] = None,
+    exp_tuple_path: Optional[str] = None,
+    inject_experience: bool = False,
+    inject_critique: bool = False,
+    inject_abstraction: bool = False,
     # lifelong_context: Optional[str] = None,
 ) -> Optional[Tuple[Union[SnapShot, Frontier], str, int]]:
     # prepare input for vlm
@@ -96,6 +100,12 @@ def query_vlm_for_response(
 
     # prepare question
     step_dict["question"] = question
+    # keep identifiers for downstream prompt
+    try:
+        step_dict["question_id"] = question_id
+        step_dict["episode_history_id"] = getattr(cfg, "episode_history_id", None)
+    except Exception:
+        pass
 
 
 
@@ -113,7 +123,15 @@ def query_vlm_for_response(
 
     # query vlm
     outputs, snapshot_id_mapping, reason, n_filtered_snapshots = explore_step(
-        step_dict, cfg, verbose=verbose, chosen_frontier_path=chosen_frontier_path, step_idx=step_idx
+        step_dict,
+        cfg,
+        verbose=verbose,
+        chosen_frontier_path=chosen_frontier_path,
+        step_idx=step_idx,
+        exp_tuple_path=exp_tuple_path,
+        inject_experience=inject_experience,
+        inject_critique=inject_critique,
+        inject_abstraction=inject_abstraction,
     )
     if outputs is None:
         logging.error(f"explore_step failed and returned None")

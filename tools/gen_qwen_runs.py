@@ -168,7 +168,7 @@ def main():
         'critique': 'experience_output.json',
         'wo-critique': 'experience_output_wo.json',
     }
-    modes = ['sim', 'random']
+    modes = ['sim', 'random', 'question-first']
     tops = [1, 3, 5]
     seeds = [13, 19, 32, 42]
 
@@ -177,10 +177,16 @@ def main():
             for topk in tops:
                 for seed in seeds:
                     # YAML
-                    out_dir = f"/anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/experience/{variant}/{'random' if mode=='random' else 'sim'}-top{topk}"
+                    if mode == 'question-first':
+                        out_dir = f"/anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/experience/{variant}/qfirst-top{topk}"
+                    else:
+                        out_dir = f"/anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/experience/{variant}/{'random' if mode=='random' else 'sim'}-top{topk}"
                     y_dir = cfg_root / variant
                     y_dir.mkdir(parents=True, exist_ok=True)
-                    y_name = f"qwen-{'random' if mode=='random' else 'sim'}-top{topk}-seed{seed}.yaml"
+                    if mode == 'question-first':
+                        y_name = f"qwen-question-first-top{topk}-seed{seed}.yaml"
+                    else:
+                        y_name = f"qwen-{'random' if mode=='random' else 'sim'}-top{topk}-seed{seed}.yaml"
                     y_path = y_dir / y_name
                     y_content = BASE_YAML.format(seed=seed, out_dir=out_dir, exp_file=exp_file)
                     y_path.write_text(y_content)
@@ -188,8 +194,12 @@ def main():
                     # SH
                     s_dir = sh_root / variant
                     s_dir.mkdir(parents=True, exist_ok=True)
-                    job = f"q-{ 'wo' if variant=='wo-critique' else 'crit' }-{'rand' if mode=='random' else 'sim'}-top{topk}-{seed}"
-                    s_name = f"qwen-{'random' if mode=='random' else 'sim'}-top{topk}-seed{seed}.sh"
+                    if mode == 'question-first':
+                        job = f"q-{ 'wo' if variant=='wo-critique' else 'crit' }-qfirst-top{topk}-{seed}"
+                        s_name = f"qwen-qfirst-top{topk}-seed{seed}.sh"
+                    else:
+                        job = f"q-{ 'wo' if variant=='wo-critique' else 'crit' }-{'rand' if mode=='random' else 'sim'}-top{topk}-{seed}"
+                        s_name = f"qwen-{'random' if mode=='random' else 'sim'}-top{topk}-seed{seed}.sh"
                     s_path = s_dir / s_name
                     cfg_path = str(y_path)
                     s_content = BASE_SH.format(job=job, variant=variant, cfg_path=cfg_path, mode=mode, topk=topk)

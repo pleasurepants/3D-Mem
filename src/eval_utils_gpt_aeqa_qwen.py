@@ -21,6 +21,43 @@ client = OpenAI(
 
 
 
+def _load_ppl_rank_qids(cfg):
+    """加载 ppl_rank 过滤的 question_id 集合"""
+    ppl_rank_category = getattr(cfg, "ppl_rank", None)
+    if not ppl_rank_category:
+        return None
+    
+    ppl_rank_file = getattr(cfg, "ppl_rank_file", "/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json")
+    
+    if not os.path.exists(ppl_rank_file):
+        logging.warning(f"[PPL_RANK] File not found: {ppl_rank_file}, filter disabled")
+        return None
+    
+    try:
+        with open(ppl_rank_file, 'r', encoding='utf-8') as f:
+            ppl_data = json.load(f)
+        
+        # 标准化类别名称: low/medium/high -> Low/Medium/High
+        category_key = ppl_rank_category.capitalize()
+        
+        if category_key not in ppl_data:
+            logging.warning(f"[PPL_RANK] Category '{category_key}' not found in {ppl_rank_file}, available: {list(ppl_data.keys())}")
+            return None
+        
+        # 获取该类别下的所有 question_id
+        category_dict = ppl_data[category_key]
+        if isinstance(category_dict, dict):
+            ppl_rank_qids = set(category_dict.keys())
+            logging.info(f"[PPL_RANK] Loaded {len(ppl_rank_qids)} question_ids for category '{category_key}'")
+            return ppl_rank_qids
+        else:
+            logging.warning(f"[PPL_RANK] Invalid data format for category '{category_key}'")
+            return None
+    except Exception as e:
+        logging.warning(f"[PPL_RANK] Failed to load ppl_rank filter: {e}")
+        return None
+
+
 def format_content(contents):
     formated_content = []
     for c in contents:
@@ -43,7 +80,7 @@ def format_content(contents):
 
 
 # send information to openai
-def call_openai_api(sys_prompt, contents) -> Optional[str]:
+def call_openai_api(sys_prompt, contents, seed: Optional[int] = None) -> Optional[str]:
     max_tries = 5
     retry_count = 0
     formated_content = format_content(contents)
@@ -53,6 +90,18 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     ]
     while retry_count < max_tries:
         try:
+            # 支持从参数或环境变量注入 seed（优先参数，其次 VLLM_SEED）
+            # 读取优先级：参数 seed > cfg.chat_seed（经外层传入）> 环境变量 VLLM_SEED
+            _seed_env = None
+            try:
+                _seed_env = int(os.getenv("VLLM_SEED")) if os.getenv("VLLM_SEED") is not None else None
+            except Exception:
+                _seed_env = None
+            _seed = seed if seed is not None else _seed_env
+            try:
+                logging.info(f"[ChatSeed] using seed={_seed}")
+            except Exception:
+                pass
             completion = client.chat.completions.create(
                 model="qwen",  # gpt-4o-internvl-minicpm-qwen
                 messages=message_text,
@@ -61,6 +110,7 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
                 top_p=0.95,
                 frequency_penalty=0,
                 presence_penalty=0,
+                **({"seed": int(_seed)} if _seed is not None else {}),
             )
             return completion.choices[0].message.content
         except openai.RateLimitError as e:
@@ -198,21 +248,6 @@ def _load_frontier_index(cfg):
         logging.warning(f"[SimpleRecall] load index failed: {e}")
         return {}
 
-
-def _load_experience(cfg):
-    root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
-    exp_filename = getattr(cfg, "experience_filename", "experience_output.json")
-    exp_path = os.path.join(root, exp_filename)
-    if not os.path.exists(exp_path):
-        logging.info(f"[SimpleRecall] experience_output.json not found: {exp_path}")
-        return {}
-    try:
-        with open(exp_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except Exception as e:
-        logging.warning(f"[SimpleRecall] load experience failed: {e}")
-        return {}
 
 
 _AEQA_QID2QUESTION = None
@@ -468,17 +503,471 @@ def _rank_by_vectors_for_question(current_question: str, store: dict, top_k: int
         return []
 
 
-def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None, top_k=1, strategy: str = 'sim', current_question: str = None, rrf_k: int = 60):
+def simple_recall_and_aggregate(
+    frontier_imgs_b64,
+    cfg,
+    exclude_question_id=None,
+    top_k=1,
+    strategy: str = 'sim',
+    current_question: str = None,
+    rrf_k: int = 60,
+    exp_tuple_path: Optional[str] = None,
+    inject_experience: bool = False,
+    inject_critique: bool = False,
+    inject_abstraction: bool = False,
+):
     if not frontier_imgs_b64 or top_k <= 0:
         return None
 
-    # 'sim' = 图像向量检索（当前BVF/CVF图片 → 训练集PNG向量）+ 文本相似（问题→问题文本）做 RRF 融合；'random' 维持不变
+    # 新增策略：traj_exp —— 返回与当前问题相近的最近K个 question 的 abstraction 文本（来自 cfg.traj_file）
+    if (strategy or 'sim') == 'traj_exp':
+        # Backward-compatibility alias: behave exactly like traj_sim
+        return simple_recall_and_aggregate(
+            frontier_imgs_b64=frontier_imgs_b64,
+            cfg=cfg,
+            exclude_question_id=exclude_question_id,
+            top_k=top_k,
+            strategy='traj_sim',
+            current_question=current_question,
+            rrf_k=rrf_k,
+            exp_tuple_path=exp_tuple_path,
+            inject_experience=inject_experience,
+            inject_critique=inject_critique,
+            inject_abstraction=inject_abstraction,
+        )
+
+    if (strategy or 'sim') == 'traj_sim':
+        try:
+            store = _load_vector_store(cfg)
+            traj_path = getattr(cfg, 'traj_file', None)
+            if not store or not isinstance(traj_path, str) or len(traj_path) == 0 or not os.path.exists(traj_path):
+                logging.info("[TrajSim] vector store or traj_file not available")
+                return None
+            
+            # 加载 ppl_rank 过滤设置
+            ppl_rank_qids = _load_ppl_rank_qids(cfg)
+            
+            # 1) 图像相似：frontier -> corpus PNG
+            dev = _device_auto()
+            from PIL import Image as _Image
+            from io import BytesIO as _BytesIO
+            pil_list = []
+            for b64 in frontier_imgs_b64:
+                try:
+                    img_bytes = base64.b64decode(b64)
+                    pil_list.append(_Image.open(_BytesIO(img_bytes)).convert('RGB'))
+                except Exception:
+                    pil_list.append(_Image.new('RGB', (224, 224), color=(0, 0, 0)))
+            enc = store['png']['enc'] or {}
+            clip_model = str(enc.get('clip_model', 'ViT-B-32'))
+            pretrained = enc.get('open_clip_pretrained') or None
+            t_emb = _embed_images_with_clip(pil_list, model_name=clip_model, pretrained=pretrained, device=dev)
+            if t_emb is None:
+                logging.info("[TrajSim] image embedding failed")
+                return None
+            import numpy as _np
+            corpus = store['png']['emb']
+            merged_candidates = []
+            for i in range(t_emb.shape[0]):
+                v = t_emb[i]
+                sims = corpus @ v.astype(_np.float32)
+                top_idx = _np.argsort(-sims)[: min(2000, max(50, int(top_k) * 50))]
+                per_scores = []
+                for idx in top_idx:
+                    meta = store['png']['meta'][int(idx)]
+                    qid = meta.get('question_id')
+                    if exclude_question_id and qid == exclude_question_id:
+                        continue
+                    
+                    # ppl_rank 过滤: 如果启用了过滤且当前 qid 不在允许列表中，则跳过
+                    if ppl_rank_qids is not None and qid not in ppl_rank_qids:
+                        continue
+                    
+                    per_scores.append({
+                        'similarity': float(sims[int(idx)]),  # clip_sim
+                        'question_id': qid,
+                        'step_key': meta.get('step_key'),
+                        'level': meta.get('level'),
+                        'filename_rel': meta.get('src_rel_path'),
+                        'source_frontier_index': i,
+                    })
+                # 局部去重 top-5
+                seen = set()
+                kept = []
+                for cand in per_scores:
+                    key = (cand['question_id'], cand['step_key'])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    kept.append(cand)
+                    if len(kept) >= 5:
+                        break
+                merged_candidates.extend(kept)
+            if not merged_candidates:
+                logging.info("[TrajSim] no merged candidates")
+                return None
+            # 2) 文本相似（当前问题 -> 训练集问题文本）
+            qid2question = _load_questions_en()
+            for cand in merged_candidates:
+                qid = cand.get('question_id')
+                qtext = qid2question.get(qid, '')
+                cand['qsim'] = _cosine_sim_tokens(current_question or '', qtext)
+            # 3) RRF 融合（在 (qid, step) 层面）
+            image_sorted = sorted(merged_candidates, key=lambda x: x['similarity'], reverse=True)
+            text_sorted = sorted(merged_candidates, key=lambda x: x.get('qsim', 0.0), reverse=True)
+            rank_img = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(image_sorted) }
+            rank_txt = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(text_sorted) }
+            for cand in merged_candidates:
+                key = (cand.get('question_id'), cand.get('step_key'))
+                ri = rank_img.get(key, len(image_sorted) + 1)
+                rt = rank_txt.get(key, len(text_sorted) + 1)
+                cand['rrf_score'] = (1.0 / (rrf_k + ri)) + (1.0 / (rrf_k + rt))
+            fused_sorted = sorted(merged_candidates, key=lambda x: x.get('rrf_score', 0.0), reverse=True)
+            # 4) 按 qid 聚合，取每个 qid 的最佳条目（用于日志 & 排序）
+            best_by_qid = {}
+            for cand in fused_sorted:
+                qid = cand.get('question_id')
+                prev = best_by_qid.get(qid)
+                if prev is None or float(cand.get('rrf_score', 0.0)) > float(prev.get('rrf_score', 0.0)):
+                    best_by_qid[qid] = cand
+            ranked_qids = sorted(best_by_qid.items(), key=lambda x: x[1].get('rrf_score', 0.0), reverse=True)
+            # 5) 选择 top_k 且 traj_file 中有 abstraction 的 qid，不足则从 ranked_qids 继续补齐，再不足随机回填
+            with open(traj_path, 'r', encoding='utf-8') as f:
+                traj_data = json.load(f)
+            selected = []
+            selected_set = set()
+            for qid, cand in ranked_qids:
+                if exclude_question_id and qid == exclude_question_id:
+                    continue
+                node = traj_data.get(qid) if isinstance(traj_data, dict) else None
+                if not isinstance(node, dict):
+                    continue
+                abstraction = node.get('abstraction')
+                if isinstance(abstraction, str) and abstraction.strip():
+                    selected.append((qid, cand))
+                    selected_set.add(qid)
+                    if len(selected) >= int(top_k):
+                        break
+            if len(selected) < int(top_k):
+                # 继续从 ranked_qids 扫描（即使 abstraction 为空也跳过，不会增加）
+                for qid, cand in ranked_qids:
+                    if len(selected) >= int(top_k):
+                        break
+                    if qid in selected_set or (exclude_question_id and qid == exclude_question_id):
+                        continue
+                    node = traj_data.get(qid) if isinstance(traj_data, dict) else None
+                    if not isinstance(node, dict):
+                        continue
+                    abstraction = node.get('abstraction')
+                    if isinstance(abstraction, str) and abstraction.strip():
+                        selected.append((qid, cand))
+                        selected_set.add(qid)
+            if len(selected) < int(top_k) and isinstance(traj_data, dict):
+                # 随机回填（仅 abstraction 非空的）
+                pool = [qid for qid, node in traj_data.items() if qid not in selected_set and isinstance(node, dict) and isinstance(node.get('abstraction'), str) and node.get('abstraction').strip() and (not exclude_question_id or qid != exclude_question_id) and (ppl_rank_qids is None or qid in ppl_rank_qids)]
+                import random as _rnd
+                _rnd.shuffle(pool)
+                for qid in pool:
+                    dummy = {'similarity': 0.0, 'qsim': 0.0, 'rrf_score': 0.0}
+                    selected.append((qid, dummy))
+                    selected_set.add(qid)
+                    if len(selected) >= int(top_k):
+                        break
+            # 6) 日志：仅打印最终选中的 qid 的 clip_sim、qsim、rrf
+            try:
+                logging.info(f"[TrajSim] selected {len(selected)} question(s) (need {int(top_k)}):")
+                for i, (qid, cand) in enumerate(selected, 1):
+                    qtext = _load_questions_en().get(qid, (traj_data.get(qid) or {}).get('question', '')) if isinstance(traj_data, dict) else ''
+                    logging.info(
+                        f"  #{i}: qid={qid} | clip_sim={float(cand.get('similarity', 0.0)):.4f} | qsim={float(cand.get('qsim', 0.0)):.4f} | rrf={float(cand.get('rrf_score', 0.0)):.6f} | question={_shorten(qtext, 180)}"
+                    )
+            except Exception:
+                pass
+            # 7) 生成 TRAJ-ABSTRACTION 文本
+            texts = []
+            for idx, (qid, cand) in enumerate(selected[: int(top_k)], 1):
+                node = traj_data.get(qid) if isinstance(traj_data, dict) else None
+                if not isinstance(node, dict):
+                    continue
+                abstraction = node.get('abstraction') or ''
+                if not (isinstance(abstraction, str) and abstraction.strip()):
+                    continue
+                block = []
+                block.append(f"Traj-Abstraction {idx}:")
+                block.append(abstraction.strip())
+                texts.append("\n".join(block))
+            return "\n\n".join(texts) if texts else None
+        except Exception as e:
+            logging.warning(f"[TrajSim] failed: {e}")
+            return None
+
+    if (strategy or 'sim') == 'traj_random':
+        try:
+            traj_path = getattr(cfg, 'traj_file', None)
+            if not isinstance(traj_path, str) or len(traj_path) == 0 or not os.path.exists(traj_path):
+                logging.info("[TrajRandom] missing traj_file; skip")
+                return None
+            
+            # 加载 ppl_rank 过滤设置
+            ppl_rank_qids = _load_ppl_rank_qids(cfg)
+            
+            with open(traj_path, 'r', encoding='utf-8') as f:
+                traj_data = json.load(f)
+            candidates = []
+            if isinstance(traj_data, dict):
+                for qid, node in traj_data.items():
+                    if exclude_question_id and qid == exclude_question_id:
+                        continue
+                    
+                    # ppl_rank 过滤: 如果启用了过滤且当前 qid 不在允许列表中，则跳过
+                    if ppl_rank_qids is not None and qid not in ppl_rank_qids:
+                        continue
+                    
+                    if not isinstance(node, dict):
+                        continue
+                    abstraction = node.get('abstraction')
+                    if isinstance(abstraction, str) and abstraction.strip():
+                        candidates.append(qid)
+            import random as _rnd
+            _rnd.shuffle(candidates)
+            picked = candidates[: max(1, int(top_k))]
+            # 日志：展示随机挑选的 qids（question 名称）
+            try:
+                logging.info(f"[VecRetrieve][traj_random] random-picked top {len(picked)} (need {int(top_k)}):")
+                for i, qid in enumerate(picked, 1):
+                    qtext = (traj_data.get(qid) or {}).get('question', '') if isinstance(traj_data, dict) else ''
+                    logging.info(f"  #{i}: qid={qid} | question={_shorten(qtext, 180)}")
+            except Exception:
+                pass
+            texts = []
+            for idx, qid in enumerate(picked, 1):
+                node = traj_data.get(qid) if isinstance(traj_data, dict) else None
+                if not isinstance(node, dict):
+                    continue
+                abstraction = node.get('abstraction') or ''
+                if not (isinstance(abstraction, str) and abstraction.strip()):
+                    continue
+                block = []
+                block.append(f"Traj-Abstraction {idx}:")
+                block.append(abstraction.strip())
+                texts.append("\n".join(block))
+            return "\n\n".join(texts) if texts else None
+        except Exception as e:
+            logging.warning(f"[TrajRandom] failed: {e}")
+            return None
+
+    # 'sim' = 图像向量检索（当前BVF/CVF图片 → 训练集PNG向量）+ 文本相似（问题→问题文本）做 RRF 融合；'question-first' = 先召回top-3相似question，再在这些question的PNG中做CLIP检索；'random' 维持不变
+    if (strategy or 'sim') == 'question-first':
+        # 步骤1: 先用问题相似度召回top-3相似question
+        store = _load_vector_store(cfg)
+        if not store:
+            logging.info("[VecRetrieve] vector store not available")
+        else:
+            try:
+                # 日志：记录当前问题
+                logging.info(f"[VecRetrieve][question-first] Current question: {current_question or 'N/A'}")
+                ranked_qids = _rank_by_vectors_for_question(current_question=current_question or '', store=store, top_k=3, rrf_k=rrf_k)
+                # 日志：记录retrieve回来的top-3相似question
+                if ranked_qids:
+                    logging.info(f"[VecRetrieve][question-first] Retrieved top-3 similar questions:")
+                    for rank, (qid, score) in enumerate(ranked_qids, 1):
+                        qtext = next((m['question'] for m in store['question']['meta'] if m['question_id'] == qid), 'N/A')
+                        logging.info(f"  #{rank}: qid={qid} | qsim={score:.4f} | question={qtext}")
+                if not ranked_qids or not frontier_imgs_b64:
+                    logging.info("[VecRetrieve] question ranking empty or no frontiers")
+                else:
+                    # 步骤2: 收集这些question对应的PNG向量索引
+                    qid_to_indices = {}
+                    for idx, meta in enumerate(store['png']['meta']):
+                        qid = meta.get('question_id')
+                        if qid and qid in [q for q, _ in ranked_qids]:
+                            if qid not in qid_to_indices:
+                                qid_to_indices[qid] = []
+                            qid_to_indices[qid].append(idx)
+
+                    relevant_indices = []
+                    for indices in qid_to_indices.values():
+                        relevant_indices.extend(indices)
+                    if not relevant_indices:
+                        logging.info("[VecRetrieve] no relevant PNGs")
+                    else:
+                        corpus = store['png']['emb'][relevant_indices]
+                        meta_list = [store['png']['meta'][idx] for idx in relevant_indices]
+
+                        # 步骤3: 对当前frontier图片做CLIP相似度检索
+                        dev = _device_auto()
+                        from PIL import Image as _Image
+                        from io import BytesIO as _BytesIO
+                        pil_list = []
+                        for b64 in frontier_imgs_b64:
+                            try:
+                                img_bytes = base64.b64decode(b64)
+                                pil_list.append(_Image.open(_BytesIO(img_bytes)).convert('RGB'))
+                            except Exception:
+                                pil_list.append(_Image.new('RGB', (224, 224), color=(0, 0, 0)))
+                        enc = store['png']['enc'] or {}
+                        clip_model = str(enc.get('clip_model', 'ViT-B-32'))
+                        pretrained = enc.get('open_clip_pretrained') or None
+                        t_emb = _embed_images_with_clip(pil_list, model_name=clip_model, pretrained=pretrained, device=dev)
+                        if t_emb is None:
+                            logging.info("[VecRetrieve] image embedding failed")
+                        else:
+                            import numpy as _np
+                            merged_candidates = []
+                            # 日志：记录图片相似度检索结果
+                            logging.info(f"[VecRetrieve][question-first] Image similarity retrieval for {len(frontier_imgs_b64)} frontier(s):")
+                            for i in range(t_emb.shape[0]):
+                                v = t_emb[i]
+                                sims = corpus @ v.astype(_np.float32)
+                                top_idx = _np.argsort(-sims)[: min(2000, max(50, top_k * 50))]
+                                logging.info(f"  Frontier #{i} top image similarities:")
+                                for rank, idx in enumerate(top_idx[:10], 1):  # 只显示前10个
+                                    sim_score = float(sims[int(idx)])
+                                    meta = meta_list[int(idx)]
+                                    qid = meta.get('question_id')
+                                    filename = meta.get('src_rel_path')
+                                    logging.info(f"    #{rank}: clip_sim={sim_score:.4f} | qid={qid} | filename={filename}")
+                                per_scores = []
+                                for idx in top_idx:
+                                    meta = meta_list[int(idx)]
+                                    qid = meta.get('question_id')
+                                    if exclude_question_id and qid == exclude_question_id:
+                                        continue
+                                    per_scores.append({
+                                        'similarity': float(sims[int(idx)]),
+                                        'question_id': qid,
+                                        'step_key': meta.get('step_key'),
+                                        'level': meta.get('level'),
+                                        'filename_rel': meta.get('src_rel_path'),
+                                        'source_frontier_index': i,
+                                    })
+                                seen = set()
+                                kept = []
+                                for cand in per_scores:
+                                    key = (cand['question_id'], cand.get('step_key'))
+                                    if key in seen:
+                                        continue
+                                    seen.add(key)
+                                    kept.append(cand)
+                                    if len(kept) >= 5:
+                                        break
+                                merged_candidates.extend(kept)
+                            if merged_candidates:
+                                best_by_key = {}
+                                for cand in merged_candidates:
+                                    key = (cand['question_id'], cand.get('step_key'))
+                                    prev = best_by_key.get(key)
+                                    if prev is None or float(cand['similarity']) > float(prev['similarity']):
+                                        best_by_key[key] = cand
+                                merged_unique = list(best_by_key.values())
+
+                                # question-first模式：直接按clip相似度排序，不用RRF
+                                final_sorted = sorted(merged_unique, key=lambda x: x['similarity'], reverse=True)
+                                try:
+                                    log_n = min(max(1, top_k), len(final_sorted))
+                                    if log_n > 0:
+                                        logging.info(f"[VecRetrieve] question-first ranking by CLIP similarity (top {log_n}):")
+                                    for rank, cand in enumerate(final_sorted[:log_n]):
+                                        logging.info(
+                                            f"  #{rank+1}: clip_sim={cand.get('similarity', 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | filename={cand.get('filename_rel') or 'N/A'}"
+                                        )
+                                except Exception:
+                                    pass
+                                final_selected = final_sorted[: max(1, top_k)]
+                                texts = []
+                                try:
+                                    # 从 exp_tuple_path 读取，并按 (qid, step_key) 构造三块文本
+                                    if isinstance(exp_tuple_path, str) and len(exp_tuple_path) > 0 and os.path.exists(exp_tuple_path):
+                                        with open(exp_tuple_path, 'r', encoding='utf-8') as _f:
+                                            tuple_data = json.load(_f)
+                                    else:
+                                        tuple_data = None
+                                except Exception:
+                                    tuple_data = None
+
+                                def _fetch_tuple_step(_data, _qid, _step_key):
+                                    if not isinstance(_data, dict):
+                                        return None
+                                    # 顶层 qid
+                                    if _qid in _data and isinstance(_data[_qid], dict):
+                                        qnode = _data[_qid]
+                                    else:
+                                        qnode = None
+                                        for _, bucket in _data.items():
+                                            if isinstance(bucket, dict) and _qid in bucket:
+                                                qnode = bucket.get(_qid)
+                                                break
+                                    if not isinstance(qnode, dict):
+                                        return None
+                                    q_text = qnode.get('question', '')
+                                    steps = qnode.get('steps') if isinstance(qnode.get('steps'), dict) else qnode
+                                    step_entry = None
+                                    if isinstance(steps, dict):
+                                        step_entry = steps.get(_step_key)
+                                    if not isinstance(step_entry, dict):
+                                        return None
+                                    return q_text, step_entry
+
+                                for j, cand in enumerate(final_selected):
+                                    qid = cand.get('question_id')
+                                    sk = cand.get('step_key')
+                                    if tuple_data is None:
+                                        continue
+                                    fetched = _fetch_tuple_step(tuple_data, qid, sk)
+                                    if not fetched:
+                                        continue
+                                    q_text, step_entry = fetched
+                                    cur = step_entry.get('current_step')
+                                    tot = step_entry.get('total_step')
+                                    caption = step_entry.get('Caption') or step_entry.get('caption') or ''
+                                    critique = step_entry.get('Critique') or step_entry.get('critique')
+                                    abstraction = step_entry.get('Abstraction') or step_entry.get('abstraction')
+                                    bvf = step_entry.get('chosen_BVF')
+                                    cvf = step_entry.get('chosen_CVF')
+                                    outcome = step_entry.get('final_reward')
+
+                                    blocks = []
+                                    exp_id = j + 1
+                                    if inject_experience:
+                                        sentence = f"Experience {exp_id}: \nAt step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                                        if caption:
+                                            sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                                        if (bvf is not None and cvf is not None):
+                                            sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                                        elif (bvf is not None):
+                                            sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                                        elif (cvf is not None):
+                                            sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                                        if outcome is not None:
+                                            sentence += f"and the outcome of that trial was {outcome}."
+                                        blocks.append(sentence.strip())
+                                    else:
+                                        blocks.append(f"Experience {exp_id}:")
+
+                                    if inject_critique and isinstance(critique, str) and critique.strip():
+                                        blocks.append("")
+                                        blocks.append(f"Critique: {critique}")
+                                    if inject_abstraction and isinstance(abstraction, str) and abstraction.strip():
+                                        blocks.append("")
+                                        blocks.append(f"Abstraction: {abstraction}")
+                                    texts.append("\n".join(blocks))
+                                return "\n\n".join(texts) if texts else None
+            except Exception as e:
+                logging.warning(f"[VecRetrieve] question-first failed: {e}")
+
     if (strategy or 'sim') == 'sim':
         store = _load_vector_store(cfg)
         if not store or not frontier_imgs_b64:
             logging.info("[VecRetrieve] vector store not available or no frontiers")
         else:
             try:
+                # 简要记录本次检索的关键信息
+                try:
+                    logging.info(
+                        f"[VecRetrieve][sim] question={_shorten(current_question or '', 160)} | num_frontiers={len(frontier_imgs_b64)}"
+                    )
+                except Exception:
+                    pass
                 dev = _device_auto()
                 from PIL import Image as _Image
                 from io import BytesIO as _BytesIO
@@ -496,6 +985,13 @@ def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None
                 if t_emb is None:
                     logging.info("[VecRetrieve] image embedding failed; skip vecimg sim")
                 else:
+                    try:
+                        cshape = getattr(store['png']['emb'], 'shape', None)
+                        logging.info(
+                            f"[VecRetrieve][sim] embeddings: frontiers={tuple(t_emb.shape)} | corpus={tuple(cshape) if cshape else 'N/A'} | model={clip_model}"
+                        )
+                    except Exception:
+                        pass
                     import numpy as _np
                     corpus = store['png']['emb']  # [N, D], 已归一化
                     merged_candidates = []
@@ -552,6 +1048,27 @@ def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None
                             for cand in merged_unique:
                                 text_scores[(cand.get('question_id'), cand.get('step_key'))] = 0.0
                         text_sorted = sorted(merged_unique, key=lambda x: text_scores[(x.get('question_id'), x.get('step_key'))], reverse=True)
+
+                        # 仅记录 image-only 与 text-only 排名（便于对比与调试）
+                        try:
+                            log_n = min(max(1, top_k), len(image_sorted))
+                            if log_n > 0:
+                                logging.info(f"[VecRetrieve][sim] image-only top {log_n}:")
+                            for rank, cand in enumerate(image_sorted[:log_n], 1):
+                                logging.info(
+                                    f"  #{rank}: clip_sim={cand.get('similarity', 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | filename={cand.get('filename_rel') or 'N/A'}"
+                                )
+                            log_n_t = min(max(1, top_k), len(text_sorted))
+                            if log_n_t > 0:
+                                logging.info(f"[VecRetrieve][sim] text-only top {log_n_t}:")
+                            for rank, cand in enumerate(text_sorted[:log_n_t], 1):
+                                key = (cand.get('question_id'), cand.get('step_key'))
+                                qsim = float(text_scores.get(key, 0.0))
+                                logging.info(
+                                    f"  #{rank}: qsim={qsim:.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')} | filename={cand.get('filename_rel') or 'N/A'}"
+                                )
+                        except Exception:
+                            pass
                         # RRF 融合
                         rank_img = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(image_sorted) }
                         rank_txt = { (c.get('question_id'), c.get('step_key')): ii+1 for ii, c in enumerate(text_sorted) }
@@ -573,32 +1090,83 @@ def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None
                                 )
                         except Exception:
                             pass
-                        # 选取 top_k 并回取经验
+                        # 选取 top_k 并回取 tuple 经验
                         final_selected = final_sorted[: max(1, top_k)]
-                        exp = _load_experience(cfg)
                         texts = []
+                        try:
+                            if isinstance(exp_tuple_path, str) and len(exp_tuple_path) > 0 and os.path.exists(exp_tuple_path):
+                                with open(exp_tuple_path, 'r', encoding='utf-8') as _f:
+                                    tuple_data = json.load(_f)
+                            else:
+                                tuple_data = None
+                        except Exception:
+                            tuple_data = None
+
+                        def _fetch_tuple_step(_data, _qid, _step_key):
+                            if not isinstance(_data, dict):
+                                return None
+                            if _qid in _data and isinstance(_data[_qid], dict):
+                                qnode = _data[_qid]
+                            else:
+                                qnode = None
+                                for _, bucket in _data.items():
+                                    if isinstance(bucket, dict) and _qid in bucket:
+                                        qnode = bucket.get(_qid)
+                                        break
+                            if not isinstance(qnode, dict):
+                                return None
+                            q_text = qnode.get('question', '')
+                            steps = qnode.get('steps') if isinstance(qnode.get('steps'), dict) else qnode
+                            step_entry = None
+                            if isinstance(steps, dict):
+                                step_entry = steps.get(_step_key)
+                            if not isinstance(step_entry, dict):
+                                return None
+                            return q_text, step_entry
+
                         for j, cand in enumerate(final_selected):
                             qid = cand.get('question_id')
                             sk = cand.get('step_key')
-                            exp_text = None
-                            try:
-                                for ep_id, qdict in exp.items():
-                                    if not isinstance(qdict, dict):
-                                        continue
-                                    qinfo = qdict.get(qid)
-                                    if not isinstance(qinfo, dict):
-                                        continue
-                                    steps = qinfo.get('steps', {})
-                                    if not isinstance(steps, dict):
-                                        continue
-                                    step_entry = steps.get(sk, {})
-                                    if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
-                                        exp_text = step_entry['experience']
-                                        break
-                                if isinstance(exp_text, str) and exp_text.strip():
-                                    texts.append(f"Experience {j}: " + exp_text.strip())
-                            except Exception:
+                            if tuple_data is None:
                                 continue
+                            fetched = _fetch_tuple_step(tuple_data, qid, sk)
+                            if not fetched:
+                                continue
+                            q_text, step_entry = fetched
+                            cur = step_entry.get('current_step')
+                            tot = step_entry.get('total_step')
+                            caption = step_entry.get('Caption') or step_entry.get('caption') or ''
+                            critique = step_entry.get('Critique') or step_entry.get('critique')
+                            abstraction = step_entry.get('Abstraction') or step_entry.get('abstraction')
+                            bvf = step_entry.get('chosen_BVF')
+                            cvf = step_entry.get('chosen_CVF')
+                            outcome = step_entry.get('final_reward')
+
+                            blocks = []
+                            exp_id = j + 1
+                            if inject_experience:
+                                sentence = f"Experience {exp_id}:\n At step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                                if caption:
+                                    sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                                if (bvf is not None and cvf is not None):
+                                    sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                                elif (bvf is not None):
+                                    sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                                elif (cvf is not None):
+                                    sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                                if outcome is not None:
+                                    sentence += f"and the outcome of that trial was {outcome}."
+                                blocks.append(sentence.strip())
+                            else:
+                                blocks.append(f"Experience {exp_id}:")
+
+                            if inject_critique and isinstance(critique, str) and critique.strip():
+                                blocks.append("")
+                                blocks.append(f"Critique: {critique}")
+                            if inject_abstraction and isinstance(abstraction, str) and abstraction.strip():
+                                blocks.append("")
+                                blocks.append(f"Abstraction: {abstraction}")
+                            texts.append("\n".join(blocks))
                         return "\n\n".join(texts) if texts else None
             except Exception as e:
                 logging.warning(f"[VecRetrieve] sim(vecimg) branch failed: {e}")
@@ -632,222 +1200,104 @@ def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None
                     selected.append({'question_id': qid, 'step_key': sk, 'level': m.get('level')})
                     if len(selected) >= max(1, top_k):
                         break
-                # 回取 experience
-                exp = _load_experience(cfg)
+                # 日志：选用的 question 与 id
+                try:
+                    qmap = _load_questions_en()
+                    logging.info(f"[VecRetrieve][random] chosen {len(selected)} candidate(s):")
+                    for i, cand in enumerate(selected, 1):
+                        qid = cand.get('question_id')
+                        qtext = qmap.get(qid, 'N/A')
+                        logging.info(f"  #{i}: qid={qid} | question={_shorten(qtext, 180)}")
+                except Exception:
+                    pass
+                # 使用 exp_tuple_path 拼接 Experience/Critique/Abstraction（与 sim/question-first 分支保持一致）
+                try:
+                    if isinstance(exp_tuple_path, str) and len(exp_tuple_path) > 0 and os.path.exists(exp_tuple_path):
+                        with open(exp_tuple_path, 'r', encoding='utf-8') as _f:
+                            tuple_data = json.load(_f)
+                    else:
+                        tuple_data = None
+                except Exception:
+                    tuple_data = None
+
+                def _fetch_tuple_step(_data, _qid, _step_key):
+                    if not isinstance(_data, dict):
+                        return None
+                    # 顶层 qid
+                    if _qid in _data and isinstance(_data[_qid], dict):
+                        qnode = _data[_qid]
+                    else:
+                        qnode = None
+                        for _, bucket in _data.items():
+                            if isinstance(bucket, dict) and _qid in bucket:
+                                qnode = bucket.get(_qid)
+                                break
+                    if not isinstance(qnode, dict):
+                        return None
+                    q_text = qnode.get('question', '')
+                    steps = qnode.get('steps') if isinstance(qnode.get('steps'), dict) else qnode
+                    step_entry = None
+                    if isinstance(steps, dict):
+                        step_entry = steps.get(_step_key)
+                    if not isinstance(step_entry, dict):
+                        return None
+                    return q_text, step_entry
+
                 texts = []
                 for j, cand in enumerate(selected):
+                    if tuple_data is None:
+                        continue
                     qid = cand.get('question_id')
                     sk = cand.get('step_key')
-                    exp_text = None
-                    try:
-                        for ep_id, qdict in exp.items():
-                            if not isinstance(qdict, dict):
-                                continue
-                            qinfo = qdict.get(qid)
-                            if not isinstance(qinfo, dict):
-                                continue
-                            steps = qinfo.get('steps', {})
-                            if not isinstance(steps, dict):
-                                continue
-                            step_entry = steps.get(sk, {})
-                            if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
-                                exp_text = step_entry['experience']
-                                break
-                        if isinstance(exp_text, str) and exp_text.strip():
-                            texts.append(f"Experience {j}: " + exp_text.strip())
-                    except Exception:
+                    fetched = _fetch_tuple_step(tuple_data, qid, sk)
+                    if not fetched:
                         continue
+                    q_text, step_entry = fetched
+                    cur = step_entry.get('current_step')
+                    tot = step_entry.get('total_step')
+                    caption = step_entry.get('Caption') or step_entry.get('caption') or ''
+                    critique = step_entry.get('Critique') or step_entry.get('critique')
+                    abstraction = step_entry.get('Abstraction') or step_entry.get('abstraction')
+                    bvf = step_entry.get('chosen_BVF')
+                    cvf = step_entry.get('chosen_CVF')
+                    outcome = step_entry.get('final_reward')
+
+                    blocks = []
+                    exp_id = j + 1
+                    if inject_experience:
+                        sentence = f"Experience {exp_id}: \nAt step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                        if caption:
+                            sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                        if (bvf is not None and cvf is not None):
+                            sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                        elif (bvf is not None):
+                            sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                        elif (cvf is not None):
+                            sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                        if outcome is not None:
+                            sentence += f"and the outcome of that trial was {outcome}."
+                        blocks.append(sentence.strip())
+                    else:
+                        blocks.append(f"Experience {exp_id}:")
+
+                    if inject_critique and isinstance(critique, str) and critique.strip():
+                        blocks.append("")
+                        blocks.append(f"Critique: {critique}")
+                    if inject_abstraction and isinstance(abstraction, str) and abstraction.strip():
+                        blocks.append("")
+                        blocks.append(f"Abstraction: {abstraction}")
+                    texts.append("\n".join(blocks))
+
                 return "\n\n".join(texts) if texts else None
             except Exception as e:
                 logging.warning(f"[VecRetrieve][random] failed: {e}")
 
     # 没有其他可用策略，返回 None
+        return None
+
+    # 预解码：载入索引并提取 bits（已弃用 ahash 路径；sim 仅使用 CLIP，提前返回）
     return None
-
-    # 预解码：索引 bits
-    idx_bits = {}
-    idx_meta = {}
-    for rel_key, rec in index_map.items():
-        if not isinstance(rec, dict):
-            continue
-        qid = rec.get('question_id')
-        sk = rec.get('step_key')
-        if not qid or not sk:
-            continue
-        if exclude_question_id and qid == exclude_question_id:
-            continue
-        bits_list = rec.get('bits')
-        if not isinstance(bits_list, list):
-            continue
-        try:
-            bits = np.asarray(bits_list, dtype=np.uint8).reshape(-1)
-        except Exception:
-            continue
-        idx_bits[rel_key] = bits
-        idx_meta[rel_key] = {
-            'episode_id': None,            # 不依赖 episode 过滤，统一从 experience 里回取
-            'question_id': qid,
-            'step_key': sk,
-            'level': rec.get('level'),
-            'filename_rel': os.path.join('frontier', rec.get('filename', '')),
-        }
-
-    # 预解码：目标 bits
-    target_bits_list = []
-    for b64 in frontier_imgs_b64:
-        bits = _pil_bits_from_b64(b64)
-        if bits is not None:
-            target_bits_list.append(bits)
-    if not target_bits_list:
-        return None
-
-    # per-frontier：取去重后的 top-5 (qid, step_key)
-    merged_candidates = []
-    for i, tbits in enumerate(target_bits_list):
-        # 对全索引计算最大相似度（与所有目标 bits 中的最大）
-        per_scores = []
-        for rel_key, cbits in idx_bits.items():
-            try:
-                sim = float(_similarity(cbits, tbits))
-            except Exception:
-                continue
-            meta = idx_meta[rel_key]
-            per_scores.append({
-                'similarity': sim,
-                **meta,
-                'source_frontier_index': i,
-            })
-        if not per_scores:
-            continue
-        per_scores.sort(key=lambda x: x['similarity'], reverse=True)
-        # 去重 top-5
-        seen = set()
-        kept = []
-        for cand in per_scores:
-            key = (cand['question_id'], cand['step_key'])
-            if key in seen:
-                continue
-            seen.add(key)
-            kept.append(cand)
-            if len(kept) >= 5:
-                break
-        merged_candidates.extend(kept)
-
-    if not merged_candidates:
-        return None
-
-    # 全局去重（按 (qid, step) 保留相似度最高的图像分数）
-    best_by_key = {}
-    for cand in merged_candidates:
-        key = (cand['question_id'], cand['step_key'])
-        prev = best_by_key.get(key)
-        if prev is None or float(cand['similarity']) > float(prev['similarity']):
-            best_by_key[key] = cand
-    merged_unique = list(best_by_key.values())
-    # 基于英文问题文本计算文本相似度
-    qid2question = _load_questions_en()
-    image_sorted = sorted(merged_unique, key=lambda x: x['similarity'], reverse=True)
-    text_scores = {}
-    if isinstance(current_question, str) and current_question.strip():
-        for cand in merged_unique:
-            qid = cand.get('question_id')
-            qtext = qid2question.get(qid, '')
-            text_scores[(cand.get('question_id'), cand.get('step_key'))] = _cosine_sim_tokens(current_question, qtext)
-    else:
-        for cand in merged_unique:
-            text_scores[(cand.get('question_id'), cand.get('step_key'))] = 0.0
-
-    text_sorted = sorted(merged_unique, key=lambda x: text_scores[(x.get('question_id'), x.get('step_key'))], reverse=True)
-    # RRF 前的统计日志
-    try:
-        qtext_coverage = sum(1 for cand in merged_unique if qid2question.get(cand.get('question_id')))
-        qsim_values = [text_scores[(c.get('question_id'), c.get('step_key'))] for c in merged_unique]
-        nonzero_qsim = [v for v in qsim_values if v > 0]
-        nz_count = len(nonzero_qsim)
-        nz_mean = (sum(nonzero_qsim) / nz_count) if nz_count > 0 else 0.0
-        nz_max = max(nonzero_qsim) if nz_count > 0 else 0.0
-        logging.info(
-            f"[SimpleRecall][RRF] candidates={len(merged_unique)} | qtext_coverage={qtext_coverage} | nonzero_qsim={nz_count} | qsim_mean={nz_mean:.4f} | qsim_max={nz_max:.4f} | rrf_k={rrf_k}"
-        )
-        # 各自通道的前 top_k 摘要
-        log_n = min(max(1, top_k), len(image_sorted))
-        if log_n > 0:
-            logging.info(f"[SimpleRecall][RRF] image-only ranking (top {log_n}):")
-            for rank, cand in enumerate(image_sorted[:log_n]):
-                logging.info(
-                    f"  #{rank+1}: img_sim={cand.get('similarity', 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')}"
-                )
-            logging.info(f"[SimpleRecall][RRF] text-only ranking (top {log_n}):")
-            for rank, cand in enumerate(text_sorted[:log_n]):
-                key = (cand.get('question_id'), cand.get('step_key'))
-                logging.info(
-                    f"  #{rank+1}: qsim={text_scores.get(key, 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')}"
-                )
-    except Exception:
-        pass
-    # 计算 RRF 分数：score = 1/(k + rank_img) + 1/(k + rank_txt)
-    rank_img = { (c.get('question_id'), c.get('step_key')): i+1 for i, c in enumerate(image_sorted) }
-    rank_txt = { (c.get('question_id'), c.get('step_key')): i+1 for i, c in enumerate(text_sorted) }
-    for cand in merged_unique:
-        key = (cand.get('question_id'), cand.get('step_key'))
-        ri = rank_img.get(key, len(image_sorted) + 1)
-        rt = rank_txt.get(key, len(text_sorted) + 1)
-        cand['rrf_score'] = (1.0 / (rrf_k + ri)) + (1.0 / (rrf_k + rt))
-        cand['qsim'] = text_scores.get(key, 0.0)
-    # 打印融合后排行（仅 top_k）
-    final_sorted = sorted(merged_unique, key=lambda x: x.get('rrf_score', 0.0), reverse=True)
-    try:
-        logging.info(f"[SimpleRecall] final candidate pool size={len(merged_unique)}, strategy={strategy}, request_top_k={top_k}")
-        log_n = min(max(1, top_k), len(final_sorted))
-        if log_n > 0:
-            logging.info(f"[SimpleRecall] fused ranking by RRF (top {log_n}):")
-        for rank, cand in enumerate(final_sorted[:log_n]):
-            logging.info(
-                f"  #{rank+1}: rrf={cand.get('rrf_score', 0.0):.6f} | img_sim={cand.get('similarity', 0.0):.4f} | qsim={cand.get('qsim', 0.0):.4f} | src_idx={cand.get('source_frontier_index')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')}"
-            )
-    except Exception:
-        pass
-
-    if (strategy or 'sim') == 'random':
-        k = min(max(1, top_k), len(merged_unique))
-        final_selected = random.sample(merged_unique, k) if k > 0 else []
-    else:
-        final_selected = final_sorted[: max(1, top_k)]
-
-    # 回取 experience 文本
-    exp = _load_experience(cfg)
-    texts = []
-    for j, cand in enumerate(final_selected):
-        qid = cand.get('question_id')
-        sk = cand.get('step_key')
-        exp_text = None
-        # 不知道 episode_id 时，穷举查找一次（字典层级通常不大）
-        try:
-            for ep_id, qdict in exp.items():
-                if not isinstance(qdict, dict):
-                    continue
-                qinfo = qdict.get(qid)
-                if not isinstance(qinfo, dict):
-                    continue
-                steps = qinfo.get('steps', {})
-                if not isinstance(steps, dict):
-                    continue
-                step_entry = steps.get(sk, {})
-                if isinstance(step_entry, dict) and isinstance(step_entry.get('experience'), str):
-                    exp_text = step_entry['experience']
-                    break
-            if isinstance(exp_text, str) and exp_text.strip():
-                texts.append(f"Experience {j}: " + exp_text.strip())
-        except Exception:
-            continue
-        try:
-            logging.info(
-                f"[SimpleRecall] selected #{j+1}: rrf={cand.get('rrf_score', 0.0):.6f} | img_sim={cand.get('similarity', 0.0):.4f} | qsim={cand.get('qsim', 0.0):.4f} | src_idx={cand.get('source_frontier_index')} | qid={qid} | step={sk} | lvl={cand.get('level')}"
-            )
-        except Exception:
-            continue
-
-    return "\n\n".join(texts) if texts else None
+    
 
 
 def format_explore_prompt(
@@ -936,10 +1386,11 @@ def format_explore_prompt_frontier(
     context=None,       # Experience replay text (cross-episode, similar-scene summaries)
     episodic_con=None,  # Episodic context text (this episode: recent steps/path & seen/unseen summary)
     frontier_type: str = "BVF",  # "BVF" for broad-view (layer0) or "CVF" for closer-view (layer1)
+    use_traj_abstraction: bool = False,  # when True, use TRAJECTORY ABSTRACTION instead of EXPERIENCE REPLAY
 ):
     """
     Frontier-selection prompt with explicit Step 0/1/2/3 and FINAL:
-      - Clear semantics (Frontier / Episodic / Experience).
+      - Clear semantics (Frontier / Episodic / Experience or Trajectory Abstraction).
       - Optional blocks via has_episodic / has_experience.
       - Strict index-only discipline.
       - Reason first, answer last; FINAL line prints only: 'frontier i'.
@@ -954,6 +1405,22 @@ def format_explore_prompt_frontier(
     # System role & definitions (based on user's template)
     # =========================
     label_word = "BVF" if str(frontier_type).upper() == "BVF" else "CVF"
+    # Context label & description switch
+    context_label = "TRAJECTORY ABSTRACTION" if bool(use_traj_abstraction) else "EXPERIENCE REPLAY"
+    if bool(use_traj_abstraction):
+        context_desc = (
+            "TRAJECTORY ABSTRACTION (if present): High-level, question-specific strategies distilled from past trajectories of similar tasks. "
+            "It provides concise guidance on which areas to prioritize or avoid for effective exploration, without low-level captions or critiques. "
+            "Each abstraction consists of two parts: (1) Environment Dynamics—describes the spatial layout, key regions, and physical structure of the environment; "
+            "(2) Decision-making Skills—provides actionable strategies and heuristics for navigating and making effective decisions in that specific environment type. "
+            "Use Environment Dynamics to understand the scene structure, and apply Decision-making Skills as guiding principles for frontier selection.\n\n"
+        )
+    else:
+        context_desc = (
+            "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, "
+            "which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
+        )
+
     sys_prompt = (
         "You are an embodied agent for exploration in an indoor environment to answer a question. "
         "At each step of exploration, you will be given frontier snapshots of your surrounding environment; your task is to pick EXACTLY ONE frontier to move to for further exploration or solving the question.\n\n"
@@ -963,10 +1430,10 @@ def format_explore_prompt_frontier(
         "You SHALL pick EXACTLY ONE BVF to look closer. With the selected BVF, you DO NOT move; you further break down that direction into Closer-View Frontiers (CVF), which give narrowed perspectives. "
         "You SHALL pick EXACTLY ONE CVF to move to in the next step.\n\n"
         "You will also be given the following information as contexts:\n"
-        "EGOCENTRIC VIEW (if shown): The agent’s immediate forward-looking camera view; use it as local context only.\n"
+        "EGOCENTRIC VIEW (if shown): The agent's immediate forward-looking camera view; use it as local context only.\n"
         "EPISODIC CONTEXT (if present): A factual textual summary of the previous steps within THIS episode (visited path, observations, likely-unseen areas). "
         "Use this to avoid redundancy and prefer novel, informative directions. It is evidence, not a command.\n"
-        "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
+        f"{context_desc}"
         "RULES:\n"
         "- You will only be given either BVFs or CVFs at a time (BVF for looking closer; CVF for moving next).\n"
         "- Your reasoning must be concrete and visual. Name specific objects, layouts, textures, lighting, text-bearing surfaces/symbols, and any cues directly relevant to the question.\n"
@@ -977,58 +1444,49 @@ def format_explore_prompt_frontier(
     content = []
 
     # =========================
-    # Frontier candidates
+    # 按用户模板重排 Content
     # =========================
-    content.append((f"You are given the following frontiers ({frontier_type} only at this step):",))
-    if len(frontier_imgs) == 0:
-        content.append(("No frontier is available.",))
-    else:
-        for i in range(len(frontier_imgs)):
-            content.append((f"{label_word} {i}", frontier_imgs[i]))
-
-    # =========================
-    # Egocentric (optional)
-    # =========================
-    if has_ego:
-        content.append(("Egocentric forward view (immediate local context):", egocentric_imgs[-1]))
-
-    # =========================
-    # Episodic context (optional)
-    # =========================
-    if has_episodic:
-        content.append((
-            "Episodic context — summary of the recent steps within THIS episode (path you followed, what you observed, "
-            "what seems already covered vs. still unexplored). Use this to avoid redundancy and to prefer novel, decision-relevant directions:\n"
-            + episodic_con.strip(),
-        ))
-
-    # =========================
-    # Experience replay (optional)
-    # =========================
-    if has_experience:
-        content.append((
-            "Experience replay — knowledge from OTHER episodes in similar scenes. It may include 'Critique:' (what happened) and 'Abstraction:' (a simple rule). "
-            "Use the Abstraction as a transferable hint for this scene. Extract only transferable visual patterns/strategies and prefer the current visible evidence when conflicts arise:\n"
-            + context.strip(),
-        ))
-
-    # =========================
-    # Question
-    # =========================
+    # 1) Question 开头
     q_text = f"Now you need to answer the question: {question}"
     if image_goal is not None:
         content.append((q_text, image_goal))
     else:
         content.append((q_text,))
 
-    # =========================
-    # Minimal reasoning scaffold consistent with user's instruction
-    # =========================
+    # 2) Frontier 列表
+    content.append(("You are given following frontier:",))
+    if len(frontier_imgs) == 0:
+        content.append(("No frontier is available.",))
+    else:
+        for i in range(len(frontier_imgs)):
+            content.append((f"{label_word} {i}:", frontier_imgs[i]))
+
+    # 3) Episodic Context（可选）
+    if has_ego:
+        content.append(("Egocentric forward view (immediate local context):", egocentric_imgs[-1]))
+    if has_episodic:
+        content.append(("\nEPISODIC CONTEXT:",))
+        content.append((episodic_con.strip(),))
+
+    # 4) EXPERIENCE REPLAY 或 TRAJECTORY ABSTRACTION（根据模式选择）
+    if has_experience:
+        content.append((f"\n{context_label}:",))
+        content.append((context.strip(),))
+
+    # 5) 最后给出行为指令
     guidance = (
-        "IMPORTANT: You MUST reason step by step using ONLY the provided frontiers (Step 1, Step 2, ...), and do NOT skip steps. "
-        "Use the contexts (EPISODIC/EXPERIENCE) if present to avoid redundancy and transfer useful cues. "
-        f"Output the rationale first and the answer last. On the final line, print ONLY '{label_word} i'."
+        f"Now reason in steps before making your choice. "
+        "Step 0: restate the task in your own words and confirm you are choosing exactly one frontier of the given type. "
+        "Step 1: from EPISODIC CONTEXT (if present), briefly state which areas are already explored and which remain unseen. "
+        + (
+            "Step 2: analyze all TRAJECTORY ABSTRACTION entries (if present). Extract 1–2 concise directive rules that give specific, problem-focused guidance for the current question. "
+            if bool(use_traj_abstraction)
+            else "Step 2: analyze all EXPERIENCE REPLAY entries (if present). For each, note the chosen frontier, the outcome, and the critique. Then integrate them into 1–2 concise directive rules that give specific, problem-focused guidance for the current question. "
+        )
+        + "Step 3: compare the current frontiers one by one using visual cues, novelty, and alignment with these directive rules, then decide on the best option. "
+        f"On the final line, print ONLY '{label_word} i'."
     )
+
     content.append((guidance,))
 
     return sys_prompt, content
@@ -1260,6 +1718,120 @@ def _shorten(text: str, max_len: int = 400) -> str:
     t = text.strip()
     return (t[:max_len] + " ...") if len(t) > max_len else t
 
+
+def build_experience_replay_from_tuple(
+    exp_tuple_path: Optional[str],
+    question_id: Optional[str],
+    default_question: Optional[str] = None,
+    inject_experience: bool = True,
+    inject_critique: bool = True,
+    inject_abstraction: bool = True,
+) -> Optional[str]:
+    """
+    从 exp_tuple json 中读取指定 question_id 的各 step 信息，生成 EXPERIENCE REPLAY 文本。
+
+    兼容两种结构：
+    1) 顶层直接以 question_id 作为键，值中包含 "question" 与多个 "step_*"。
+    2) 顶层为 episode 映射，再到 question_id，值中包含 "question" 与 "steps" 字段。
+    """
+    try:
+        if not exp_tuple_path or not os.path.exists(exp_tuple_path) or not question_id:
+            return None
+        with open(exp_tuple_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        qnode = None
+        # 结构1：顶层 question_id
+        if isinstance(data, dict) and question_id in data:
+            qnode = data.get(question_id)
+        # 结构2：顶层 episode -> question_id -> {question, steps}
+        if qnode is None and isinstance(data, dict):
+            for _, bucket in data.items():
+                if isinstance(bucket, dict) and question_id in bucket:
+                    qnode = bucket.get(question_id)
+                    break
+
+        if not isinstance(qnode, dict):
+            return None
+
+        q_text = qnode.get("question", default_question or "")
+
+        # 可能有两种存储：直接多个 step_* 或统一 steps 字段
+        steps_obj = None
+        if "steps" in qnode and isinstance(qnode["steps"], dict):
+            steps_obj = qnode["steps"]
+        else:
+            # 收集所有 step_*
+            steps_obj = {k: v for k, v in qnode.items() if isinstance(v, dict) and k.startswith("step_")}
+
+        if not steps_obj:
+            return None
+
+        # 按 step 序号排序
+        def _step_order(k: str) -> int:
+            try:
+                return int(k.split("_")[-1])
+            except Exception:
+                return 0
+
+        lines = []
+        for idx, step_key in enumerate(sorted(steps_obj.keys(), key=_step_order), start=1):
+            s = steps_obj.get(step_key) or {}
+            cur = s.get("current_step")
+            tot = s.get("total_step")
+            caption = s.get("Caption") or s.get("caption") or ""
+            critique = s.get("Critique") or s.get("critique")
+            abstraction = s.get("Abstraction") or s.get("abstraction")
+            bvf = s.get("chosen_BVF")
+            cvf = s.get("chosen_CVF")
+            outcome = s.get("final_reward") or qnode.get("final_reward")
+
+            # 若三项全关，则跳过该 step
+            if not (inject_experience or inject_critique or inject_abstraction):
+                continue
+
+            # 经验编号统一使用顺序编号 1..K，避免 current_step 不连续导致编号缺失
+            exp_id = idx
+
+            # 组块1：Caption tuple（可关，润色用词）
+            if inject_experience:
+                sentence = f"Experience {exp_id}: \nAt step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                if caption:
+                    sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                if (bvf is not None and cvf is not None):
+                    sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                elif (bvf is not None):
+                    sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                elif (cvf is not None):
+                    sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                if outcome is not None:
+                    sentence += f"and the outcome of that trial was {outcome}."
+                lines.append(sentence.strip())
+            else:
+                # 若关闭 caption 仍保留 Experience 分组标题，便于阅读分块
+                lines.append(f"Experience {exp_id}:")
+
+            # 组块2：Critique（可关，按要求前置换行并以 'Critique:' 开头）
+            if inject_critique and critique:
+                lines.append("")
+                lines.append(f"Critique: {critique}")
+
+            # 组块3：Abstraction（可关，按要求前置换行并以 'Abstraction:' 开头）
+            if inject_abstraction and abstraction:
+                lines.append("")
+                lines.append(f"Abstraction: {abstraction}")
+            # 空行分隔不同 experience
+            lines.append("")
+
+        text = "\n".join(lines).strip()
+        return text if text else None
+    except Exception as e:
+        try:
+            logging.info(f"[ExpTuple] build failed for qid={question_id}: {e}")
+        except Exception:
+            pass
+        return None
+
 def aggregate_recall_contexts_for_layer(
     layer_alias: str,        # 用自然词，比如 "initial directions" / "closer looks"
     contexts: list,          # List[Optional[str]]，与候选对齐
@@ -1390,7 +1962,17 @@ def frontier_context(
 
 
 
-def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
+def explore_step(
+    step,
+    cfg,
+    verbose=False,
+    chosen_frontier_path=None,
+    step_idx=None,
+    exp_tuple_path: Optional[str] = None,
+    inject_experience: bool = False,
+    inject_critique: bool = False,
+    inject_abstraction: bool = False,
+):
     step["use_prefiltering"] = cfg.prefiltering
     step["top_k_categories"] = cfg.top_k_categories
     (
@@ -1436,7 +2018,11 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         print(f"Snapshot images available: {len(snapshot_imgs)}")
         retry_bound = 3
         for _ in range(retry_bound):
-            full_response = call_openai_api(sys_prompt, content)
+            full_response = call_openai_api(
+                sys_prompt,
+                content,
+                seed=(int(getattr(cfg, "chat_seed")) if hasattr(cfg, "chat_seed") and getattr(cfg, "chat_seed") is not None else None)
+            )
             if full_response is None:
                 print("call_openai_api (snapshot) returns None, retrying")
                 continue
@@ -1474,7 +2060,21 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
     # ==== (NEW) Layer-0 回忆与聚合（只对初始方向层做） ====
     _replay_top = int(getattr(cfg, "replay_top", 1))
-    if _replay_top > 0:
+    # 注入阶段开关：""/None → 两层都注入；"bvf" → 仅 layer0；"cvf" → 仅 layer1
+    try:
+        # prefer cfg.exp_at; fallback to cfg.replay_at -> cfg.inject_stage for compatibility
+        _stage_flag = getattr(cfg, "exp_at", None)
+        if _stage_flag is None or (isinstance(_stage_flag, str) and _stage_flag.strip() == ""):
+            _stage_flag = getattr(cfg, "replay_at", None)
+        if _stage_flag is None or (isinstance(_stage_flag, str) and _stage_flag.strip() == ""):
+            _stage_flag = getattr(cfg, "inject_stage", "")
+        _stage_flag = str(_stage_flag or "").strip().lower()
+    except Exception:
+        _stage_flag = ""
+    _inject_layer0 = (_stage_flag in ("", "bvf"))
+    _inject_layer1 = (_stage_flag in ("", "cvf"))
+
+    if _replay_top > 0 and _inject_layer0:
         # 使用本文件中的最简实现（不依赖 context_generator）
         step["replay_layer0_aggregated_context"] = simple_recall_and_aggregate(
             frontier_imgs_b64=frontier_imgs_0,
@@ -1482,37 +2082,57 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             exclude_question_id=step.get("question_id"),
             top_k=_replay_top,
             strategy=(
-                "random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"
+                "traj_random" if str(getattr(cfg, "replay_mode", "sim")).startswith("traj_random") else (
+                    "traj_sim" if str(getattr(cfg, "replay_mode", "sim")).startswith("traj") else (
+                        "random" if getattr(cfg, "replay_mode", "sim") == "random" else (
+                            "question-first" if getattr(cfg, "replay_mode", "sim") == "question-first" else "sim"
+                        )
+                    )
+                )
             ),
             current_question=question,
+            exp_tuple_path=exp_tuple_path,
+            inject_experience=bool(inject_experience),
+            inject_critique=bool(inject_critique),
+            inject_abstraction=bool(inject_abstraction),
         )
     else:
         step["replay_layer0_aggregated_context"] = None
-        logging.info("[ReplayCtx] replay_top=0; skip layer0 recall and env context injection.")
+        if _replay_top <= 0:
+            logging.info("[ReplayCtx] replay_top=0; skip layer0 recall and env context injection.")
+        elif not _inject_layer0:
+            logging.info("[ReplayCtx] replay_at=cvf; skip layer0 (BVF) env context injection.")
 
 
     episodic_con = None
     if not os.path.exists(chosen_frontier_path):
         os.makedirs(chosen_frontier_path, exist_ok=True)
 
-    png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
-    if len(png_files) > 0:
-        sys_prompt, content = frontier_context(chosen_frontier_path)
-        episodic_con = call_openai_api(sys_prompt, content)
-        logging.info(f"Froncon label: {episodic_con}")
-
+    # 允许通过 cfg.use_episodic_context 显式关闭 episodic context
+    if bool(getattr(cfg, "use_episodic_context", True)):
+        png_files = [f for f in os.listdir(chosen_frontier_path) if f.endswith('.png')]
+        if len(png_files) > 0:
+            sys_prompt, content = frontier_context(chosen_frontier_path)
+            episodic_con = call_openai_api(
+                sys_prompt,
+                content,
+                seed=(int(getattr(cfg, "chat_seed")) if hasattr(cfg, "chat_seed") and getattr(cfg, "chat_seed") is not None else None)
+            )
+            logging.info(f"Froncon label: {episodic_con}")
     else:
-        pass
+        logging.info("[EpisodicCtx] Disabled by cfg.use_episodic_context=False")
 
 
 
-    layer0_con = step.get("replay_layer0_aggregated_context") if _replay_top > 0 else None
+    # 当 _replay_top=0 或禁用 layer0 注入时，不注入任何 experience（env recall）
+    layer0_con = step.get("replay_layer0_aggregated_context") if (_replay_top > 0 and _inject_layer0) else None
     try:
         logging.info(f"[ReplayCtx] layer0 aggregated context len: {len(layer0_con) if isinstance(layer0_con, str) else 'None'}")
     except Exception:
         pass
 
     # ------- Step 2.1: 先让VLM在layer0大簇里选 -------
+    # 经验文本统一通过 simple_recall_and_aggregate 基于检索候选 (qid, step) 从 exp_tuple 中回取
     sys_prompt, content = format_explore_prompt_frontier(
         question,
         egocentric_imgs,
@@ -1523,8 +2143,9 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         use_snapshot_class=True,
         image_goal=image_goal,
         context=(layer0_con if _replay_top > 0 else None),
-        episodic_con=episodic_con,
+        episodic_con=(episodic_con if bool(getattr(cfg, "use_episodic_context", True)) else None),
         frontier_type="BVF",
+        use_traj_abstraction=bool(str(getattr(cfg, "replay_mode", "sim")).startswith("traj")),
     )
     if verbose:
         try:
@@ -1543,7 +2164,11 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
     idx0 = None
     for _ in range(retry_bound):
-        full_response = call_openai_api(sys_prompt, content)
+        full_response = call_openai_api(
+            sys_prompt,
+            content,
+            seed=(int(getattr(cfg, "chat_seed")) if hasattr(cfg, "chat_seed") and getattr(cfg, "chat_seed") is not None else None)
+        )
         if full_response is None:
             print("call_openai_api (frontier layer0) returns None, retrying")
             continue
@@ -1590,7 +2215,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
 
 
-        # —— 对该方向下的“更近处视角”子集做聚合（indices 为全局 layer1 索引） ——
+        # —— 对该方向下的"更近处视角"子集做聚合（indices 为全局 layer1 索引） ——
         layer1_texts_all = step.get("replay_context_text_per_frontier", {}).get("layer1", [])
         layer1_context_text = None
         if layer1_texts_all and isinstance(layer1_indices, list) and len(layer1_indices) > 0:
@@ -1603,7 +2228,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
 
         # ==== (NEW) 对该方向的更近处子集做回忆与聚合 ====
-        if _replay_top > 0:
+        if _replay_top > 0 and _inject_layer1:
             # 根据选择的大簇子集做同样的最简实现
             subgroup_b64 = [frontier_imgs_1[i] for i in layer1_indices]
             layer1_context_text = simple_recall_and_aggregate(
@@ -1612,13 +2237,26 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 exclude_question_id=step.get("question_id"),
                 top_k=_replay_top,
                 strategy=(
-                    "random" if getattr(cfg, "replay_mode", "sim") == "random" else "sim"
+                    "traj_random" if str(getattr(cfg, "replay_mode", "sim")).startswith("traj_random") else (
+                        "traj_sim" if str(getattr(cfg, "replay_mode", "sim")).startswith("traj") else (
+                            "random" if getattr(cfg, "replay_mode", "sim") == "random" else (
+                                "question-first" if getattr(cfg, "replay_mode", "sim") == "question-first" else "sim"
+                            )
+                        )
+                    )
                 ),
                 current_question=question,
+                exp_tuple_path=exp_tuple_path,
+                inject_experience=bool(inject_experience),
+                inject_critique=bool(inject_critique),
+                inject_abstraction=bool(inject_abstraction),
             )
         else:
             layer1_context_text = None
-            logging.info("[ReplayCtx] replay_top=0; skip layer1 subgroup recall and env context injection.")
+            if _replay_top <= 0:
+                logging.info("[ReplayCtx] replay_top=0; skip layer1 subgroup recall and env context injection.")
+            elif not _inject_layer1:
+                logging.info("[ReplayCtx] replay_at=bvf; skip layer1 (CVF) env context injection.")
 
 
         sys_prompt, content = format_explore_prompt_frontier(
@@ -1630,9 +2268,10 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             egocentric_view=step.get("use_egocentric_views", False),
             use_snapshot_class=True,
             image_goal=image_goal,
-            context=(layer1_context_text if _replay_top > 0 else None),
-            episodic_con=episodic_con,
+            context=(layer1_context_text if (_replay_top > 0 and _inject_layer1) else None),
+            episodic_con=(episodic_con if bool(getattr(cfg, "use_episodic_context", True)) else None),
             frontier_type="CVF",
+            use_traj_abstraction=bool(str(getattr(cfg, "replay_mode", "sim")).startswith("traj")),
         )
         if verbose:
             try:
@@ -1656,7 +2295,11 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         idx1_in_subgroup = None
         final_reason = ""
         for _ in range(retry_bound):
-            full_response = call_openai_api(sys_prompt, content)
+            full_response = call_openai_api(
+                sys_prompt,
+                content,
+                seed=(int(getattr(cfg, "chat_seed")) if hasattr(cfg, "chat_seed") and getattr(cfg, "chat_seed") is not None else None)
+            )
             
             if full_response is None:
                 print("call_openai_api (frontier layer1) returns None, retrying")

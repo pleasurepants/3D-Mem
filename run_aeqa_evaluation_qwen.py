@@ -539,9 +539,12 @@ def append_step_coords_json(
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def main(cfg, start_ratio=0.0, end_ratio=1.0):
+    logging.info("[DEBUG] Starting main function...")
     # load the default concept graph config
+    logging.info("[DEBUG] Loading concept graph config...")
     cfg_cg = OmegaConf.load(cfg.concept_graph_config_path)
     OmegaConf.resolve(cfg_cg)
+    logging.info("[DEBUG] Concept graph config loaded successfully")
 
     img_height = cfg.img_height
     img_width = cfg.img_width
@@ -551,6 +554,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
     np.random.seed(cfg.seed)
 
     # Load dataset
+    logging.info("[DEBUG] Loading questions dataset...")
     questions_list = json.load(open(cfg.questions_list_path, "r"))
     total_questions = len(questions_list)
     # sort the data according to the question id
@@ -562,20 +566,25 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
     ]
     logging.info(f"number of questions after splitting: {len(questions_list)}")
     logging.info(f"question path: {cfg.questions_list_path}")
+    logging.info("[DEBUG] Questions dataset loaded successfully")
 
     # load detection and segmentation models
+    logging.info("[DEBUG] Loading YOLO model...")
     detection_model = YOLOWorld(cfg.yolo_model_name)
     logging.info(f"Load YOLO model {cfg.yolo_model_name} successful!")
 
+    logging.info("[DEBUG] Loading SAM model...")
     sam_predictor = SAM(cfg.sam_model_name)  # UltraLytics SAM
     logging.info(f"Load SAM model {cfg.sam_model_name} successful!")
 
+    logging.info("[DEBUG] Loading CLIP model...")
     clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
         # "ViT-H-14", pretrained="/anvme/workspace/v100dd12-3dmem/model/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin"  # "ViT-H-14", "laion2b_s32b_b79k"
         "ViT-H-14", pretrained=CLIP_PATH + "/open_clip_pytorch_model.bin"
     )
     clip_tokenizer = open_clip.get_tokenizer("ViT-B-32")
     logging.info(f"Load CLIP model successful!")
+    logging.info("[DEBUG] All models loaded successfully")
 
     # Initialize the logger
     logger = Logger(
@@ -587,6 +596,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
     )
 
     # Run all questions
+    logging.info(f"[DEBUG] Starting to process {len(questions_list)} questions...")
     for question_idx, question_data in enumerate(questions_list):
         question_id = question_data["question_id"]
         scene_id = question_data["episode_history"]
@@ -799,6 +809,13 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     logging.info(f"[ReplaySim] Pre-create replay json failed: {e}")
 
                 # query the VLM for the next navigation point, and the reason for the choice
+                # annotate identifiers into cfg for prompt construction
+                try:
+                    cfg.episode_history_id = scene_id
+                    cfg.current_question_id = question_id
+                    cfg.current_question_text = question
+                except Exception:
+                    pass
                 vlm_response = query_vlm_for_response(
                     question=question,
                     scene=scene,
@@ -810,6 +827,10 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
                     step_idx=cnt_step,
                     question_id=question_id,
                     lifelong_json_path=lifelong_json_path,
+                    exp_tuple_path=(args.exp_tuple if isinstance(args.exp_tuple, str) and len(args.exp_tuple) > 0 else None),
+                    inject_experience=(False if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.caption)),
+                    inject_critique=(False if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.critique)),
+                    inject_abstraction=(True if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.abstraction)),
                     # lifelong_context=lifelong_context,
                 )
                 if vlm_response is None:
@@ -988,17 +1009,65 @@ if __name__ == "__main__":
     parser.add_argument("-cf", "--cfg_file", help="cfg file path", default="", type=str)
     parser.add_argument("--start_ratio", help="start ratio", default=0.0, type=float)
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
-    parser.add_argument("--replay_mode", help="replay selection mode: sim or random", default="sim", type=str)
+    parser.add_argument("--replay_mode", help="replay selection mode: sim or random or traj_sim or traj_random", default="sim", type=str)
     parser.add_argument("--replay_top", help="top-k for replay candidates", default=1, type=int)
     parser.add_argument("--retrieve_root", help="external retrieve root; expects replay_step_info.json & experience_output.json inside", default="", type=str)
+    parser.add_argument("--use_episodic_context", help="whether to enable episodic context (0/1)", default=1, type=int)
+    parser.add_argument("--chat_seed", help="random seed for vLLM generation (decoupled from cfg.seed)", default=None, type=int)
+    parser.add_argument("--exp_tuple", help="path to exp_tuple json for EXPERIENCE REPLAY (no default)", default="", type=str)
+    # toggles for injecting experience/critique/abstraction from JSON (default off)
+    _bool = lambda x: str(x).lower() in ("1", "true", "t", "yes", "y")
+    parser.add_argument("--caption", "--experience", dest="caption", help="inject base caption tuple lines", default=False, type=_bool)
+    parser.add_argument("--critique", help="inject critique reflection lines", default=False, type=_bool)
+    parser.add_argument("--abstraction", help="inject abstraction guideline lines", default=False, type=_bool)
+    parser.add_argument("--traj_file", help="trajectory json for traj_* modes (qid -> {question, abstraction, thinking_process})", default="", type=str)
+    # replay injection stage control
+    # preferred flag: --exp_at; aliases: --replay_at / --inject_stage for backward compatibility
+    parser.add_argument("--exp_at", "--replay_at", "--inject_stage", dest="exp_at", help="limit replay injection stage: '' (default, both), 'bvf' (layer0 only), 'cvf' (layer1 only)", default="", type=str)
+    # ppl_rank mode parameter
+    parser.add_argument("--ppl_rank", help="perplexity rank category for filtering: 'low', 'medium', or 'high' (case-insensitive)", default="", type=str)
+    parser.add_argument("--ppl_rank_file", help="path to ppl_rank json file", default="/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json", type=str)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
     # CLI overrides for replay recall behavior
-    cfg.replay_mode = args.replay_mode
+    cfg.replay_mode = str(args.replay_mode).strip().lower()
     cfg.replay_top = args.replay_top
     if args.retrieve_root:
         cfg.retrieve_root = args.retrieve_root
+    # Episodic context toggle
+    cfg.use_episodic_context = bool(args.use_episodic_context)
+    # vLLM per-request seed (independent from cfg.seed)
+    if args.chat_seed is not None:
+        cfg.chat_seed = int(args.chat_seed)
+    # traj_* external file path
+    if args.traj_file:
+        cfg.traj_file = args.traj_file
+    
+    # ppl_rank parameters
+    if args.ppl_rank:
+        cfg.ppl_rank = str(args.ppl_rank).strip().lower()
+        cfg.ppl_rank_file = args.ppl_rank_file
+
+    # normalize inject_stage into cfg (empty -> None)
+    # normalize stage flag (exp_at preferred)
+    try:
+        _stage = str(args.exp_at).strip().lower()
+        if _stage in ("bvf", "cvf"):
+            cfg.exp_at = _stage
+        else:
+            cfg.exp_at = None
+    except Exception:
+        cfg.exp_at = None
+    # backward compatibility mirrors
+    try:
+        cfg.replay_at = cfg.exp_at
+    except Exception:
+        pass
+    try:
+        cfg.inject_stage = cfg.exp_at
+    except Exception:
+        pass
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
@@ -1037,6 +1106,23 @@ if __name__ == "__main__":
     for handler in logging.getLogger().handlers:
         handler.setFormatter(formatter)
 
+    # ppl_rank logging (moved after logging setup)
+    if args.ppl_rank:
+        logging.info(f"[PPL_RANK] Mode enabled: category={cfg.ppl_rank}, file={cfg.ppl_rank_file}")
+
+    # If chat_seed is provided, propagate to environment so all API calls (even without explicit seed) use it
+    try:
+        if hasattr(cfg, 'chat_seed') and cfg.chat_seed is not None:
+            os.environ['VLLM_SEED'] = str(int(cfg.chat_seed))
+    except Exception:
+        pass
+
     # run
     logging.info(f"***** Running {cfg.exp_name} *****")
+    try:
+        logging.info(
+            f"[ChatSeed] chat_seed={getattr(cfg, 'chat_seed', None)} | VLLM_SEED={os.getenv('VLLM_SEED')}"
+        )
+    except Exception:
+        pass
     main(cfg, args.start_ratio, args.end_ratio)
