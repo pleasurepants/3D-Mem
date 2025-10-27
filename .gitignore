@@ -185,3 +185,5 @@ slurm/*.out
 slurm*
 *.slurm
 *.out
+
+data
