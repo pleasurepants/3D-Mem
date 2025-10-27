@@ -148,12 +148,12 @@ def query_vlm_for_response(
     step_dict["image"] = subtask_metadata["image"]
 
     ##
-    # save_snapshot_objects_with_names(
-    #     question_id=subtask_metadata["question_id"],
-    #     snapshot_objects=step_dict["snapshot_objects"],
-    #     object_id_to_name=object_id_to_name,
-    #     json_path=lifelong_json_path,
-    # )
+    save_snapshot_objects_with_names(
+        question_id=subtask_metadata["question_id"],
+        snapshot_objects=step_dict["snapshot_objects"],
+        object_id_to_name=object_id_to_name,
+        json_path=lifelong_json_path,
+    )
 
     # query vlm
     (

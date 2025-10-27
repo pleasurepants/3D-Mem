@@ -150,7 +150,8 @@ def tuple_step_save(
         # saved_result[ep_id][question_id].setdefault("subtask_metadata", subtask_metadata)
 
     # step_key = f"step_{cnt_step}"
-    step_key = f"step_{cnt_step.split('-')[-1]}"    # question_id include subtask_idx
+    subtask_idx, local_idx = re.match(r"task-(\d+)_step-(\d+)", cnt_step).groups()
+    step_key = f"step_{local_idx}"    # question_id include subtask_idx
     saved_result[ep_id][question_id]["steps"][step_key] = {}
 
     # --- dirs ---
@@ -216,16 +217,17 @@ def tuple_step_save(
     }
 
     # -------- memory_snapshots --------
-    # memory_snapshots = {}
-    # if os.path.exists(lifelong_json_path):
-    #     with open(lifelong_json_path, 'r', encoding='utf-8') as f:
-    #         lifelong_data = json.load(f)
-    #     # lifelong_data expected: {question_id: {img_name: obj_list, ...}, ...}
-    #     if question_id in lifelong_data:
-    #         img2objs = lifelong_data[question_id]
-    #         for img_name, obj_list in img2objs.items():
-    #             if img_name.startswith(f"{cnt_step}-"): # TODO: save snapshot objects, save_snapshot_objects_with_names()
-    #                 memory_snapshots[img_name] = obj_list
+    memory_snapshots = {}
+    if os.path.exists(lifelong_json_path):
+        with open(lifelong_json_path, 'r', encoding='utf-8') as f:
+            lifelong_data = json.load(f)
+        # lifelong_data expected: {question_id: {img_name: obj_list, ...}, ...}
+        if question_id in lifelong_data:
+            img2objs = lifelong_data[question_id]
+            for img_name, obj_list in img2objs.items():
+                # if img_name.startswith(f"{cnt_step}-"):
+                if img_name.startswith(f"{subtask_idx}_{local_idx}"):
+                    memory_snapshots[img_name] = obj_list
 
     # saved_result[ep_id][question_id]["steps"][step_key]["memory_snapshots"] = memory_snapshots
 
@@ -535,8 +537,9 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                         semantic_obs = obs["semantic_sensor"]
 
                         # collect all view features
-                        obs_file_name = f"{global_step}-view_{view_idx}.png"
-                        # TODO: change to "task-{subtask_idx}_step-{cnt_step}"? 
+                        # obs_file_name = f"{global_step}-view_{view_idx}.png"
+                        obs_file_name = f"{subtask_idx}_{cnt_step}_{global_step}-view_{view_idx}.png"
+                        # change to "task-{subtask_idx}_step-{cnt_step}"
                         with torch.no_grad():
                             # Concept graph pipeline update
                             annotated_rgb, added_obj_ids, target_obj_id_mapping = (
