@@ -298,8 +298,11 @@ class Logger:
             for results_path in all_results_paths:
                 with open(results_path, "rb") as f:
                     all_results.update(pickle.load(f))
+            # fix nan values
+            result_values = list(all_results.values())
+            result_values = result_values[~np.isnan(result_values)]
             logging.info(
-                f"Total {filename} results: {100 * np.mean(list(all_results.values())):.2f}, len: {len(all_results)}"
+                f"Total {filename} results: {100 * np.mean(result_values):.2f}, len: {len(result_values)}, nan_count: {len(all_results) - len(result_values)}"
             )
             with open(os.path.join(self.output_dir, f"{filename}.pkl"), "wb") as f:
                 pickle.dump(all_results, f)
@@ -317,8 +320,10 @@ class Logger:
                             all_results[task_name] = []
                         all_results[task_name] += task_res
             for task_name, task_res in all_results.items():
+                # fix nan values
+                task_res_filtered = task_res[~np.isnan(task_res)]
                 logging.info(
-                    f"Total {filename} results for {task_name}: {100 * np.mean(task_res):.2f}, len: {len(task_res)}"
+                    f"Total {filename} results for {task_name}: {100 * np.mean(task_res_filtered):.2f}, len: {len(task_res_filtered)}, nan_count: {len(task_res) - len(task_res_filtered)}"
                 )
             with open(os.path.join(self.output_dir, f"{filename}.pkl"), "wb") as f:
                 pickle.dump(all_results, f)
@@ -397,7 +402,7 @@ class Logger:
             / max(gt_subtask_explore_dist, self.subtask_explore_dist)
         )
 
-        self.success_by_task[goal_type].append(self.success_by_distance[subtask_id])
+        self.success_by_task[goal_type].append(self.success_by_distance[subtask_id])    # use _by_distance
         self.spl_by_task[goal_type].append(self.spl_by_distance[subtask_id])
 
         logging.info(
@@ -407,6 +412,7 @@ class Logger:
             f"Subtask spl by snapshot: {self.spl_by_snapshot[subtask_id]}, spl by distance: {self.spl_by_distance[subtask_id]}"
         )
 
+        # running average
         logging.info(
             f"Success rate by snapshot: {100 * np.mean(np.asarray(list(self.success_by_snapshot.values()))):.2f}"
         )
