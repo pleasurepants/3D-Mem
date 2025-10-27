@@ -432,18 +432,20 @@ def format_explore_prompt_frontier(
     # =========================
     # Frontier candidates
     # =========================
-    content.append((f"You are given the following frontiers ({frontier_type} only at this step):",))
+    content.append((f"You are given the following frontiers ({frontier_type} only at this step):\n",))
     if len(frontier_imgs) == 0:
-        content.append(("No frontier is available.",))
+        content.append(("No frontier is available.\n",))
     else:
         for i in range(len(frontier_imgs)):
-            content.append((f"{label_word} {i}", frontier_imgs[i]))
+            content.append((f"{label_word} {i} ", frontier_imgs[i]))
+            content.append(("\n",))
 
     # =========================
     # Egocentric (optional)
     # =========================
     if has_ego:
-        content.append(("Egocentric forward view (immediate local context):", egocentric_imgs[-1]))
+        content.append(("Egocentric forward view (immediate local context): ", egocentric_imgs[-1]))
+        content.append(("\n",))
 
     # =========================
     # Episodic context (optional)
@@ -471,8 +473,9 @@ def format_explore_prompt_frontier(
     q_text = f"Now you need to answer the question: {question}"
     if image_goal is not None:
         content.append((q_text, image_goal))
+        content.append(("\n",))
     else:
-        content.append((q_text + " ",))
+        content.append((q_text + "\n",))
         
     # =========================
     # Minimal reasoning scaffold consistent with user's instruction
