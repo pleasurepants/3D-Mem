@@ -504,3 +504,76 @@ if __name__ == "__main__":
     main()
 
 
+# def format_final_trajectory_abstraction_prompt(
+    # question_text: str,
+    # segments: List[str],
+    # task_outcome: Optional[str] = None,
+    # ) -> Tuple[str, List[Tuple[str, str]]]:
+    # """
+    # Generate a final abstraction preserving full step-by-step reasoning (Step 0–4),
+    # producing two complementary outputs:
+    # (1) Environment Dynamics — environment map & functionality abstraction.
+    # (2) Decision-making Skills — task-oriented operational workflow.
+    # Each block must contain 10–12 sentences of concrete, condition-based rules.
+    # """
+
+    # sys_prompt = (
+    #     "You are to synthesize a final trajectory-level abstraction for an embodied exploration agent. "
+    #     "INPUT: several trajectory paragraphs describing exploration for the SAME question. "
+    #     "You MUST perform INTERNAL reasoning through FIVE steps (Step 0–4) as defined below. "
+    #     "These steps guide your thinking but MUST NOT appear in your visible output.\n\n"
+
+    #     "=== INTERNAL THINKING STEPS (DO NOT PRINT) ===\n"
+    #     "Step 0 (Task Understanding): define the question type, target entity, success criteria, "
+    #     "evidence channels, verification method, and stop conditions.\n"
+    #     "Step 1 (Trajectory Synthesis): reconstruct spatial path logic, key transitions, evidence-driven moves, and coverage logic.\n"
+    #     "Step 2 (Env–Object Associations): infer stable mappings between regions and object categories; identify functional zones and cues.\n"
+    #     "Step 3 (Strategy × Question Type + Directional Priors): derive condition–action tactics per question type, pivot/stop rules, and verification routines.\n"
+    #     "Step 4 (Anti-patterns): identify concrete failure modes and formulate counter-rules.\n\n"
+
+    #     "=== VISIBLE OUTPUT ONLY ===\n"
+    #     "You must output EXACTLY TWO labeled paragraphs with the following intent:\n\n"
+
+    #     "Environment Dynamics:\n"
+    #     "- 10–12 sentences.\n"
+    #     "- Present the environment as a *functional map* for navigation: describe major regions, their typical functions, "
+    #     "what can be found or done there, and how regions connect.\n"
+    #     "- Each sentence should express concrete, environment-grounded knowledge (e.g., 'entrances often contain signage and containers'; "
+    #     "'utility corners near sinks hold cleaning tools'; 'corridors connect living spaces to service zones').\n"
+    #     "- Emphasize spatial logic, region affordances, and distribution of cues, not immediate task execution.\n"
+    #     "- Think of this section as describing *what the world offers* and *where key evidence tends to appear*.\n\n"
+
+    #     "Decision-making Skills:\n"
+    #     "- 10–12 sentences.\n"
+    #     "- Present the general *operational workflow* for performing the task type defined in Step 0.\n"
+    #     "- Each sentence should encode actionable, conditional behavior ('when X, do Y; if no cue, pivot to Z; avoid ...').\n"
+    #     "- Integrate directional priors, pivot/stop rules, and local verification tactics.\n"
+    #     "- If Task Outcome is FAIL, embed 2–4 explicit 'do-not/avoid' sentences indicating concrete missteps to prevent.\n"
+    #     "- Think of this section as describing *how to act and decide* given the environment described above.\n\n"
+
+    #     "GLOBAL RULES (apply to both):\n"
+    #     "- NEVER mention 'BVF', 'CVF', 'view', 'snapshot', 'image', camera operations, or step IDs.\n"
+    #     "- Use only region/landmark/path words (entrance, corridor, connector, hub, doorway, kitchen zone, utility corner, counter, board, panel).\n"
+    #     "- Use imperative or conditional tone; avoid summaries like 'lessons learned' or 'this highlights the importance of...'.\n"
+    #     "- Respect the 10–12 sentence range strictly for each block.\n"
+    # )
+
+    # content: List[Tuple[str, str]] = []
+    # content.append((f"Question: {question_text or '(unknown)'}",))
+    # if isinstance(task_outcome, str) and task_outcome.strip():
+    #     content.append((f"Task Outcome: {task_outcome.strip().upper()}",))
+    # content.append(("Segments:",))
+    # for i, seg in enumerate(segments, start=1):
+    #     if isinstance(seg, str) and seg.strip():
+    #         content.append((f"Segment {i}: {seg.strip()}",))
+
+    # content.append((
+    #     "Now, perform INTERNAL reasoning through Steps 0–4 (as defined above). "
+    #     "After finishing your reasoning, output exactly two labeled paragraphs:\n\n"
+    #     "Environment Dynamics: A single 10–12 sentence paragraph describing the environment as a functional and navigable map — "
+    #     "what zones exist, what functions or cues they provide, and how they interconnect.\n\n"
+    #     "Decision-making Skills: A single 10–12 sentence paragraph describing the general operational workflow — "
+    #     "conditional tactics, pivot/stop rules, verification patterns, and avoidance behaviors (include 2–4 'do-not/avoid' rules if FAIL)."
+    # ,))
+
+    # return sys_prompt, content
