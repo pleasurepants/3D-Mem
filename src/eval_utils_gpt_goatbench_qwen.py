@@ -216,7 +216,7 @@ def format_explore_prompt(
     egocentric_view=False,
     use_snapshot_class=True,
     image_goal=None,
-):
+):  # unchanged from original
     sys_prompt = "Task: You are an agent in an indoor scene that is able to observe the surroundings and explore the environment. You are tasked with indoor navigation, and you are required to choose either a Snapshot or a Frontier image to explore and find the target object required in the question.\n"
 
     content = []
@@ -296,9 +296,10 @@ def format_explore_prompt_frontier(
     egocentric_view=False,
     use_snapshot_class=True,
     image_goal=None,
-    context=None,
-    episodic_con=None,
-    frontier_type="BVF",
+    context=None,       # Experience replay text (cross-episode, similar-scene summaries)
+    episodic_con=None,  # Episodic context text (this episode: recent steps/path & seen/unseen summary)
+    frontier_type: str = "BVF",  # "BVF" for broad-view (layer0) or "CVF" for closer-view (layer1)
+    use_traj_abstraction: bool = False,  # when True, use TRAJECTORY ABSTRACTION instead of EXPERIENCE REPLAY
 ):
     """
     Frontier-selection prompt with explicit Step 0/1/2/3 and FINAL:
@@ -317,6 +318,24 @@ def format_explore_prompt_frontier(
     # System role & definitions (based on user's template)
     # =========================
     label_word = "BVF" if str(frontier_type).upper() == "BVF" else "CVF"
+    
+    # Context label & description switch
+    context_label = "TRAJECTORY ABSTRACTION" if bool(use_traj_abstraction) else "EXPERIENCE REPLAY"
+    if bool(use_traj_abstraction):
+        context_desc = (
+            "TRAJECTORY ABSTRACTION (if present): High-level, question-specific strategies distilled from past trajectories of similar tasks. "
+            "It provides concise guidance on which areas to prioritize or avoid for effective exploration, without low-level captions or critiques. "
+            "Each abstraction consists of two parts: (1) Environment Dynamics—describes the spatial layout, key regions, and physical structure of the environment; "
+            "(2) Decision-making Skills—provides actionable strategies and heuristics for navigating and making effective decisions in that specific environment type. "
+            "Use Environment Dynamics to understand the scene structure, and apply Decision-making Skills as guiding principles for frontier selection.\n\n"
+        )
+    else:
+        context_desc = (
+            "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, "
+            "which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
+        )
+    
+    
     sys_prompt = ""
     sys_prompt += (
         "You are an embodied agent for exploration in an indoor environment to find the target object required in the question. "
@@ -326,10 +345,11 @@ def format_explore_prompt_frontier(
         + "You SHALL pick EXACTLY ONE BVF to look closer. With the selected BVF, you DO NOT move; you further break down that direction into Closer-View Frontiers (CVF), which give narrowed perspectives. "
         + "You SHALL pick EXACTLY ONE CVF to move to in the next step.\n\n"
         + "You will be given the following information as contexts:\n"
-        + "EGOCENTRIC VIEW (if shown): The agent’s immediate forward-looking camera view; use it as local context only.\n"
+        + "EGOCENTRIC VIEW (if shown): The agent's immediate forward-looking camera view; use it as local context only.\n"
         + "EPISODIC CONTEXT (if present): A factual textual summary of the previous steps within THIS episode (visited path, observations, likely-unseen areas). "
         + "Use this to avoid redundancy and prefer novel, informative directions. It is evidence, not a command.\n"
-        + "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
+        # + "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
+        + f"{context_desc}"
         + "RULES:\n"
         + "- You will only be given either BVFs or CVFs at a time (BVF for looking closer; CVF for moving next).\n"
         + "- Your reasoning must be concrete and visual. Name specific objects, layouts, textures, lighting, text-bearing surfaces/symbols, and any cues directly relevant to the question.\n"
@@ -338,6 +358,16 @@ def format_explore_prompt_frontier(
     )
     
     content = []
+    
+    # =========================
+    # Question
+    # =========================
+    q_text = f"Now you need to answer the question: {question}"
+    if image_goal is not None:
+        content.append((q_text, image_goal))
+        content.append(("\n",))
+    else:
+        content.append((q_text + "\n",))
     # =========================
     # Frontier candidates
     # =========================
@@ -360,39 +390,45 @@ def format_explore_prompt_frontier(
     # Episodic context (optional)
     # =========================
     if has_episodic:
-        content.append((
-            "Episodic context — summary of the recent steps within THIS episode (path you followed, what you observed, "
-            "what seems already covered vs. still unexplored). Use this to avoid redundancy and to prefer novel, decision-relevant directions:\n"
-            + episodic_con.strip(),
-        ))
+        # content.append((
+        #     "Episodic context — summary of the recent steps within THIS episode (path you followed, what you observed, "
+        #     "what seems already covered vs. still unexplored). Use this to avoid redundancy and to prefer novel, decision-relevant directions:\n"
+        #     + episodic_con.strip(),
+        # ))
+        content.append((f"\nEPISODIC CONTEXT: ",))
+        content.append((episodic_con.strip(),))
     
     # =========================
     # Experience replay (optional)
     # =========================
     if has_experience:
-        content.append((
-            "Experience replay — knowledge from OTHER episodes in similar scenes. It may include 'Critique:' (what happened) and 'Abstraction:' (a simple rule). "
-            "Use the Abstraction as a transferable hint for this scene. Extract only transferable visual patterns/strategies and prefer the current visible evidence when conflicts arise:\n"
-            + context.strip(),
-        ))
-    
-    # =========================
-    # Question
-    # =========================
-    q_text = f"Now you need to answer the question: {question}"
-    if image_goal is not None:
-        content.append((q_text, image_goal))
-        content.append(("\n",))
-    else:
-        content.append((q_text + "\n",))
+        # content.append((
+        #     "Experience replay — knowledge from OTHER episodes in similar scenes. It may include 'Critique:' (what happened) and 'Abstraction:' (a simple rule). "
+        #     "Use the Abstraction as a transferable hint for this scene. Extract only transferable visual patterns/strategies and prefer the current visible evidence when conflicts arise:\n"
+        #     + context.strip(),
+        # ))
+        content.append((f"\n{context_label}: ",))
+        content.append((context.strip(),))
         
     # =========================
     # Minimal reasoning scaffold consistent with user's instruction
     # =========================
+    # guidance = (
+    #     "IMPORTANT: You MUST reason step by step using ONLY the provided frontiers (Step 1, Step 2, ...), and do NOT skip steps. "
+    #     "Use the contexts (EPISODIC/EXPERIENCE) if present to avoid redundancy and transfer useful cues. "
+    #     f"Output the rationale first and the answer last. On the final line, print ONLY '{label_word} i'."
+    # )
     guidance = (
-        "IMPORTANT: You MUST reason step by step using ONLY the provided frontiers (Step 1, Step 2, ...), and do NOT skip steps. "
-        "Use the contexts (EPISODIC/EXPERIENCE) if present to avoid redundancy and transfer useful cues. "
-        f"Output the rationale first and the answer last. On the final line, print ONLY '{label_word} i'."
+        f"Now reason in steps before making your choice. "
+        "Step 0: restate the task in your own words and confirm you are choosing exactly one frontier of the given type. "
+        "Step 1: from EPISODIC CONTEXT (if present), briefly state which areas are already explored and which remain unseen. "
+        + (
+            "Step 2: analyze all TRAJECTORY ABSTRACTION entries (if present). Extract 1-2 concise directive rules that give specific, problem-focused guidance for the current question. "
+            if bool(use_traj_abstraction)
+            else "Step 2: analyze all EXPERIENCE REPLAY entries (if present). For each, note the chosen frontier, the outcome, and the critique. Then integrate them into 1-2 concise directive rules that give specific, problem-focused guidance for the current question. "
+        )
+        + "Step 3: compare the current frontiers one by one using visual cues, novelty, and alignment with these directive rules, then decide on the best option. "
+        f"On the final line, print ONLY '{label_word} i'."
     )
     content.append((guidance,))
 
@@ -475,14 +511,15 @@ def format_explore_prompt_snapshot(
     
     ## ---- 枚举所有可用index
     # if len(snapshot_imgs) > 0:
-    #     indices_list = ", ".join([str(i) for i in range(len(snapshot_imgs))])
-    #     # 组合所有可选格式
-    #     example_str = "', '".join([f"Snapshot {i}" for i in range(len(snapshot_imgs))])
-    #     indices_hint = f"The only available Snapshot indices are: {indices_list}.\n"
-    #     indices_example = f"You can answer using only '{example_str}', but never use an index not in this list.\n"
+    #     # indices_list = ", ".join([str(i) for i in range(len(snapshot_imgs))])
+    #     # # 组合所有可选格式
+    #     # example_str = "', '".join([f"Snapshot {i}" for i in range(len(snapshot_imgs))])
+    #     # indices_hint = f"The only available Snapshot indices are: {indices_list}.\n"
+    #     # indices_example = f"You can answer using only '{example_str}', but never use an index not in this list.\n"
+    #     indices_list = "; ".join([f"Snapshot {i}, Object {j}" for i, rgb_id in enumerate(snapshot_imgs.keys()) for j in range(len(snapshot_crops[rgb_id]))])
+    #     indices_hint = f"The only available Snapshot and Object indices combinations are: {indices_list}.\n"
     # else:
     #     indices_hint = ""
-    #     indices_example = ""
 
     # 6 here is the format of the answer
     text = "Please answer in exactly one of the following two formats:\n"
@@ -492,9 +529,10 @@ def format_explore_prompt_snapshot(
     text += "If you select a Snapshot, please provide your answer in the following format: 'Snapshot i, Object j', where i, j are the index of the snapshot and the object you choose. "
     text += "For example, if you choose the fridge in the first snapshot, please return 'Snapshot 0, Object 2', where 2 is the index of the fridge in that snapshot.\n"
     text += "You can explain the reason for your choice, but put it in a new line after the choice.\n"
+    # text += indices_hint
     text += "If you are absolutely sure that none of the Snapshots contain enough information, please return 'No Snapshot is available'.\n"
     text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot.\n"
-    text += "Only use the provided Snapshot indices, and DO NOT make up any index that is not listed above."
+    text += "Only use the provided Snapshot and Object indices, and DO NOT make up any index that is not listed above."
     content.append((text,))
 
     return sys_prompt, content
