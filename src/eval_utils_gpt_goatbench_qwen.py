@@ -1175,28 +1175,28 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             except Exception as e:
                 print(f"Layer1 format error: {full_response} | {e}")
     
-    if idx1_in_subgroup is None:
-        idx_random = random.randrange(0, max(1, len(frontier_imgs_subgroup)))
-        # 映射回全局 layer1 索引
-        final_layer1_idx = layer1_indices[idx_random]
+        if idx1_in_subgroup is None:
+            idx_random = random.randrange(0, max(1, len(frontier_imgs_subgroup)))
+            # 映射回全局 layer1 索引
+            final_layer1_idx = layer1_indices[idx_random]
+            global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
+            response = f'frontier {global_frontier_idx}'
+            reason = f"Randomly selected index {global_frontier_idx} due to parsing failure."
+            return response, snapshot_id_mapping, snapshot_crop_mapping, reason, len(snapshot_full_imgs)
+            
+        elif idx1_in_subgroup >= len(layer1_indices):
+            logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
+            response = f"frontier {idx0}"
+            final_reason = full_response_layer0
+            return response, snapshot_id_mapping, snapshot_crop_mapping, full_response_layer0, len(snapshot_full_imgs)
+            
+        final_layer1_idx = layer1_indices[idx1_in_subgroup]
+        # frontier index = len(self.frontiers_layer0) + final_layer1_idx
         global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
-        response = f'frontier {global_frontier_idx}'
-        reason = f"Randomly selected index {global_frontier_idx} due to parsing failure."
+        response = f"frontier {global_frontier_idx}"
+        logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
+        logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx} (global index: {global_frontier_idx})")
+
+        save_base64_to_png_layer1(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx, idx0)
+
         return response, snapshot_id_mapping, snapshot_crop_mapping, reason, len(snapshot_full_imgs)
-        
-    elif idx1_in_subgroup >= len(layer1_indices):
-        logging.warning(f"[Fallback] Invalid or missing Layer1 index ({idx1_in_subgroup}), fallback to Layer0 index {idx0}")
-        response = f"frontier {idx0}"
-        final_reason = full_response_layer0
-        return response, snapshot_id_mapping, snapshot_crop_mapping, full_response_layer0, len(snapshot_full_imgs)
-        
-    final_layer1_idx = layer1_indices[idx1_in_subgroup]
-    # frontier index = len(self.frontiers_layer0) + final_layer1_idx
-    global_frontier_idx = len(step["frontier_imgs_0"]) + final_layer1_idx
-    response = f"frontier {global_frontier_idx}"
-    logging.info(f"[Layer1] VLM selected group index: {idx1_in_subgroup}")
-    logging.info(f"[Layer1] This corresponds to global layer1 index: {final_layer1_idx} (global index: {global_frontier_idx})")
-
-    save_base64_to_png_layer1(frontier_imgs_1[int(final_layer1_idx)], chosen_frontier_path, step_idx, final_layer1_idx, idx0)
-
-    return response, snapshot_id_mapping, snapshot_crop_mapping, reason, len(snapshot_full_imgs)
