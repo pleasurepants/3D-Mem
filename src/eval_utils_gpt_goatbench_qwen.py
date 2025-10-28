@@ -17,6 +17,9 @@ client = OpenAI(
     api_key=OPENAI_KEY,
 )
 
+def _load_ppl_rank_qids(cfg):
+    pass
+
 
 def format_content(contents):
     formated_content = []
@@ -196,6 +199,13 @@ def get_step_info(step, verbose=False):
     )
 
 
+# ================== 最简检索实现（独立于 context_generator） ==================
+
+    
+def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None, top_k=1, strategy: str = 'sim', current_question: str = None, rrf_k: int = 60):
+    pass
+
+
 def format_explore_prompt(
     question,
     egocentric_imgs,
@@ -271,107 +281,6 @@ def format_explore_prompt(
     text = "Please provide your answer in the following format: 'Snapshot i, Object j' or 'Frontier i', where i, j are the index of the snapshot or frontier you choose. "
     text += "For example, if you choose the fridge in the first snapshot, please return 'Snapshot 0, Object 2', where 2 is the index of the fridge in that snapshot.\n"
     text += "You can explain the reason for your choice, but put it in a new line after the choice.\n"
-    content.append((text,))
-
-    return sys_prompt, content
-
-
-def format_explore_prompt_snapshot(
-    question,
-    egocentric_imgs,
-    frontier_imgs,
-    snapshot_imgs,
-    snapshot_classes,
-    snapshot_crops,
-    egocentric_view=False,
-    use_snapshot_class=True,
-    image_goal=None,
-):
-    sys_prompt = "Task: You are an agent in an indoor scene that is able to observe the surroundings and explore the environment. "
-    sys_prompt += "You are tasked with indoor navigation, and you are required to choose a Snapshot to find the target object required in the question.\n"
-
-    content = []
-    # 1 here is some basic info
-    text = "Definitions:\n"
-    text += (
-        "Snapshot: A focused observation of several objects. It contains a full image of the cluster of objects, and separate image crops of each object. "
-        + "Choosing a snapshot means that the object asked in the question is within the cluster of objects that the snapshot represents, and you will choose that object as the final answer of the question. "
-        # + "Therefore, if you choose a snapshot, you should also choose the object in the snapshot that you think is the answer to the question.\n"
-        + "You should always try to select a Snapshot and also choose the object in the snapshot that you think is the answer to the question. "
-        + "Only if you are absolutely sure that none of the Snapshots contain enough information should you reply with 'No Snapshot is available'.\n"
-    )
-    # text += "Frontier: An unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction.\n"
-
-    # 2 here is the question
-    text += f"Question: {question}"
-    if image_goal is not None:
-        content.append((text, image_goal))
-        content.append(("\n",))
-    else:
-        content.append((text + "\n",))
-
-    text = "Select the Snapshot that would help find the answer of the question.\n"
-    content.append((text,))
-
-    # 3 here is the egocentric views
-    if egocentric_view:
-        text = (
-            "The following is the egocentric view of the agent in forward direction: "
-        )
-        content.append((text, egocentric_imgs[-1]))
-        content.append(("\n",))
-
-    # 4 here is the snapshot images
-    text = "The followings are all the snapshots that you can choose. Following each snapshot image are the class name and image crop of each object contained in the snapshot.\n"
-    text += "Please note that the class name may not be accurate due to the limitation of the object detection model. "
-    text += "So you still need to utilize the images to make the decision.\n"
-    content.append((text,))
-    if len(snapshot_imgs) == 0:
-        content.append(("No Snapshot is available\n",))
-    else:
-        for i, rgb_id in enumerate(snapshot_imgs.keys()):
-            content.append((f"Snapshot {i} ", snapshot_imgs[rgb_id]))
-            for j in range(len(snapshot_crops[rgb_id])):
-                content.append(
-                    (
-                        f"Object {j}: {snapshot_classes[rgb_id][j]}",
-                        snapshot_crops[rgb_id][j],
-                    )
-                )
-            content.append(("\n",))
-
-    # # 5 here is the frontier images
-    # text = "The followings are all the Frontiers that you can explore: \n"
-    # content.append((text,))
-    # if len(frontier_imgs) == 0:
-    #     content.append(("No Frontier is available\n",))
-    # else:
-    #     for i in range(len(frontier_imgs)):
-    #         content.append((f"Frontier {i} ", frontier_imgs[i]))
-    #         content.append(("\n",))
-    
-    ## ---- 枚举所有可用index
-    # if len(snapshot_imgs) > 0:
-    #     indices_list = ", ".join([str(i) for i in range(len(snapshot_imgs))])
-    #     # 组合所有可选格式
-    #     example_str = "', '".join([f"Snapshot {i}" for i in range(len(snapshot_imgs))])
-    #     indices_hint = f"The only available Snapshot indices are: {indices_list}.\n"
-    #     indices_example = f"You can answer using only '{example_str}', but never use an index not in this list.\n"
-    # else:
-    #     indices_hint = ""
-    #     indices_example = ""
-
-    # 6 here is the format of the answer
-    text = "Please answer in exactly one of the following two formats:\n"
-    text += "1. Snapshot i, Object j\n[Your reason for your choice.]\n"
-    text += "2. No Snapshot is available.\n"
-    text += "The two formats are mutually exclusive. Never combine 'No Snapshot is available' with any Snapshot index.\n"
-    text += "If you select a Snapshot, please provide your answer in the following format: 'Snapshot i, Object j', where i, j are the index of the snapshot and the object you choose. "
-    text += "For example, if you choose the fridge in the first snapshot, please return 'Snapshot 0, Object 2', where 2 is the index of the fridge in that snapshot.\n"
-    text += "You can explain the reason for your choice, but put it in a new line after the choice.\n"
-    text += "If you are absolutely sure that none of the Snapshots contain enough information, please return 'No Snapshot is available'.\n"
-    text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot.\n"
-    text += "Only use the provided Snapshot indices, and DO NOT make up any index that is not listed above."
     content.append((text,))
 
     return sys_prompt, content
@@ -490,6 +399,107 @@ def format_explore_prompt_frontier(
     return sys_prompt, content
 
 
+def format_explore_prompt_snapshot(
+    question,
+    egocentric_imgs,
+    frontier_imgs,
+    snapshot_imgs,
+    snapshot_classes,
+    snapshot_crops,
+    egocentric_view=False,
+    use_snapshot_class=True,
+    image_goal=None,
+):
+    sys_prompt = "Task: You are an agent in an indoor scene that is able to observe the surroundings and explore the environment. "
+    sys_prompt += "You are tasked with indoor navigation, and you are required to choose a Snapshot to find the target object required in the question.\n"
+
+    content = []
+    # 1 here is some basic info
+    text = "Definitions:\n"
+    text += (
+        "Snapshot: A focused observation of several objects. It contains a full image of the cluster of objects, and separate image crops of each object. "
+        + "Choosing a snapshot means that the object asked in the question is within the cluster of objects that the snapshot represents, and you will choose that object as the final answer of the question. "
+        # + "Therefore, if you choose a snapshot, you should also choose the object in the snapshot that you think is the answer to the question.\n"
+        + "You should always try to select a Snapshot and also choose the object in the snapshot that you think is the answer to the question. "
+        + "Only if you are absolutely sure that none of the Snapshots contain enough information should you reply with 'No Snapshot is available'.\n"
+    )
+    # text += "Frontier: An unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction.\n"
+
+    # 2 here is the question
+    text += f"Question: {question}"
+    if image_goal is not None:
+        content.append((text, image_goal))
+        content.append(("\n",))
+    else:
+        content.append((text + "\n",))
+
+    text = "Select the Snapshot that would help find the answer of the question.\n"
+    content.append((text,))
+
+    # 3 here is the egocentric views
+    if egocentric_view:
+        text = (
+            "The following is the egocentric view of the agent in forward direction: "
+        )
+        content.append((text, egocentric_imgs[-1]))
+        content.append(("\n",))
+
+    # 4 here is the snapshot images
+    text = "The followings are all the snapshots that you can choose. Following each snapshot image are the class name and image crop of each object contained in the snapshot.\n"
+    text += "Please note that the class name may not be accurate due to the limitation of the object detection model. "
+    text += "So you still need to utilize the images to make the decision.\n"
+    content.append((text,))
+    if len(snapshot_imgs) == 0:
+        content.append(("No Snapshot is available\n",))
+    else:
+        for i, rgb_id in enumerate(snapshot_imgs.keys()):
+            content.append((f"Snapshot {i} ", snapshot_imgs[rgb_id]))
+            for j in range(len(snapshot_crops[rgb_id])):
+                content.append(
+                    (
+                        f"Object {j}: {snapshot_classes[rgb_id][j]}",
+                        snapshot_crops[rgb_id][j],
+                    )
+                )
+            content.append(("\n",))
+
+    # # 5 here is the frontier images
+    # text = "The followings are all the Frontiers that you can explore: \n"
+    # content.append((text,))
+    # if len(frontier_imgs) == 0:
+    #     content.append(("No Frontier is available\n",))
+    # else:
+    #     for i in range(len(frontier_imgs)):
+    #         content.append((f"Frontier {i} ", frontier_imgs[i]))
+    #         content.append(("\n",))
+    
+    ## ---- 枚举所有可用index
+    # if len(snapshot_imgs) > 0:
+    #     indices_list = ", ".join([str(i) for i in range(len(snapshot_imgs))])
+    #     # 组合所有可选格式
+    #     example_str = "', '".join([f"Snapshot {i}" for i in range(len(snapshot_imgs))])
+    #     indices_hint = f"The only available Snapshot indices are: {indices_list}.\n"
+    #     indices_example = f"You can answer using only '{example_str}', but never use an index not in this list.\n"
+    # else:
+    #     indices_hint = ""
+    #     indices_example = ""
+
+    # 6 here is the format of the answer
+    text = "Please answer in exactly one of the following two formats:\n"
+    text += "1. Snapshot i, Object j\n[Your reason for your choice.]\n"
+    text += "2. No Snapshot is available.\n"
+    text += "The two formats are mutually exclusive. Never combine 'No Snapshot is available' with any Snapshot index.\n"
+    text += "If you select a Snapshot, please provide your answer in the following format: 'Snapshot i, Object j', where i, j are the index of the snapshot and the object you choose. "
+    text += "For example, if you choose the fridge in the first snapshot, please return 'Snapshot 0, Object 2', where 2 is the index of the fridge in that snapshot.\n"
+    text += "You can explain the reason for your choice, but put it in a new line after the choice.\n"
+    text += "If you are absolutely sure that none of the Snapshots contain enough information, please return 'No Snapshot is available'.\n"
+    text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot.\n"
+    text += "Only use the provided Snapshot indices, and DO NOT make up any index that is not listed above."
+    content.append((text,))
+
+    return sys_prompt, content
+
+
 def format_prefiltering_prompt(question, class_list, top_k=10, image_goal=None):
     content = []
     sys_prompt = "You are an AI agent in a 3D indoor scene.\n"
@@ -589,10 +599,6 @@ def prefiltering(
     return snapshot_classes, keep_index, keep_index_snapshot
 
 
-def simple_recall_and_aggregate(frontier_imgs_b64, cfg, exclude_question_id=None, top_k=1, strategy: str = 'sim', current_question: str = None, rrf_k: int = 60):
-    pass
-
-
 def clean_reason(reason):
     """
     更鲁棒地去除reason/answer中带有 [answer: xxx] 或 [reason: xxx] 及所有[]，只保留核心文本
@@ -604,6 +610,71 @@ def clean_reason(reason):
     # 去除首尾引号和空格
     reason = reason.strip().strip("\"'")
     return reason
+
+
+def parse_frontier_index(output: str):
+    """
+    解析输出文本，返回(reason, index)
+    支持全文任意位置的frontier index格式
+    """
+    # 支持 'frontier i'、'bvf i'、'cvf i' 三种格式（取最后一个命中）
+    # matches = list(re.finditer(r'(?:frontier|bvf|cvf)\s*(\d+)', output, re.IGNORECASE))
+    matches = list(re.finditer(r'(?:frontier|bvf|cvf|bfv|cfv)\s*(\d+)', output, re.IGNORECASE))
+    if matches:
+        last_match = matches[-1]
+        index = int(last_match.group(1))
+        reason = output[:last_match.start()].strip()
+        return reason, index
+    else:
+        raise ValueError(f"Could not parse frontier index")
+    
+    
+def _shorten(text: str, max_len: int = 400) -> str:
+    if not text:
+        return ""
+    t = text.strip()
+    return (t[:max_len] + " ...") if len(t) > max_len else t
+
+
+def build_experience_replay_from_tuple(
+    exp_tuple_path: Optional[str],
+    question_id: Optional[str],
+    default_question: Optional[str] = None,
+    inject_experience: bool = True,
+    inject_critique: bool = True,
+    inject_abstraction: bool = True,
+) -> Optional[str]:
+    pass
+
+
+def aggregate_recall_contexts_for_layer(
+    layer_alias: str,        # 用自然词，比如 "initial directions" / "closer looks"
+    contexts: list,          # List[Optional[str]]，与候选对齐
+    indices: Optional[list] = None,  # 若只汇总子集（例如某个方向下的 closer looks），则传对应的全局索引
+) -> Optional[str]:
+    """
+    生成一段自然语言总述：
+    - 先是层级总述（不用出现 'layer' 字样）
+    - 后面按候选编号列出每个候选的一句话摘要（截断）
+    """
+    items = []
+    if indices is None:
+        pairs = list(enumerate(contexts))
+    else:
+        pairs = [(i, contexts[i]) for i in indices]
+
+    for i, ctx in pairs:
+        if ctx:
+            items.append(f"(candidate #{i}) { _shorten(ctx, 300) }")
+
+    if not items:
+        return None
+
+    header = (
+        f"Recalled summary for {layer_alias}: "
+        f"the following candidates have useful past hints that may guide the decision."
+    )
+    return header + "\n" + "\n".join(items)
 
 
 def save_base64_to_png(b64_str, save_dir, step_idx, idx):
@@ -701,59 +772,6 @@ def frontier_context(
 
     return sys_prompt, content
 
-
-def parse_frontier_index(output: str):
-    """
-    解析输出文本，返回(reason, index)
-    支持全文任意位置的frontier index格式
-    """
-    # 支持 'frontier i'、'bvf i'、'cvf i' 三种格式（取最后一个命中）
-    # matches = list(re.finditer(r'(?:frontier|bvf|cvf)\s*(\d+)', output, re.IGNORECASE))
-    matches = list(re.finditer(r'(?:frontier|bvf|cvf|bfv|cfv)\s*(\d+)', output, re.IGNORECASE))
-    if matches:
-        last_match = matches[-1]
-        index = int(last_match.group(1))
-        reason = output[:last_match.start()].strip()
-        return reason, index
-    else:
-        raise ValueError(f"Could not parse frontier index")
-
-
-def _shorten(text: str, max_len: int = 400) -> str:
-    if not text:
-        return ""
-    t = text.strip()
-    return (t[:max_len] + " ...") if len(t) > max_len else t
-
-def aggregate_recall_contexts_for_layer(
-    layer_alias: str,        # 用自然词，比如 "initial directions" / "closer looks"
-    contexts: list,          # List[Optional[str]]，与候选对齐
-    indices: Optional[list] = None,  # 若只汇总子集（例如某个方向下的 closer looks），则传对应的全局索引
-) -> Optional[str]:
-    """
-    生成一段自然语言总述：
-    - 先是层级总述（不用出现 'layer' 字样）
-    - 后面按候选编号列出每个候选的一句话摘要（截断）
-    """
-    items = []
-    if indices is None:
-        pairs = list(enumerate(contexts))
-    else:
-        pairs = [(i, contexts[i]) for i in indices]
-
-    for i, ctx in pairs:
-        if ctx:
-            items.append(f"(candidate #{i}) { _shorten(ctx, 300) }")
-
-    if not items:
-        return None
-
-    header = (
-        f"Recalled summary for {layer_alias}: "
-        f"the following candidates have useful past hints that may guide the decision."
-    )
-    return header + "\n" + "\n".join(items)
-    
 
 def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=None):
     step["use_prefiltering"] = cfg.prefiltering # true
@@ -1037,7 +1055,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             return response, snapshot_id_mapping, snapshot_crop_mapping, final_reason, len(snapshot_full_imgs)
         
         ## ==== 对该方向下的“更近处视角”子集做聚合（indices 为全局 layer1 索引） ====
-        layer1_texts_all = step.get("replay_context_text_per_frontier", {}).get("layer1", [])   # TODO: no such key
+        layer1_texts_all = step.get("replay_context_text_per_frontier", {}).get("layer1", [])   # TODO: no such key, in context_generator, which is deprecated
         layer1_context_text = None
         if layer1_texts_all and isinstance(layer1_indices, list) and len(layer1_indices) > 0:
             layer1_context_text = aggregate_recall_contexts_for_layer(
