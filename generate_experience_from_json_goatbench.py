@@ -847,6 +847,7 @@ def generate_experiences(
                 # Output container (single unified experience per step)
                 step_out = {
                     "experience": None,
+                    "captions": None,
                 }
 
                 # Generate captions first, then generate final experience using captions
@@ -962,6 +963,7 @@ def generate_experiences(
                     )
                     if t:
                         step_out["experience"] = t.strip()
+                        step_out["captions"] = captions_text.strip()
                         logging.info(f"[Experience] {episode_id}/{question_id}/{step_key}: {step_out['experience']}")
                 except Exception as e:
                     logging.warning(f"step-level context failed: epi={episode_id} q={question_id} step={step_key} err={e}")
