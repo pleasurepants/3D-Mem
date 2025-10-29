@@ -186,11 +186,11 @@ def generate_captions_for_frontiers(
     """
     Produce captions for BVFs/CVFs using the specified format and guidance.
     Expected output format (no extra text, exactly the following lines structure):
+      BVF0: <description>
       BVF1: <description>
-      BVF2: <description>
       ...
+      CVF0: <description>
       CVF1: <description>
-      CVF2: <description>
       ...
     """
     n_initial = len(initial_rels)
@@ -718,13 +718,13 @@ def generate_experience_from_captions(
     bvf_lines: List[str] = []
     for i in range(n_initial):
         cap = bf_caps[i] if i < len(bf_caps) and bf_caps[i] else ""
-        bvf_lines.append(f"BVF{i+1}: {cap}")    # todo
+        bvf_lines.append(f"BVF{i}: {cap}")
     if bvf_lines:
         content.append(("\n\n".join(bvf_lines),))
     cvf_lines: List[str] = []
     for j in range(n_detail):
         cap = cf_caps[j] if j < len(cf_caps) and cf_caps[j] else ""
-        cvf_lines.append(f"CVF{j+1}: {cap}")
+        cvf_lines.append(f"CVF{j}: {cap}")
     if cvf_lines:
         content.append(("\n\n".join(cvf_lines),))
 
