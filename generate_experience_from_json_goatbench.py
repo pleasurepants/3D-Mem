@@ -34,7 +34,7 @@ def _best_match_l0_rel(target_rel: Optional[str], candidates: List[str]) -> Opti
     if target_rel in candidates:
         return target_rel
     try:
-        # Expect formats like 'frontier/32-layer0-0.png'
+        # Expect formats like 'frontier/32-layer0-0.png' or 'task-0_step-0-layer0-0.png'
         if "-layer0-" in target_rel:
             prefix, tail = target_rel.split("-layer0-", 1)
             # Build base prefix including '-layer0-'
@@ -62,7 +62,7 @@ def _best_match_l1_rel(target_rel: Optional[str], candidates: List[str]) -> Opti
     if target_rel in candidates:
         return target_rel
     try:
-        # Expect formats like 'frontier/32-layer1-0_1.png'
+        # Expect formats like 'frontier/32-layer1-0_1.png' or 'task-0_step-0-layer1-0_1.png'
         if "-layer1-" in target_rel:
             prefix, tail = target_rel.split("-layer1-", 1)
             base = prefix + "-layer1-"
@@ -93,9 +93,14 @@ def _parse_bvf_idx_from_rel(rel: Optional[str]) -> Optional[int]:
     try:
         if not rel or not isinstance(rel, str):
             return None
-        m = re.search(r"/([0-9]+)-layer0-([0-9]+)\.png$", rel)  # TODO
+        # Support both old format: /32-layer0-0.png and new format: task-0_step-0-layer0-0.png
+        m = re.search(r"/([0-9]+)-layer0-([0-9]+)\.png$", rel)
         if m:
             return int(m.group(2))
+        # Try new format: task-X_step-X-layer0-X.png
+        m = re.search(r"task-([0-9]+)_step-([0-9]+)-layer0-([0-9]+)\.png$", rel)
+        if m:
+            return int(m.group(3))
     except Exception:
         pass
     return None
@@ -105,9 +110,14 @@ def _parse_cvf_idx_from_rel(rel: Optional[str]) -> Optional[int]:
     try:
         if not rel or not isinstance(rel, str):
             return None
-        m = re.search(r"/([0-9]+)-layer1-([0-9]+)_([0-9]+)\.png$", rel) # TODO
+        # Support both old format: /32-layer1-0_1.png and new format: task-0_step-0-layer1-0_1.png
+        m = re.search(r"/([0-9]+)-layer1-([0-9]+)_([0-9]+)\.png$", rel)
         if m:
             return int(m.group(3))
+        # Try new format: task-X_step-X-layer1-X_Y.png
+        m = re.search(r"task-([0-9]+)_step-([0-9]+)-layer1-([0-9]+)_([0-9]+)\.png$", rel)
+        if m:
+            return int(m.group(4))
     except Exception:
         pass
     return None
@@ -200,7 +210,9 @@ def generate_captions_for_frontiers(
         rules_parts.append("You MUST output no CVF lines. ")
     rules_str = "".join(rules_parts)
     sys_prompt = (
-        "You are an embodied agent located in an indoor environment. You are given a question to answer and must perceive the environment with a camera and choose a frontier where to move in the next step to solve this task as efficiently as possible. "
+        # "You are an embodied agent located in an indoor environment. You are given a question to answer and must perceive the environment with a camera and choose a frontier where to move in the next step to solve this task as efficiently as possible. "
+        "You are an embodied agent located in an indoor environment. You are given a question and you need to explore the environment to find the target object required in the question. "
+        "You must perceive the environment with a camera and choose a frontier where to move in the next step to solve this task as efficiently as possible. "
         "At each step, you are firstly given a list of 'broad-view frontiers' (BVF), which are coarse exploration directions that cover distinct areas of the scene, and choose one index of BVF to look closer. "
         "With the selected BVF direction, you do not move; instead, you break down the view along this direction into closer, narrowed‑down views and are provided with a list of 'closer‑view frontiers' (CVF). CVF are detailed snapshots in the selected direction; the final movement target is the chosen CVF. "
         "Now, you are given the images of BVFs and CVFs at one step and the current question; your task is to describe each snapshot image and output EXACTLY in the following format (no extra text):\n\n"
@@ -218,7 +230,9 @@ def generate_captions_for_frontiers(
     content.append(("You are given the following BVFs and CVFs:",))
 
     def _add_img(rel_path: str):
-        abs_path = os.path.join(searcher.output_parent_dir, searcher.exp_name, question_id, rel_path)
+        # abs_path = os.path.join(searcher.output_parent_dir, searcher.exp_name, question_id, rel_path)
+        scene_id, ep_id, task_id = question_id.split("_")
+        abs_path = os.path.join(searcher.output_parent_dir, searcher.exp_name, f"{scene_id}_ep_{ep_id}", rel_path)
         if os.path.exists(abs_path):
             with open(abs_path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode("utf-8")
@@ -676,7 +690,8 @@ def generate_experience_from_captions(
     # Critique prompt (system): background and requirements per user's template
     sys_prompt = (
         "You are an embodied agent located in an indoor environment and can perceive the environment with a camera. "
-        "You are given a question and you need to explore the environment to answer the question. "
+        # "You are given a question and you need to explore the environment to answer the question. "
+        "You are are given a question and you need to explore the environment to find the target object required in the question. "
         "At each step, you should choose a frontier where to move in the next step to solve the task as efficiently as possible. "
         "At each step, you are firstly given a list of 'broad-view frontiers' (BVF), which are coarse exploration directions that cover distinct areas of the scene, and you select the index of one BVF to look closer. "
         "Under the selected BVF, you are provided with a list of 'closer-view frontiers' (CVF) to choose from as your destination for the next step. CVF are detailed snapshots of the selected BVF’s direction. "
@@ -703,7 +718,7 @@ def generate_experience_from_captions(
     bvf_lines: List[str] = []
     for i in range(n_initial):
         cap = bf_caps[i] if i < len(bf_caps) and bf_caps[i] else ""
-        bvf_lines.append(f"BVF{i+1}: {cap}")
+        bvf_lines.append(f"BVF{i+1}: {cap}")    # todo
     if bvf_lines:
         content.append(("\n\n".join(bvf_lines),))
     cvf_lines: List[str] = []
