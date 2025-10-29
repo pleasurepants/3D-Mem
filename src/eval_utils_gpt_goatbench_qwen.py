@@ -342,6 +342,7 @@ def format_explore_prompt_frontier(
         + "At each step of exploration, you will be given frontier snapshots of your surrounding environment; your task is to pick EXACTLY ONE frontier to move to for further exploration or solving the question.\n\n"
         + "FRONTIERs are candidate entry points toward yet-unseen or information-rich regions—typical visual patterns include doorways/thresholds, corridors/intersections, stairs, corners/turns, or vantage points that likely open new coverage.\n\n"
         + "You will be given 2 types of frontiers: Broad-View Frontier (BVF) segments your 360° surrounding environment so that you can have an overview. "
+        + "Closer-View Frontier (CVF) gives narrowed perspectives of a specific BVF direction. "
         + "You SHALL pick EXACTLY ONE BVF to look closer. With the selected BVF, you DO NOT move; you further break down that direction into Closer-View Frontiers (CVF), which give narrowed perspectives. "
         + "You SHALL pick EXACTLY ONE CVF to move to in the next step.\n\n"
         + "You will be given the following information as contexts:\n"
@@ -371,12 +372,12 @@ def format_explore_prompt_frontier(
     # =========================
     # Frontier candidates
     # =========================
-    content.append((f"You are given the following frontiers ({frontier_type} only at this step):\n",))
+    content.append((f"You are given the following frontiers:\n",))
     if len(frontier_imgs) == 0:
         content.append(("No frontier is available.\n",))
     else:
         for i in range(len(frontier_imgs)):
-            content.append((f"{label_word} {i} ", frontier_imgs[i]))
+            content.append((f"{label_word} {i}: ", frontier_imgs[i]))
             content.append(("\n",))
 
     # =========================
@@ -448,21 +449,26 @@ def format_explore_prompt_snapshot(
 ):
     sys_prompt = "Task: You are an agent in an indoor scene that is able to observe the surroundings and explore the environment. "
     sys_prompt += "You are tasked with indoor navigation, and you are required to choose a Snapshot to find the target object required in the question.\n"
+    sys_prompt += "Definitions:\n"
+    sys_prompt += "Snapshot: A focused observation of several objects. It contains a full image of the cluster of objects, and separate image crops of each object. "
+    sys_prompt += "Choosing a snapshot means that the object asked in the question is within the cluster of objects that the snapshot represents, and you will choose that object as the final answer of the question. "
+    sys_prompt += "You should always try to select a Snapshot and also choose the object in the snapshot that you think is the answer to the question. "
+    sys_prompt += "Only if you are absolutely sure that none of the Snapshots contain enough information should you reply with 'No Snapshot is available'.\n"
 
     content = []
     # 1 here is some basic info
-    text = "Definitions:\n"
-    text += (
-        "Snapshot: A focused observation of several objects. It contains a full image of the cluster of objects, and separate image crops of each object. "
-        + "Choosing a snapshot means that the object asked in the question is within the cluster of objects that the snapshot represents, and you will choose that object as the final answer of the question. "
-        # + "Therefore, if you choose a snapshot, you should also choose the object in the snapshot that you think is the answer to the question.\n"
-        + "You should always try to select a Snapshot and also choose the object in the snapshot that you think is the answer to the question. "
-        + "Only if you are absolutely sure that none of the Snapshots contain enough information should you reply with 'No Snapshot is available'.\n"
-    )
+    # text = "Definitions:\n"
+    # text += (
+    #     "Snapshot: A focused observation of several objects. It contains a full image of the cluster of objects, and separate image crops of each object. "
+    #     + "Choosing a snapshot means that the object asked in the question is within the cluster of objects that the snapshot represents, and you will choose that object as the final answer of the question. "
+    #     # + "Therefore, if you choose a snapshot, you should also choose the object in the snapshot that you think is the answer to the question.\n"
+    #     + "You should always try to select a Snapshot and also choose the object in the snapshot that you think is the answer to the question. "
+    #     + "Only if you are absolutely sure that none of the Snapshots contain enough information should you reply with 'No Snapshot is available'.\n"
+    # )
     # text += "Frontier: An unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction.\n"
 
     # 2 here is the question
-    text += f"Question: {question}"
+    text = f"Question: {question}"
     if image_goal is not None:
         content.append((text, image_goal))
         content.append(("\n",))
@@ -510,29 +516,29 @@ def format_explore_prompt_snapshot(
     #         content.append(("\n",))
     
     ## ---- 枚举所有可用index
-    # if len(snapshot_imgs) > 0:
-    #     # indices_list = ", ".join([str(i) for i in range(len(snapshot_imgs))])
-    #     # # 组合所有可选格式
-    #     # example_str = "', '".join([f"Snapshot {i}" for i in range(len(snapshot_imgs))])
-    #     # indices_hint = f"The only available Snapshot indices are: {indices_list}.\n"
-    #     # indices_example = f"You can answer using only '{example_str}', but never use an index not in this list.\n"
-    #     indices_list = "; ".join([f"Snapshot {i}, Object {j}" for i, rgb_id in enumerate(snapshot_imgs.keys()) for j in range(len(snapshot_crops[rgb_id]))])
-    #     indices_hint = f"The only available Snapshot and Object indices combinations are: {indices_list}.\n"
-    # else:
-    #     indices_hint = ""
+    if len(snapshot_imgs) > 0:
+        # indices_list = ", ".join([str(i) for i in range(len(snapshot_imgs))])
+        # # 组合所有可选格式
+        # example_str = "', '".join([f"Snapshot {i}" for i in range(len(snapshot_imgs))])
+        # indices_hint = f"The only available Snapshot indices are: {indices_list}.\n"
+        # indices_example = f"You can answer using only '{example_str}', but never use an index not in this list.\n"
+        indices_list = "', '".join([f"Snapshot {i}, Object {j}" for i, rgb_id in enumerate(snapshot_imgs.keys()) for j in range(len(snapshot_crops[rgb_id]))])
+        indices_hint = f"The only available Snapshot and Object indices combinations are: '{indices_list}'.\n"
+    else:
+        indices_hint = ""
 
     # 6 here is the format of the answer
     text = "Please answer in exactly one of the following two formats:\n"
     text += "1. Snapshot i, Object j\n[Your reason for your choice.]\n"
     text += "2. No Snapshot is available.\n"
     text += "The two formats are mutually exclusive. Never combine 'No Snapshot is available' with any Snapshot index.\n"
-    text += "If you select a Snapshot, please provide your answer in the following format: 'Snapshot i, Object j', where i, j are the index of the snapshot and the object you choose. "
+    text += "If you select a Snapshot, please provide your answer in the following format: 'Snapshot i, Object j', where i, j are the index of the snapshot and the object you choose as the required one in the question. "
     text += "For example, if you choose the fridge in the first snapshot, please return 'Snapshot 0, Object 2', where 2 is the index of the fridge in that snapshot.\n"
     text += "You can explain the reason for your choice, but put it in a new line after the choice.\n"
-    # text += indices_hint
+    text += indices_hint
+    text += "Only use the provided Snapshot and Object indices, and DO NOT make up any index that is not listed above.\n"
     text += "If you are absolutely sure that none of the Snapshots contain enough information, please return 'No Snapshot is available'.\n"
     text += "You may also use information from other Snapshots and egocentric views to help you answer, but you must always select the single most relevant Snapshot.\n"
-    text += "Only use the provided Snapshot and Object indices, and DO NOT make up any index that is not listed above."
     content.append((text,))
 
     return sys_prompt, content
