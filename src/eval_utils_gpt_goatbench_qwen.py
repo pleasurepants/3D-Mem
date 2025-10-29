@@ -844,7 +844,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
     if verbose:
         # logging.info(f"Input prompt:")
-        logging.info(f"Input prompt (snapshot):")
+        # logging.info(f"Input prompt (snapshot):")
+        logging.info("[Snapshot Prompt]: ")
         message = sys_prompt
         for c in content:
             message += c[0]
@@ -854,6 +855,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
 
     if len(snapshot_full_imgs) == 0:
         print("No snapshot images available, directly entering frontier exploration.")
+        logging.info("No snapshot images available, directly entering frontier exploration.")
     else:
         print(f"Snapshot images available: {len(snapshot_full_imgs)}")
         retry_bound = 3
@@ -867,6 +869,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             if isinstance(full_response, list):
                 full_response = " ".join(full_response)
             full_response = full_response.strip().lower()
+            if verbose:
+                logging.info(f"[Snapshot Response]: {full_response}")
             if full_response.startswith("snapshot"):
                 # tokens = full_response.split()
                 # if len(tokens) >= 2 and tokens[1].isdigit():
@@ -899,6 +903,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                         return final_response, snapshot_id_mapping, snapshot_crop_mapping, final_reason, len(snapshot_full_imgs)
                     else:
                         print(f"Snapshot index out of range: {snapshot_idx} (length: {len(snapshot_full_imgs)})")
+                        logging.info(f"Snapshot index out of range: {snapshot_idx} (length: {len(snapshot_full_imgs)}), response: {full_response}")
                         continue
                 else:
                     print(f"Snapshot response format error: {full_response}")
@@ -1036,7 +1041,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         except Exception:
             pass
     if verbose:
-        logging.info(f"Input prompt (frontier layer0):")
+        # logging.info(f"Input prompt (frontier layer0):")
+        logging.info("[Frontier Layer0 Prompt]: ")
         message = sys_prompt
         for c in content:
             message += c[0]
@@ -1053,6 +1059,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
         if isinstance(full_response, list):
             full_response = " ".join(full_response)
         full_response = full_response.strip().lower()
+        if verbose:
+            logging.info(f"[Frontier Layer0 Response]: {full_response}")
         try:
             reason, idx0 = parse_frontier_index(full_response)
             if 0 <= idx0 < len(frontier_imgs_0):
@@ -1140,7 +1148,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             except Exception:
                 pass
         if verbose:
-            logging.info(f"Input prompt (frontier layer1):")
+            # logging.info(f"Input prompt (frontier layer1):")
+            logging.info("[Frontier Layer1 Prompt]: ")
             message = sys_prompt
             for c in content:
                 message += c[0]
@@ -1159,6 +1168,8 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
             if isinstance(full_response, list):
                 full_response = " ".join(full_response)
             full_response = full_response.strip().lower()
+            if verbose:
+                logging.info(f"[Frontier Layer1 Response]: {full_response}")
             try:
                 reason, idx1_in_subgroup = parse_frontier_index(full_response)
                 if 0 <= idx1_in_subgroup < len(frontier_imgs_subgroup):
