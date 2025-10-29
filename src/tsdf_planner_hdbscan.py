@@ -184,11 +184,15 @@ class TSDFPlanner(TSDFPlannerBase):
             # just skip this question
             logging.error(f"Error in update_frontier_map: frontier area size is 0")
             self.frontiers = []
+            self.frontiers_layer0 = []
+            self.frontiers_layer1 = []
             return False
         if len(frontier_edge_areas) == 0:
             # this happens rather rarely
             logging.error(f"Error in update_frontier_map: frontier edge area size is 0")
             self.frontiers = []
+            self.frontiers_layer0 = []
+            self.frontiers_layer1 = []
             return False
         
         

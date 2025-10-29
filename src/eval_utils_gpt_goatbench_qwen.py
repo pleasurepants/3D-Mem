@@ -1067,6 +1067,7 @@ def explore_step(step, cfg, verbose=False, chosen_frontier_path=None, step_idx=N
                 break
             else:
                 print(f"Layer0 index out of range: {idx0} (length: {len(frontier_imgs_0)})")
+                idx0 = None # reset idx0
         except Exception as e:
             print(f"Layer0 format error: {full_response} | {e}")
     
