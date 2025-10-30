@@ -5,10 +5,10 @@ exp_name: "seed13"  # set in `vllm serve`
 # scene_dataset_config_path: "/home/hpc/v100dd/v100dd12/code/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
 # scene_data_path: "/anvme/workspace/v100dd12-3dmem/hm3d/data/3dmem"
 # questions_list_path: 'data/aeqa_questions-41.json'
-# output_parent_dir: "/nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot"
-# test_data_dir: "data/goat_bench/train/content/"
-output_parent_dir: "/nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/val-unseen_hierarchical-cot"
-test_data_dir: "data/goat_bench/val_unseen/content/"
+output_parent_dir: "/nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot"
+test_data_dir: "data/goat_bench/train/content/"
+# output_parent_dir: "/nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/val-unseen_hierarchical-cot"
+# test_data_dir: "data/goat_bench/val_unseen/content/"
 scene_dataset_config_path: "/nfs/data8/jingpei/eqa/open-eqa/data/scene_datasets/hm3d/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/nfs/data8/jingpei/eqa/open-eqa/data/scene_datasets/hm3d/"
 # questions_list_path: 'data/aeqa_questions-41.json'
