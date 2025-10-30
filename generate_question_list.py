@@ -37,6 +37,15 @@ from src.goatbench_utils import prepare_goatbench_navigation_goals
 from src.query_vlm_goatbench_qwen import query_vlm_for_response
 from src.logger_goatbench import Logger
 
+def _json_default(o):
+    if isinstance(o, np.ndarray):
+        return o.tolist()
+    if isinstance(o, (np.floating, np.integer)):
+        return o.item()
+    if isinstance(o, (np.bool_,)):
+        return bool(o)
+    return str(o)
+
 def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
     # load the default concept graph config
     cfg_cg = OmegaConf.load(cfg.concept_graph_config_path)
@@ -208,7 +217,12 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
 
                 question_list.append(subtask_metadata)
     
-    json.dump(question_list, open(cfg.output_dir + "/question_list.json", "w"), indent=4)
+    json.dump(
+        question_list,
+        open(cfg.output_dir + "/question_list.json", "w"),
+        indent=4,
+        default=_json_default,
+    )
 
 
 if __name__ == "__main__":
