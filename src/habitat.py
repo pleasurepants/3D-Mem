@@ -46,6 +46,9 @@ def pose_normal_to_tsdf_real(pose):
 def make_semantic_cfg(settings):
     # simulator backend
     sim_cfg = habitat_sim.SimulatorConfiguration()
+    # TODO: should add or not?
+    # sim_cfg.gpu_device_id = 0
+    # sim_cfg.enable_physics = False
     sim_cfg.scene_id = settings["scene"]
     sim_cfg.scene_dataset_config_file = settings["scene_dataset_config_file"]
     sim_cfg.load_semantic_mesh = True
