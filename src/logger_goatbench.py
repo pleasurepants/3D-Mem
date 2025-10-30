@@ -299,7 +299,7 @@ class Logger:
                 with open(results_path, "rb") as f:
                     all_results.update(pickle.load(f))
             # fix nan values
-            result_values = list(all_results.values())
+            result_values = np.asarray(list(all_results.values()), dtype=float)
             result_values = result_values[~np.isnan(result_values)]
             logging.info(
                 f"Total {filename} results: {100 * np.mean(result_values):.2f}, len: {len(result_values)}, nan_count: {len(all_results) - len(result_values)}"
@@ -321,7 +321,8 @@ class Logger:
                         all_results[task_name] += task_res
             for task_name, task_res in all_results.items():
                 # fix nan values
-                task_res_filtered = task_res[~np.isnan(task_res)]
+                task_res_array = np.asarray(task_res, dtype=float)
+                task_res_filtered = task_res_array[~np.isnan(task_res_array)]
                 logging.info(
                     f"Total {filename} results for {task_name}: {100 * np.mean(task_res_filtered):.2f}, len: {len(task_res_filtered)}, nan_count: {len(task_res) - len(task_res_filtered)}"
                 )
