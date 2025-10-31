@@ -96,7 +96,7 @@ def build_index(root: str, workers: int, hash_size: int, merge: bool, output: Op
             if "_ep_" in qid:
                 parts = qid.split("_ep_")
                 scene_id = parts[0]
-                episode_id = f"ep_{parts[1]}"
+                episode_id = parts[1]
             else:
                 # fallback: 使用原始 qid
                 scene_id = qid
