@@ -25,3 +25,4 @@ cd /nfs/data8/jingpei/eqa/3D-Mem
 # export END_POINT="http://10.153.51.154:8006/v1"    # worker-5
 
 python generate_question_list.py -cf /nfs/data8/jingpei/eqa/3D-Mem/cfg/dbs_cfg/goatbench_qwen_rollout.yaml
+# in train_hierarchical-cot_log
