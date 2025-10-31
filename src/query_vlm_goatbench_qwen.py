@@ -59,6 +59,10 @@ def query_vlm_for_response(
     chosen_frontier_path: str = None,
     step_idx: str = "",
     lifelong_json_path: Optional[str] = None,
+    exp_tuple_path: Optional[str] = None,
+    inject_experience: bool = False,
+    inject_critique: bool = False,
+    inject_abstraction: bool = False,
 ) -> Optional[Tuple[Union[SnapShot, Frontier], int]]:
     # prepare input for vlm
     step_dict = {}
@@ -162,7 +166,17 @@ def query_vlm_for_response(
         snapshot_crop_mapping,
         reason,
         n_filtered_snapshots,
-    ) = explore_step(step_dict, cfg, verbose=verbose, chosen_frontier_path=chosen_frontier_path, step_idx=step_idx)
+    ) = explore_step(
+        step_dict, 
+        cfg, 
+        verbose=verbose, 
+        chosen_frontier_path=chosen_frontier_path, 
+        step_idx=step_idx,
+        exp_tuple_path=exp_tuple_path,
+        inject_experience=inject_experience,
+        inject_critique=inject_critique,
+        inject_abstraction=inject_abstraction,
+    )
     # step_idx: task-{subtask_idx}_step-{cnt_step}
     if outputs is None:
         logging.error(f"explore_step failed and returned None")

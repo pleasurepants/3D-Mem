@@ -683,6 +683,14 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                         except Exception as e:
                             logging.info(f"[ReplaySim] Pre-create replay json failed: {e}")
                         
+                        # annotate identifiers into cfg for prompt construction
+                        # seems not used
+                        try:
+                            cfg.episode_history_id = scene_id
+                            cfg.current_question_id = subtask_metadata["question_id"]
+                            cfg.current_question_text = subtask_metadata["question"]
+                        except Exception:
+                            pass
                         # query the VLM for the next navigation point, and the reason for the choice
                         vlm_response = query_vlm_for_response(
                             subtask_metadata=subtask_metadata,
@@ -696,6 +704,10 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             step_idx=f"task-{subtask_idx}_step-{cnt_step}", # saving frontier
                             # question_id=question_id,
                             lifelong_json_path=lifelong_json_path,
+                            exp_tuple_path=(args.exp_tuple if isinstance(args.exp_tuple, str) and len(args.exp_tuple) > 0 else None),
+                            inject_experience=(False if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.caption)),
+                            inject_critique=(False if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.critique)),
+                            inject_abstraction=(True if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.abstraction)),
                         )
                         if vlm_response is None:
                             logging.info(
@@ -922,6 +934,22 @@ if __name__ == "__main__":
     parser.add_argument("--replay_mode", help="replay selection mode: sim or random", default="sim", type=str)
     parser.add_argument("--replay_top", help="top-k for replay candidates", default=1, type=int)
     parser.add_argument("--retrieve_root", help="external retrieve root; expects replay_step_info.json & experience_output.json inside", default="", type=str)
+    parser.add_argument("--use_episodic_context", help="whether to enable episodic context (0/1)", default=1, type=int)
+    parser.add_argument("--chat_seed", help="random seed for vLLM generation (decoupled from cfg.seed)", default=None, type=int)
+    # not used here, but `vllm serve ... --seed 0`
+    parser.add_argument("--exp_tuple", help="path to exp_tuple json for EXPERIENCE REPLAY (no default)", default="", type=str)
+    # toggles for injecting experience/critique/abstraction from JSON (default off)
+    _bool = lambda x: str(x).lower() in ("1", "true", "t", "yes", "y")
+    parser.add_argument("--caption", "--experience", dest="caption", help="inject base caption tuple lines", default=False, type=_bool)
+    parser.add_argument("--critique", help="inject critique reflection lines", default=False, type=_bool)
+    parser.add_argument("--abstraction", help="inject abstraction guideline lines", default=False, type=_bool)
+    parser.add_argument("--traj_file", help="trajectory json for traj_* modes (qid -> {question, abstraction, thinking_process})", default="", type=str)
+    # replay injection stage control
+    # preferred flag: --exp_at; aliases: --replay_at / --inject_stage for backward compatibility
+    parser.add_argument("--exp_at", "--replay_at", "--inject_stage", dest="exp_at", help="limit replay injection stage: '' (default, both), 'bvf' (layer0 only), 'cvf' (layer1 only)", default="", type=str)
+    # ppl_rank mode parameter
+    parser.add_argument("--ppl_rank", help="perplexity rank category for filtering: 'low', 'medium', or 'high' (case-insensitive)", default="", type=str)
+    parser.add_argument("--ppl_rank_file", help="path to ppl_rank json file", default="/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json", type=str)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
@@ -930,6 +958,40 @@ if __name__ == "__main__":
     cfg.replay_top = args.replay_top
     if args.retrieve_root:
         cfg.retrieve_root = args.retrieve_root
+
+    # Episodic context toggle
+    cfg.use_episodic_context = bool(args.use_episodic_context)
+    # vLLM per-request seed (independent from cfg.seed)
+    if args.chat_seed is not None:
+        cfg.chat_seed = int(args.chat_seed)
+    # traj_* external file path
+    if args.traj_file:
+        cfg.traj_file = args.traj_file
+    
+    # ppl_rank parameters
+    if args.ppl_rank:
+        cfg.ppl_rank = str(args.ppl_rank).strip().lower()
+        cfg.ppl_rank_file = args.ppl_rank_file
+    
+    # normalize inject_stage into cfg (empty -> None)
+    # normalize stage flag (exp_at preferred)
+    try:
+        _stage = str(args.exp_at).strip().lower()
+        if _stage in ("bvf", "cvf"):
+            cfg.exp_at = _stage
+        else:
+            cfg.exp_at = None
+    except Exception:
+        cfg.exp_at = None
+    # backward compatibility mirrors
+    try:
+        cfg.replay_at = cfg.exp_at
+    except Exception:
+        pass
+    try:
+        cfg.inject_stage = cfg.exp_at
+    except Exception:
+        pass
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
@@ -968,6 +1030,10 @@ if __name__ == "__main__":
     # Set the custom formatter
     for handler in logging.getLogger().handlers:
         handler.setFormatter(formatter)
+        
+    # ppl_rank logging (moved after logging setup)
+    if args.ppl_rank:
+        logging.info(f"[PPL_RANK] Mode enabled: category={cfg.ppl_rank}, file={cfg.ppl_rank_file}")
 
     # run
     logging.info(f"***** Running {cfg.exp_name} *****")
