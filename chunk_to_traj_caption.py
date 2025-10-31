@@ -108,11 +108,13 @@ def load_all_question_nodes(exp_tuple_path: str) -> Dict[str, dict]:
         return result
 
     # Case A: top-level qid
+    # for question_id in data.keys(), e.g., exp_tuple_v0.json
     for k, v in data.items():
         if isinstance(k, str) and _is_question_node(v):
             result[k] = v
 
     # Case B: episode -> qid
+    # structure like experience_output.json (scene_id as outer key), but experience_output.json not have "question" key
     for _, bucket in data.items():
         if isinstance(bucket, dict):
             for qid, qnode in bucket.items():
@@ -300,7 +302,8 @@ def generate_caption_for_question(
 
     # Determine task outcome
     task_outcome = None
-    final_reward = str(qnode.get("final_reward", "")).lower()
+    # final_reward = str(qnode.get("final_reward", "")).lower()
+    final_reward = str(qnode.get("step_0", {}).get("final_reward", "")).lower()
     if final_reward == "pass":
         task_outcome = "PASS"
     elif final_reward == "fail":
