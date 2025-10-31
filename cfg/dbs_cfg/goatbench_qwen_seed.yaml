@@ -1,11 +1,11 @@
 # General
-seed: 13
-exp_name: "seed13"  # set in `vllm serve`
+seed: 19
+exp_name: "seed19"  # set in `vllm serve`
 # output_parent_dir: "/anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/similarity/top-3"
 # scene_dataset_config_path: "/home/hpc/v100dd/v100dd12/code/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
 # scene_data_path: "/anvme/workspace/v100dd12-3dmem/hm3d/data/3dmem"
 # questions_list_path: 'data/aeqa_questions-41.json'
-output_parent_dir: "/nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/hierarchical-cot"
+output_parent_dir: "/nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/hierarchical-cot_v1.1"
 scene_dataset_config_path: "/nfs/data8/jingpei/eqa/open-eqa/data/scene_datasets/hm3d/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/nfs/data8/jingpei/eqa/open-eqa/data/scene_datasets/hm3d/"
 # questions_list_path: 'data/aeqa_questions-41.json'

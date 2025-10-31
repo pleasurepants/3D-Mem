@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=goatbench_hierarchical-cot_seed19
+#SBATCH --job-name=goatbench_hierarchical-cot_v1.1_seed19
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
