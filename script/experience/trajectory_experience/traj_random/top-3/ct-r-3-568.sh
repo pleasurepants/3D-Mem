@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=ct-r-3-568
+#SBATCH --job-name=cra-r-3-568
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a100:2
+#SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=12:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/caption-trajectory_experience/traj_random/top-3/ct-r-3-568-%j.out
-#SBATCH --partition a100
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/traj_abs_format_po_nega/traj_random/top-3/cra-r-3-568-%j.out
+#SBATCH --partition a40
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 
@@ -58,7 +58,7 @@ source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate 3dmem
 source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
-CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/experience/trajectory_experience/traj_random/top-3/ct-r-3-568.yaml --replay_mode traj_random --replay_top 3 --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set --chat_seed 568 --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/traj_abs_format.json --caption true --critique true --abstraction true --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json
+CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/experience/trajectory_experience/traj_random/top-3/ct-r-3-568.yaml --replay_mode traj_random --replay_top 3 --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set --chat_seed 568 --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/captions_reflection_abstraction_v1.json --caption true --critique true --abstraction true --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
 if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
