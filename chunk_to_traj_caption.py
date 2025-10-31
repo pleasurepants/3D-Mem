@@ -298,10 +298,6 @@ def generate_caption_for_question(
         cvf = sd.get("chosen_CVF") if isinstance(sd.get("chosen_CVF"), int) else None
         step_pairs.append((step_key, (cap if isinstance(cap, str) else ""), bvf, cvf))
 
-    # Limit steps if max_steps is specified
-    if isinstance(max_steps, int) and max_steps > 0:
-        step_pairs = step_pairs[:max_steps]
-
     # Determine task outcome
     task_outcome = None
     final_reward = str(qnode.get("final_reward", "")).lower()
