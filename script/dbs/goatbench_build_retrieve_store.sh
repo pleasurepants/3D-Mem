@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=10-00:00:00
-#SBATCH --nodelist=worker-minor-6
+#SBATCH --nodelist=worker-7
 #SBATCH --output=/nfs/data8/jingpei/eqa/3D-Mem/slurm/goatbench/%x-%j.out 
 
 
@@ -45,7 +45,11 @@ cd /nfs/data8/jingpei/eqa/3D-Mem
 
 
 python -m training_set.build_retrieve_store \
-  --questions_path /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/question_list.json \
-  --dst_root /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/retrieve \
-  --sbert_model /anvme/workspace/v100dd12-3dmem/model/all-MiniLM-L6-v2 \
-  --faiss_factory_txt Flat
+  --src_root /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13 \
+  --dst_root /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/retrieve \
+  --clip_model ViT-H-14 \
+  --open_clip_pretrained /nfs/data8/jingpei/eqa/models/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin \
+  --open_clip_tokenizer_model ViT-B-32 \
+  --sbert_model /nfs/data8/jingpei/eqa/models/all-MiniLM-L6-v2 \
+  --faiss_factory_txt Flat \
+  --questions_path /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot_log/seed13/question_list.json

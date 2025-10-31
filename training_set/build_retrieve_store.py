@@ -6,7 +6,9 @@ import json
 import argparse
 import logging
 import shutil
+import time
 from typing import List, Dict, Tuple
+from tqdm import tqdm
 
 import numpy as np
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # disable warning
@@ -284,7 +286,7 @@ def main():
     logging.info(f"[BuildRetrieve] src_root = {src_root}")
     logging.info(f"[BuildRetrieve] dst_root = {dst_root}")
 
-    items = find_frontier_pngs(src_root)    # [{ 'qid': question_id, 'png_path': str }]
+    items = find_frontier_pngs(src_root)    # [{ 'qid': question_id, 'png_path': str (full path) }]
     if not items:
         logging.error('no frontier PNGs found.')
         sys.exit(2)
@@ -324,7 +326,7 @@ def main():
                 copied_files.append(os.path.relpath(dst, dst_root))
             except Exception as e:
                 logging.warning(f"copy failed: {src} -> {dst} ({e})")
-            if (i % 500 == 0) or (i == total):
+            if (i % 1000 == 0) or (i == total):
                 logging.info(f"[BuildRetrieve] copied {i}/{total}")
         # 记录复制后的相对路径
         for m, rel_dst in zip(img_meta, copied_files):
@@ -364,12 +366,14 @@ def main():
         # 每处理完一张 PNG 打一条日志
         for p in pbatch:
             processed += 1
-            logging.info(f"[BuildRetrieve] encoded {processed}/{total_imgs} {os.path.relpath(p, src_root)}")
+            # logging.info(f"[BuildRetrieve] encoded {processed}/{total_imgs} {os.path.relpath(p, src_root)}")
+        if processed % 1000 == 0 or processed == total_imgs:
+            logging.info(f"[BuildRetrieve] encoded {processed}/{total_imgs} images")
     img_emb = np.concatenate(img_emb, axis=0).astype(np.float32)
     logging.info(f"[BuildRetrieve] image embeddings: {img_emb.shape}")
 
     # ---- 计算问题 SBERT embeddings ----
-    qmap = load_questions_map(args.questions_path)
+    qmap = load_questions_map(args.questions_path)  # { question_id: question_text }
     # 只保留在 items 中出现过的 qid
     uniq_qids = sorted(list({it['qid'] for it in items}))
     q_texts: List[str] = [qmap.get(qid, '') for qid in uniq_qids]
