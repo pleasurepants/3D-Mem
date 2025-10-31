@@ -544,23 +544,25 @@ def generate_caption_tuples(
                     _append_error(f"[INDEX_MISS_CVF] epi={episode_id} q={question_id} step={step_key} chosen_l1={chosen_l1} not in detail_rels={detail_rels}")
 
                 # 生成 Caption（仅使用 Caption，不做 critique 生成）
-                captions_text = None
-                try:
-                    step_idx_text = str(current_step) if current_step >= 0 else "NA"
-                    captions_text = generate_captions_for_frontiers(
-                        searcher=searcher,
-                        question_id=question_id,
-                        question_text=question_text,
-                        step_idx_text=step_idx_text,
-                        initial_rels=initial_rels,
-                        detail_rels=detail_rels,
-                    )
-                except Exception as e:
-                    logging.warning(f"[Caption] Failed: epi={episode_id} q={question_id} step={step_key} err={e}")
-                    _append_error(f"[CAPTION_FAIL] epi={episode_id} q={question_id} step={step_key} err={e}")
-                    captions_text = None
+                # captions_text = None
+                captions_text = step_exp.get("captions", None)
                 if not captions_text:
-                    _append_error(f"[CAPTION_EMPTY] epi={episode_id} q={question_id} step={step_key} captions is empty")
+                    try:
+                        step_idx_text = str(current_step) if current_step >= 0 else "NA"
+                        captions_text = generate_captions_for_frontiers(
+                            searcher=searcher,
+                            question_id=question_id,
+                            question_text=question_text,
+                            step_idx_text=step_idx_text,
+                            initial_rels=initial_rels,
+                            detail_rels=detail_rels,
+                        )
+                    except Exception as e:
+                        logging.warning(f"[Caption] Failed: epi={episode_id} q={question_id} step={step_key} err={e}")
+                        _append_error(f"[CAPTION_FAIL] epi={episode_id} q={question_id} step={step_key} err={e}")
+                        captions_text = None
+                    if not captions_text:
+                        _append_error(f"[CAPTION_EMPTY] epi={episode_id} q={question_id} step={step_key} captions is empty")
 
                 # 从参考 exp 中解析 Critique / Abstraction
                 experience_text = step_exp.get("experience") if isinstance(step_exp, dict) else None
