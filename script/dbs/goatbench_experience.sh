@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=goatbench_generate_experience_train
+#SBATCH --job-name=goatbench_train_captions_from_chunk
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -32,15 +32,15 @@ export END_POINT="http://10.153.51.154:8006/v1"    # worker-5
 #     --exp_name seed13
 
 # parse experience into critique and abstraction, rearrange structure
-python generate_experience_from_json_goatbench.py \
-    --input_json /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/replay_step_info.json \
-    --output_json /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/experience_output.json \
-    --output_parent_dir /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/ \
-    --exp_name seed13 \
-    --questions_list_path /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot_log/seed13/question_list.json \
-    --captions_only \
-    --experience_json_path /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/experience_output.json \
-    --tuple_output_json /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/exp_tuple_v0.json
+# python generate_experience_from_json_goatbench.py \
+#     --input_json /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/replay_step_info.json \
+#     --output_json /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/experience_output.json \
+#     --output_parent_dir /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/ \
+#     --exp_name seed13 \
+#     --questions_list_path /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot_log/seed13/question_list.json \
+#     --captions_only \
+#     --experience_json_path /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/experience_output.json \
+#     --tuple_output_json /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/exp_tuple_v0.json
 
 # out-dated
 # python generate_abstraction_from_captions.py \
@@ -49,8 +49,8 @@ python generate_experience_from_json_goatbench.py \
 #   --seed 32 \
 #   --out /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/traj_abs_single.json
 
-# python chunk_to_traj_caption.py \
-#     --exp_tuple /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/exp_tuple_v0.json \
-#     --seed 13 \
-#     # --max_steps 10 \  # not specify
-#     --out /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/traj_abs_single.json
+python chunk_to_traj_caption.py \
+    --exp_tuple /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/exp_tuple_v0.json \
+    --max_steps 10 \
+    --seed 13 \
+    --out /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/final_captions_from_chunk.json
