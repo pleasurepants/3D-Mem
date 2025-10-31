@@ -25,11 +25,14 @@ def find_frontier_pngs(src_root: str) -> List[Dict]:
         if base.lower() != 'frontier':
             continue
         # question_id 为 frontier 的上级目录名
-        qid = os.path.basename(os.path.dirname(dirpath))
+        qid = os.path.basename(os.path.dirname(dirpath))    # {scene_id}_ep_{episode_id}
+        scene_id, episode_id = qid.split('_ep_')
         for fn in filenames:
             if fn.lower().endswith('.png'):
+                task_id = fn.split('-')[1].split('_')[0]    # task-0_step-34-layer1-1_1.png
+                question_id = f"{scene_id}_{episode_id}_{task_id}"
                 items.append({
-                    'qid': qid,
+                    'qid': question_id,
                     'png_path': os.path.join(dirpath, fn)
                 })
     return items
@@ -39,6 +42,7 @@ def load_frontier_index(src_root: str) -> Dict[Tuple[str, str], Dict]:
     """
     加载 src_root/.frontier_ahash_index.json，返回以 (question_id, filename) 作为键的映射。
     filename 为纯文件名（不带路径）。
+    check cursor/build_frontier_ahash_index.py
     """
     idx_path = os.path.join(src_root, '.frontier_ahash_index.json')
     mapping = {}
@@ -51,8 +55,8 @@ def load_frontier_index(src_root: str) -> Dict[Tuple[str, str], Dict]:
         for rec in index_map.values():
             if not isinstance(rec, dict):
                 continue
-            qid = rec.get('question_id')
-            fname = rec.get('filename')
+            qid = rec.get('question_id')    # {scene_id}_{episode_id}_{task_id}
+            fname = rec.get('filename')     # task-0_step-34-layer1-1_1.png
             if not qid or not fname:
                 continue
             mapping[(qid, os.path.basename(fname))] = rec
@@ -280,14 +284,14 @@ def main():
     logging.info(f"[BuildRetrieve] src_root = {src_root}")
     logging.info(f"[BuildRetrieve] dst_root = {dst_root}")
 
-    items = find_frontier_pngs(src_root)
+    items = find_frontier_pngs(src_root)    # [{ 'qid': question_id, 'png_path': str }]
     if not items:
         logging.error('no frontier PNGs found.')
         sys.exit(2)
     logging.info(f"[BuildRetrieve] frontier PNGs: {len(items)}")
 
     # frontier 索引（用于补充 step_key/level 等元信息）
-    qid_fname_to_rec = load_frontier_index(src_root)
+    qid_fname_to_rec = load_frontier_index(src_root)    # { (question_id, filename): { 'step_key': str, 'level': str, 'filename': str } }
 
     # ---- 构建图像路径与元数据 ----
     img_paths: List[str] = [it['png_path'] for it in items]
@@ -427,4 +431,17 @@ def main():
 if __name__ == '__main__':
     main()
 
-
+"""
+dst_root/
+├── png/
+│   ├── embeddings.npy      # [N, D] 图片特征向量
+│   ├── meta.json           # 图片元数据列表
+│   ├── encoders.json       # 编码器配置
+│   ├── index.faiss         # FAISS 索引（可选）
+│   └── *.png               # 复制的图片（如果 --copy_images）
+└── question/
+    ├── embeddings.npy      # [M, D] 问题文本特征向量
+    ├── meta.json           # 问题元数据列表
+    ├── encoders.json       # 编码器配置
+    └── index.faiss         # FAISS 索引（可选）
+"""
