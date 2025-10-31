@@ -37,11 +37,20 @@ python generate_experience_from_json_goatbench.py \
     --output_json /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/experience_output.json \
     --output_parent_dir /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/ \
     --exp_name seed13 \
+    --questions_list_path /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot_log/seed13/question_list.json \
     --captions_only \
     --experience_json_path /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/experience_output.json \
+    --tuple_output_json /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/exp_tuple_v0.json
 
+# out-dated
 # python generate_abstraction_from_captions.py \
 #   --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/exp_tuple_v0.json \
 #   --max_steps 10 \
 #   --seed 32 \
 #   --out /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/traj_abs_single.json
+
+# python chunk_to_traj_caption.py \
+#     --exp_tuple /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/exp_tuple_v0.json \
+#     --seed 13 \
+#     # --max_steps 10 \  # not specify
+#     --out /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/traj_abs_single.json

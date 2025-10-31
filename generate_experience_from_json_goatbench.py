@@ -433,6 +433,7 @@ def generate_caption_tuples(
                 if not isinstance(q_text_from_map, str) or not q_text_from_map:
                     q_text_from_map = (qinfo_in.get("question", "") or "").strip()
                 results[question_id]["question"] = q_text_from_map
+                results[question_id]["final_reward"] = final_reward
 
             for step_key, step_exp in steps_exp.items():
                 if not isinstance(step_exp, dict):
@@ -1016,8 +1017,12 @@ def main():
             exp_name=args.exp_name,
             experience_json_path=args.experience_json_path,
             tuple_output_json_path=tuple_output,
+            questions_json_path=args.questions_list_path,
         )
         print(tuple_output)
+        # input_json (replay_step_info.json, get frontier info) + experience_json_path (experience_output.json, get critique and abstraction) 
+        # -> tuple_output_json_path (exp_tuple.json), captions, flattened structure with question_id as outer layer
+        # output_json (experience_output.json) not used or as tuple_output_json
     else:
         results = generate_experiences(
             input_json_path=args.input_json,
@@ -1027,6 +1032,9 @@ def main():
             questions_list_path=args.questions_list_path,
         )
         print(args.output_json)
+        # input_json (replay_step_info.json) -> output_json (experience_output.json)
+        # experience_output not used
+        # questions_list_path not used
 
 
 if __name__ == "__main__":
