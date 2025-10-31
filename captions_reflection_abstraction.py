@@ -8,121 +8,6 @@ from typing import Dict, List, Optional, Tuple
 from src.eval_utils_gpt_aeqa_qwen import call_openai_api
 
 
-def _load_tuple_node(exp_tuple_path: str, question_id: str) -> Optional[dict]:
-    """
-    Load the question node for a given question_id from an exp_tuple json file.
-    Compatible with two structures:
-      1) Top-level mapping: { question_id: {"question": str, "step_0": {...}, ...} }
-      2) Top-level episodes: { episode_key: { question_id: {"question": str, "steps": {...}} } }
-    """
-    if not exp_tuple_path or not os.path.exists(exp_tuple_path):
-        logging.warning(f"exp_tuple file not found: {exp_tuple_path}")
-        return None
-    try:
-        with open(exp_tuple_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception as e:
-        logging.error(f"failed to read exp_tuple: {e}")
-        return None
-
-    if not isinstance(data, dict):
-        return None
-
-    # Structure 1
-    if question_id in data and isinstance(data[question_id], dict):
-        return data[question_id]
-
-    # Structure 2
-    for _, bucket in data.items():
-        if isinstance(bucket, dict) and question_id in bucket and isinstance(bucket[question_id], dict):
-            return bucket[question_id]
-
-    return None
-
-
-def _collect_steps(qnode: dict) -> Tuple[str, List[Tuple[str, dict]]]:
-    """
-    Return the question text and a sorted list of (step_key, step_dict).
-    Supports both scattered step_* and nested steps dict.
-    """
-    if not isinstance(qnode, dict):
-        return "", []
-
-    question_text = qnode.get("question", "")
-
-    steps_obj = None
-    if "steps" in qnode and isinstance(qnode["steps"], dict):
-        steps_obj = qnode["steps"]
-    else:
-        steps_obj = {k: v for k, v in qnode.items() if isinstance(v, dict) and k.startswith("step_")}
-
-    if not steps_obj:
-        return question_text, []
-
-    def _step_order(k: str) -> int:
-        try:
-            return int(k.split("_")[-1])
-        except Exception:
-            return 0
-
-    items = sorted(list(steps_obj.items()), key=lambda kv: _step_order(kv[0]))
-    return question_text, items
-
-
-def _truncate(text: Optional[str], max_chars: int = 600) -> str:
-    if not isinstance(text, str):
-        return ""
-    t = text.strip()
-    if len(t) <= max_chars:
-        return t
-    return t[: max(0, max_chars - 3)] + "..."
-
-
-def _is_question_node(node: dict) -> bool:
-    if not isinstance(node, dict):
-        return False
-    if not isinstance(node.get("question"), str):
-        return False
-    if isinstance(node.get("steps"), dict):
-        return True
-    for k, v in node.items():
-        if isinstance(v, dict) and isinstance(k, str) and k.startswith("step_"):
-            return True
-    return False
-
-
-def load_all_question_nodes(exp_tuple_path: str) -> Dict[str, dict]:
-    """
-    Load all question nodes from the tuple file, supporting both top-level qid and
-    episode->qid layouts. Returns mapping {question_id: question_node}.
-    """
-    result: Dict[str, dict] = {}
-    if not exp_tuple_path or not os.path.exists(exp_tuple_path):
-        logging.warning(f"exp_tuple file not found: {exp_tuple_path}")
-        return result
-    try:
-        with open(exp_tuple_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception as e:
-        logging.error(f"failed to read exp_tuple: {e}")
-        return result
-
-    if not isinstance(data, dict):
-        return result
-
-    # Case A: top-level qid
-    for k, v in data.items():
-        if isinstance(k, str) and _is_question_node(v):
-            result[k] = v
-
-    # Case B: episode -> qid
-    for _, bucket in data.items():
-        if isinstance(bucket, dict):
-            for qid, qnode in bucket.items():
-                if isinstance(qid, str) and _is_question_node(qnode):
-                    result[qid] = qnode
-
-    return result
 
 
 def format_abstraction_prompt(*args, **kwargs):
@@ -138,38 +23,6 @@ def build_abstraction_for_question(*args, **kwargs):
 
 
 
-def format_trajectory_from_captions_prompt(
-    question_text: str,
-    captions_by_steps: List[Tuple[str, str, Optional[int], Optional[int]]],  # (step_key, caption, chosen_bvf, chosen_cvf)
-    task_outcome: Optional[str] = None,
-) -> Tuple[str, List[Tuple[str, str]]]:
-
-    sys_prompt = (
-        "You are summarizing a movement trajectory in an indoor environment from step captions. "
-        "BASELINE POLICY: the agent first selects a broader direction (BVF) and then a closer sub-direction (CVF) within that BVF. This two-stage selection is a fixed baseline and is NOT to be debated; use the provided chosen BVF/CVF only as internal evidence to understand movement direction. "
-        "INPUT: a question and several step captions (what was visible/focused at each step), together with the chosen BVF and CVF indices at each step. "
-        "TASK: condense these steps into a clear sequence of where the agent moved or focused in the environment (trajectory), using region/landmark words (e.g., hallway, entrance, kitchen zone, sink area). Do NOT mention or discuss 'BVF', 'CVF', 'view', 'snapshot', 'image', or camera operations in your outputs; avoid step IDs; use natural language. "
-        "After summarizing the trajectory, write a Critique paragraph reflecting on the route per the given questions. Finally, print an Abstraction line that repeats the Captions paragraph verbatim."
-    )
-    sys_prompt += (
-        "\nOUTPUT (print exactly in this order):\n"
-        "Captions: <ONE single paragraph with 16–20 sentences summarizing the overall trajectory and movement logic derived from the captions; use only region/landmark and path terms; avoid any mention of views/BVF/CVF/images; avoid step IDs; cohesive, non-bulleted prose>\n"
-        "Critique: <ONE paragraph addressing: whether choices aimed to explore unseen vs solve immediately; how selections impacted the next steps; how timing in the trajectory shaped impact; how selections influenced final outcome; whether better alternatives existed and why>"
-    )
-
-    content: List[Tuple[str, str]] = []
-    content.append((f"Question: {question_text or '(unknown)'}",))
-    if isinstance(task_outcome, str) and task_outcome.strip():
-        content.append((f"Task Outcome: {task_outcome.strip().upper()}",))
-    content.append(("Below are the step captions and the chosen indices for each step (for your internal reasoning; do NOT mention BVF/CVF in outputs):",))
-    for step_key, cap, bvf, cvf in captions_by_steps:
-        if isinstance(cap, str) and cap.strip():
-            content.append((f"{step_key} Caption: {cap.strip()}",))
-        content.append((f"{step_key} Chosen: BVF {('NA' if bvf is None else str(bvf))}; CVF {('NA' if cvf is None else str(cvf))}",))
-    content.append((
-        "Now print EXACTLY two blocks in order: (1) Captions paragraph (16–20 sentences), (2) Critique paragraph. Then print Abstraction: <repeat the Captions paragraph verbatim>. Do not add any other headers or lines.",
-    ))
-    return sys_prompt, content
 
 
 def format_final_trajectory_abstraction_prompt(
@@ -223,13 +76,6 @@ def format_final_trajectory_abstraction_prompt(
     return sys_prompt, content
 
 
-def _extract_answer(qnode: dict) -> str:
-    # Try multiple common keys; fallback to empty string
-    for k in ["answer", "final_answer", "gt_answer", "ground_truth", "pred_answer"]:
-        v = qnode.get(k)
-        if isinstance(v, str) and v.strip():
-            return v.strip()
-    return ""
 
 
 def _split_thinking_and_abstraction(full_text: Optional[str]) -> Tuple[str, str]:
@@ -303,124 +149,75 @@ def _write_incremental_json(out_path: str, qid: str, obj: dict):
         logging.warning(f"[Write][incremental] failed for qid={qid} path={out_path}: {e}")
 
 
-def generate_traj_abstraction_with_critiques(
-    exp_tuple_path: str,
+def generate_traj_abstraction_from_chunk_caption(
+    chunk_caption_data: dict,
     question_id: str,
     seed: Optional[int] = None,
-    max_steps: Optional[int] = None,
 ) -> Optional[dict]:
     """
-    Two-stage pipeline per question:
-      1) Group step critiques by 'group size' (this function uses max_steps as group size) and generate one Critique per group.
-      2) Aggregate all group critiques into a single trajectory-level Abstraction.
-
+    Generate abstraction directly from chunk caption data.
+    
+    Args:
+        chunk_caption_data: dict containing question_text, caption, and status
+        question_id: the question ID
+        seed: optional random seed
+        
     Returns a dict: {
       'question': str,
-      'answer': str,
-      'abstraction': str,           # 'Abstraction: ...'
-      'critiques': { 'step_0_4': 'Critique: ...', ... }
+      'abstraction': str,
     }
-    or None if the question_id is not found.
+    or None if the data is invalid.
     """
-    qnode = _load_tuple_node(exp_tuple_path, question_id)
-    if not isinstance(qnode, dict):
+    if not isinstance(chunk_caption_data, dict):
+        return None
+        
+    question_text = chunk_caption_data.get("question_text", "")
+    caption = chunk_caption_data.get("caption", "")
+    status = chunk_caption_data.get("status", "")
+    
+    if not question_text or not caption:
         return None
 
-    question_text, steps = _collect_steps(qnode)
-    if not steps:
-        return None
-
-    # Prepare groups of step-level captions
-    step_pairs: List[Tuple[str, str, Optional[int], Optional[int]]] = []  # (step_key, caption, bvf, cvf)
-    for step_key, sd in steps:
-        cap = sd.get("Caption") or sd.get("caption") or ""
-        bvf = sd.get("chosen_BVF") if isinstance(sd.get("chosen_BVF"), int) else None
-        cvf = sd.get("chosen_CVF") if isinstance(sd.get("chosen_CVF"), int) else None
-        step_pairs.append((step_key, (cap if isinstance(cap, str) else ""), bvf, cvf))
-
-    # Group into chunks by group size (use max_steps as grouping size)
-    trajectories_combined: List[str] = []  # collect Abstraction-only per chunk
-    thinking_all: List[str] = []          # collect Step lines per chunk
-    critiques_map: Dict[str, str] = {}    # kept for compatibility; now unused
-    group_size = max_steps if isinstance(max_steps, int) and max_steps > 0 else 5
-    for i in range(0, len(step_pairs), group_size):
-        chunk = step_pairs[i : i + group_size]
-        logging.info(f"[Traj] qid={question_id} chunk={i//group_size+1} range_keys={[kp for kp,_1,_2,_3 in chunk]}")
-        sys_p, cont = format_trajectory_from_captions_prompt(
-            question_text, chunk,
-            task_outcome=("PASS" if (str(qnode.get("final_reward", "")).lower() == "pass") else ("FAIL" if (str(qnode.get("final_reward", "")).lower() == "fail") else None))
-        )
-        traj_out = call_openai_api(sys_p, cont, seed=seed)
-        traj_text = (traj_out or "").strip()
-        # store by range key like step_0_4 (kept for compatibility)
-        start_key = chunk[0][0]
-        end_key = chunk[-1][0]
-        try:
-            start_idx = int(start_key.split("_")[-1])
-        except Exception:
-            start_idx = i
-        try:
-            end_idx = int(end_key.split("_")[-1])
-        except Exception:
-            end_idx = i + len(chunk) - 1
-        range_key = f"step_{start_idx}_{end_idx}"
-        # split thinking vs abstraction
-        thinking_process, abstr_only = _split_thinking_and_abstraction(traj_text)
-        if thinking_process:
-            thinking_all.append(thinking_process)
-        if abstr_only:
-            trajectories_combined.append(abstr_only)
-        logging.info(f"[Traj] qid={question_id} chunk={i//group_size+1} abstr_len={len(abstr_only)} tp_len={len(thinking_process)}")
-        critiques_map[range_key] = traj_text  # Optional: raw per-chunk record
-
-    # Final abstraction: summarize across chunk-level paragraphs into one final paragraph via one more VLM call
+    # Use the caption directly as the trajectory description
+    # Generate final abstraction using the caption
     final_sys, final_cont = format_final_trajectory_abstraction_prompt(
         question_text,
-        segments=trajectories_combined,
-        task_outcome=("PASS" if (str(qnode.get("final_reward", "")).lower() == "pass") else ("FAIL" if (str(qnode.get("final_reward", "")).lower() == "fail") else None))
+        segments=[caption],  # Use the caption as a single segment
+        task_outcome=("PASS" if status.lower() == "pass" else ("FAIL" if status.lower() == "fail" else None))
     )
     final_out = call_openai_api(final_sys, final_cont, seed=seed)
     final_out = (final_out or "").strip()
-    thinking_process = "\n".join([t for t in thinking_all if t])
     _, abstraction_text = _split_thinking_and_abstraction(final_out)
-    logging.info(f"[Traj][Final] qid={question_id} segments={len(trajectories_combined)} final_abs_len={len(abstraction_text)} tp_total_len={len(thinking_process)}")
+    logging.info(f"[Traj][Final] qid={question_id} final_abs_len={len(abstraction_text)}")
 
     return {
         "question": question_text,
         "abstraction": abstraction_text,
-        "thinking_process": thinking_process,
-        "captions_step": critiques_map,
     }
 
 
 def _parse_args():
     parser = argparse.ArgumentParser(
-        description="Generate a generalized Abstraction for a question_id by summarizing its step logs."
+        description="Generate a generalized Abstraction from chunk caption data."
     )
     parser.add_argument(
-        "--exp_tuple",
+        "--chunk_caption",
         type=str,
         required=True,
-        help="Path to exp_tuple json (no default; pass via shell).",
+        help="Path to chunk caption json file containing question_text, caption, and status.",
     )
     parser.add_argument(
         "--question_id",
         type=str,
         required=False,
         default=None,
-        help="Target question_id to summarize. Omit for processing all.",
+        help="Target question_id to process. Omit for processing all.",
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=None,
         help="Optional chat seed (overrides env VLLM_SEED).",
-    )
-    parser.add_argument(
-        "--max_steps",
-        type=int,
-        default=None,
-        help="Optionally cap the number of steps included (use earliest).",
     )
     parser.add_argument(
         "--out",
@@ -434,21 +231,49 @@ def _parse_args():
         default=None,
         help="Optional cap when processing all questions.",
     )
-    # removed: group_size; we always consolidate all selected steps into one critique
     return parser.parse_args()
+
+
+def load_chunk_caption_data(chunk_caption_path: str) -> Dict[str, dict]:
+    """
+    Load chunk caption data from JSON file.
+    Returns mapping {question_id: {question_text, caption, status}}.
+    """
+    if not os.path.exists(chunk_caption_path):
+        logging.warning(f"chunk_caption file not found: {chunk_caption_path}")
+        return {}
+    try:
+        with open(chunk_caption_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {}
+        return data
+    except Exception as e:
+        logging.error(f"failed to read chunk_caption: {e}")
+        return {}
 
 
 def main():
     args = _parse_args()
     logging.basicConfig(level=logging.INFO)
 
+    # Load chunk caption data
+    chunk_data = load_chunk_caption_data(args.chunk_caption)
+    if not chunk_data:
+        logging.warning("no chunk caption data found; nothing to do")
+        return
+
     # Mode 1: single question
     if isinstance(args.question_id, str) and len(args.question_id) > 0:
-        result_obj = generate_traj_abstraction_with_critiques(
-            exp_tuple_path=args.exp_tuple,
+        if args.question_id not in chunk_data:
+            logging.warning(f"question_id {args.question_id} not found in chunk data")
+            print("{}")
+            return
+            
+        result_obj = generate_traj_abstraction_from_chunk_caption(
+            chunk_caption_data=chunk_data[args.question_id],
             question_id=args.question_id,
             seed=args.seed,
-            max_steps=args.max_steps,
         )
         if result_obj is None:
             print("{}")
@@ -462,35 +287,30 @@ def main():
         return
 
     # Mode 2: process all questions in the file
-    all_nodes = load_all_question_nodes(args.exp_tuple)
-    if not all_nodes:
-        logging.warning("no question nodes found in exp_tuple; nothing to do")
-        return
     if not isinstance(args.out, str) or len(args.out) == 0:
         raise SystemExit("--out is required when processing all questions")
 
-    qids = sorted(all_nodes.keys())
+    qids = sorted(chunk_data.keys())
     if isinstance(args.max_questions, int) and args.max_questions > 0:
         qids = qids[: args.max_questions]
 
     results: Dict[str, dict] = {}
     for qid in qids:
         try:
-            obj = generate_traj_abstraction_with_critiques(
-                exp_tuple_path=args.exp_tuple,
+            obj = generate_traj_abstraction_from_chunk_caption(
+                chunk_caption_data=chunk_data[qid],
                 question_id=qid,
                 seed=args.seed,
-                max_steps=args.max_steps,
             )
             if obj is None:
-                results[qid] = {"question": "", "answer": "", "abstraction": "", "critiques": {}}
+                results[qid] = {"question": "", "abstraction": ""}
             else:
                 results[qid] = obj
             # incremental write after each question
             _write_incremental_json(args.out, qid, results[qid])
         except Exception as e:
             logging.warning(f"abstraction generation failed for {qid}: {e}")
-            results[qid] = {"question": "", "answer": "", "abstraction": "", "critiques": {}}
+            results[qid] = {"question": "", "abstraction": ""}
             _write_incremental_json(args.out, qid, results[qid])
 
     # final write to ensure consistency

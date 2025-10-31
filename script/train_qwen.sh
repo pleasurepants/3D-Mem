@@ -84,6 +84,15 @@ CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/generate_exp
     --captions_only \
     --experience_json_path /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/experience_output.json
 
+CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/generate_experience_from_json.py \
+    --input_json /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/replay_step_info.json \
+    --output_json /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/experience_output.json \
+    --output_parent_dir /anvme/workspace/v100dd12-3dmem/openeqa \
+    --exp_name ee_qwen/qwen-exp-168 \
+    --captions_only \
+    --experience_json_path /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/experience_output.json \
+    --tuple_output_json /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/exp_tuple_v0.json
+
 
 echo "[INFO] Debug run finished. Killing vLLM server (PID=$VLLM_PID)..."
 if [ -n "$VLLM_PID" ] && kill -0 "$VLLM_PID" 2>/dev/null; then
