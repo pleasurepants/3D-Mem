@@ -1,9 +1,9 @@
 import os
 import json
+import re
 import argparse
 import logging
 from typing import Dict, List, Optional, Tuple
-
 # Reuse the existing OpenAI chat wrapper
 from src.eval_utils_gpt_aeqa_qwen import call_openai_api
 
@@ -24,7 +24,174 @@ def build_abstraction_for_question(*args, **kwargs):
 
 
 
+# v-1
+# def format_final_trajectory_abstraction_prompt(
+#     question_text: str,
+#     segments: List[str],
+#     task_outcome: Optional[str] = None,
+# ) -> Tuple[str, List[Tuple[str, str]]]:
 
+#     sys_prompt = (
+#         "You are to synthesize a final trajectory-level abstraction for an embodied exploration agent. "
+#         "INPUT: several trajectory paragraphs, each summarizing a short segment for the SAME question. "
+#         "TASK: think step by step to integrate these segments, then output steps and a final Abstraction. "
+#         "STRICT FORMAT: Your output MUST contain EXACTLY SIX blocks in this order and with these labels: \n"
+#         "Step 0 (Task Understanding) — 2–3 sentences\n"
+#         "Step 1 (Trajectory) — 8–10 sentences\n"
+#         "Step 2 (Env–Object Associations) — 4–6 sentences\n"
+#         "Step 3 (Strategy × Question Type + Directional Priors) — 4–6 sentences\n"
+#         "Step 4 (Anti-patterns) — 2–3 sentences\n"
+#         "Abstraction: <20–24 sentence cohesive paragraph>\n"
+#         "No extra lines, no additional headers, and do NOT reorder or omit any block. Do NOT mention 'BVF', 'CVF', 'view', 'snapshot', 'image', camera operations, or step IDs anywhere. Use only region/landmark/path terms and task-relevant cues. "
+#         "In the Abstraction paragraph, always include concrete environment-task priors (e.g., 'recycling stations near utility/kitchen zones', 'signage near entrances/hubs'). If Task Outcome is FAIL, also include 2–4 explicit lessons phrased as do-not/avoid rules (e.g., 'avoid lingering in cluttered corners without new cues', 'do not switch directions without fresh evidence')."
+#     )
+#     content: List[Tuple[str, str]] = []
+#     content.append((f"Question: {question_text or '(unknown)'}",))
+#     if isinstance(task_outcome, str) and task_outcome.strip():
+#         content.append((f"Task Outcome: {task_outcome.strip().upper()}",))
+#     content.append(("Segments:",))
+#     for i, seg in enumerate(segments, start=1):
+#         if isinstance(seg, str) and seg.strip():
+#             content.append((f"Segment {i}: {seg.strip()}",))
+#     content.append((
+#         "Now print the following blocks in the exact order and with the exact labels (no extra content before/after). Constraints for ALL blocks: do NOT mention BVF/CVF/views/snapshots/images/camera; do NOT use step IDs; use only region/landmark/path words and task-relevant cues; keep prose, no bullets.\n\n"
+#         "Step 0 (Task Understanding) — 2–3 sentences: Paraphrase succinctly what the question asks (e.g., find/verify/compare), and what constitutes success.\n\n"
+#         "Step 1 (Trajectory) — 8–10 sentences: Summarize the overall trajectory across segments.\n"
+#         "- Describe the entry points, major regions/rooms traversed (e.g., entrance, hallway, kitchen zone, utility area, living space), and key transitions between them.\n"
+#         "- Indicate movement directionality (toward/away from salient regions or landmarks) and why the route changed (e.g., encountering new evidence or exhausting an area).\n"
+#         "- Focus on path logic and coverage (what was visited first/next/last), not on per-image details.\n\n"
+#         "Step 2 (Env–Object Associations) — 4–6 sentences: General priors linking categories to regions.\n"
+#         "- Use generic categories and regions (e.g., signage near entrances/hubs; cookware in kitchen-like areas; cleaning supplies near sinks/utility corners; clothing/linens near bedroom/closet zones).\n"
+#         "- Avoid scene-specific item names.\n\n"
+#         "Step 3 (Strategy × Question Type + Directional Priors) — 4–6 sentences: Concrete guidance per question type with directional priors.\n"
+#         "- Location: shortlist regions via priors, then confirm in the most indicative sub-areas.\n"
+#         "- Attribute/State: prioritize proximity checks of the target category using functional/visual cues; verify state locally.\n"
+#         "- Counting/Relationship: gain coverage to enumerate instances first, then verify local relations.\n"
+#         "- Text-reading: seek text-bearing surfaces/signage/panels with high-contrast lettering near decision points (entrances, hubs, boards).\n"
+#         "- Helpful: connectors (hallways/intersections), doorways, hubs; Harmful: blind dead-ends, purely cluttered corners without new cues.\n\n"
+#         "Step 4 (Anti-patterns) — 2–3 sentences: Common failure modes to avoid.\n"
+#         "- Make it concrete and environment-aware: specify where/when NOT to go. For example: following the perimeter of closed garage doors yields little new evidence when searching for containers; diving into deep storage alcoves is unhelpful for text-reading tasks; lingering in decor-heavy corners seldom helps container/appliance queries; circling vehicle bays rarely reveals recycling signage. Also state when to stop: avoid repeating passes along blank walls or returning to dead-end utility closets after container zones were already scanned; do not switch directions without fresh evidence; treat wrong or full-bin findings as negative evidence to pivot early.\n\n"
+#         "**Abstraction**: <20–24 sentence cohesive paragraph integrating Steps 1–5 into actionable, transferable guidance for similar tasks. Do not introduce scope beyond Steps 1–5; do not mention BVF/CVF/views/images; do not use step IDs.>",
+#     ))
+#     return sys_prompt, content
+
+
+
+
+# v0
+# def format_final_trajectory_abstraction_prompt(
+#     question_text: str,
+#     segments: List[str],
+#     task_outcome: Optional[str] = None,
+# ) -> Tuple[str, List[Tuple[str, str]]]:
+
+#     # sys_prompt: global rules plus enforced CoT structure (defines format without embedding specific inputs)
+#     sys_prompt = (
+#         "You are a self-reflective embodied exploration agent.\n"
+#         "Your task is to produce a two-part analysis of a full exploration trajectory with a STRICT step-by-step Chain-of-Thought style in <reflection>.\n\n"
+#         "=== INPUT SCHEMA (provided separately) ===\n"
+#         "<Target task>...</Target task>\n"
+#         "<exploration trajectory>...</exploration trajectory>\n"
+#         "<Final outcome>...</Final outcome>\n\n"
+#         "=== OUTPUT FORMAT (must be exact; HTML-like tags; no extra headers or sections) ===\n"
+#         "<reflection>\n"
+#         "  <step1_task_understanding></step1_task_understanding>\n"
+#         "  <step2_trajectory_reconstruction></step2_trajectory_reconstruction>\n"
+#         "  <step3_strategy_balance></step3_strategy_balance>\n"
+#         "  <step4_directional_shifts></step4_directional_shifts>\n"
+#         "  <step5_phase_timing></step5_phase_timing>\n"
+#         "  <step6_style_analysis></step6_style_analysis>\n"
+#         "  <step7_alternative_global_strategy></step7_alternative_global_strategy>\n"
+#         "  <summary_explain_outcome></summary_explain_outcome>\n"
+#         "</reflection>\n\n"
+#         "<abstraction>\n"
+#         "</abstraction>\n\n"
+#         "=== REFLECTION (step-by-step content requirements) ===\n"
+#         "- <step1_task_understanding>: State the overarching goal and success condition succinctly.\n"
+#         "- <step2_trajectory_reconstruction>: Reconstruct the overall route: which regions came first vs. later, transitions, and reasons for changes.\n"
+#         "- <step3_strategy_balance>: Judge if the trajectory prioritized broad coverage vs. immediate problem-solving; explain how that balance affected efficiency/success.\n"
+#         "- <step4_directional_shifts>: Identify major directional/region shifts; which improved evidence gain, which caused stagnation, and why.\n"
+#         "- <step5_phase_timing>: Explain how early/mid/late sequencing and timing shaped the final outcome.\n"
+#         "- <step6_style_analysis>: Describe how local choices aggregated into a general exploration style; name systemic strengths/weaknesses.\n"
+#         "- <step7_alternative_global_strategy>: Propose a better global strategy (if any), specifying how ordering, regions, or pivots would change and why it would likely improve performance.\n"
+#         "- <summary_explain_outcome>: Tie the above analysis to the final outcome (SUCCESS/FAIL) and list 2–3 concrete improvements for a redo.\n\n"
+#         "=== ABSTRACTION (writing guidelines) ===\n"
+#         "- The <abstraction> block must contain exactly FOUR labeled parts in this order and format:\n"
+#         "  General: <one cohesive paragraph with 3–5 sentences of transferable reasoning rules.>\n"
+#         "  Specific: <one cohesive paragraph with 5–7 sentences detailing environment–task priors and concrete cues.>\n"
+#         "  Positive Lessons: <2–4 sentences highlighting what to prioritize or repeat in future similar tasks.>\n"
+#         "  Negative Lessons: <2–4 sentences identifying pitfalls or strategies to avoid next time.>\n"
+#         "- Each part must start with its label exactly as shown (no extra tags or markdown). Keep the full <abstraction> block coherent and self-contained (14–18 sentences total).\n"
+#         "— Positive/Negative specificity rules —\n"
+#         "- In 'Positive Lessons', write 2–4 if–then rules that each include: (i) a concrete region or landmark, (ii) a perceptual/functional cue, (iii) an action verb, and (iv) an expected effect tied to <reflection> (reference which step influenced it, e.g., 'from step3/step5').\n"
+#         "- In 'Negative Lessons', write 2–4 anti-pattern rules that each include: (i) a trigger condition, (ii) a stop/pivot criterion with a small numeric threshold (e.g., 'within 1–2 transitions'), and (iii) a counterfactual fix linked to <reflection> (e.g., 'pivot to utility corners because of early-phase timing in step5').\n"
+#         "- Every sentence in 'Positive Lessons' and 'Negative Lessons' must contain at least one region/landmark term and one concrete action; avoid generic terms like 'be efficient', 'avoid detours' unless paired with a condition and a remedy.\n"
+#         "- Prefer measurable phrasing (e.g., 'after scanning two non-informative rooms', 'within two doorway transitions', 'when signage density is low, switch to high-prior zones').\n"
+
+#         "=== CONSTRAINTS ===\n"
+#         "- Use only regions/landmarks/paths and task-relevant cues. Do NOT mention cameras, images, BVF/CVF, or step IDs beyond the required tags.\n"
+#         "- Keep tag names and order EXACTLY as specified. No extra sections, bullets, or markdown headers. "
+#         "In <abstraction>, extend and consolidate the reasoning from <reflection>, reusing its concrete insights and environment–task priors instead of introducing new generalities. "
+#         "Give special weight to <summary_explain_outcome> when writing <abstraction>, expanding its causal reasoning and implications into a longer, detailed synthesis of about 14–18 sentences."
+#         " The <abstraction> block must be written as plain prose only—no sub-tags such as <general>, <specific>, <positive_lessons>, or <negative_lessons> are allowed."
+#         "It must comprehensively integrate the reasoning and conclusions from all steps in <reflection>—covering task understanding, trajectory logic, strategy balance, directional shifts, phase timing, exploration style, and alternative strategies—into one cohesive synthesis."
+
+
+#     )
+
+#     # content: inject concrete inputs (HTML blocks) and supply minimal instructions that enforce the required format
+#     content: List[Tuple[str, str]] = []
+
+#     content.append((
+#         "<Target task>\n"
+#         f"{question_text or '(unknown)'}\n"
+#         "</Target task>",
+#     ))
+
+#     if segments:
+#         joined_segments = []
+#         for i, seg in enumerate(segments, start=1):
+#             if isinstance(seg, str) and seg.strip():
+#                 joined_segments.append(f"#chunk {i}: {seg.strip()}")
+#         trajectory_text = "\n".join(joined_segments) if joined_segments else "(no segments)"
+#     else:
+#         trajectory_text = "(no segments)"
+
+#     content.append((
+#         "<exploration trajectory>\n"
+#         f"{trajectory_text}\n"
+#         "</exploration trajectory>",
+#     ))
+
+#     final_outcome_str = (task_outcome or "").strip() or "(unknown)"
+#     content.append((
+#         "<Final outcome>\n"
+#         f"{final_outcome_str}\n"
+#         "</Final outcome>",
+#     ))
+
+#     content.append((
+#         "Now produce the output strictly in the required format with the exact tags and order:\n"
+#         "<reflection>\n"
+#         "  <step1_task_understanding>...</step1_task_understanding>\n"
+#         "  <step2_trajectory_reconstruction>...</step2_trajectory_reconstruction>\n"
+#         "  <step3_strategy_balance>...</step3_strategy_balance>\n"
+#         "  <step4_directional_shifts>...</step4_directional_shifts>\n"
+#         "  <step5_phase_timing>...</step5_phase_timing>\n"
+#         "  <step6_style_analysis>...</step6_style_analysis>\n"
+#         "  <step7_alternative_global_strategy>...</step7_alternative_global_strategy>\n"
+#         "  <summary_explain_outcome>...</summary_explain_outcome>\n"
+#         "</reflection>\n\n"
+#         "In <abstraction>, extend from <reflection> by reusing its concrete insights and environment–task priors; do not introduce new generalities.\n"
+#         "Make 'Positive Lessons' and 'Negative Lessons' concrete: use if–then / anti-pattern + pivot rules with regions, cues, actions, numeric thresholds\n"
+#         "<abstraction>...</abstraction>\n"
+#     ))
+
+#     return sys_prompt, content
+
+
+
+# v1
 def format_final_trajectory_abstraction_prompt(
     question_text: str,
     segments: List[str],
@@ -32,61 +199,154 @@ def format_final_trajectory_abstraction_prompt(
 ) -> Tuple[str, List[Tuple[str, str]]]:
 
     sys_prompt = (
-        "You are to synthesize a final trajectory-level abstraction for an embodied exploration agent. "
-        "INPUT: several trajectory paragraphs, each summarizing a short segment for the SAME question. "
-        "TASK: think step by step to integrate these segments, then output steps and a final Abstraction. "
-        "STRICT FORMAT: Your output MUST contain EXACTLY SIX blocks in this order and with these labels: \n"
-        "Step 0 (Task Understanding) — 2–3 sentences\n"
-        "Step 1 (Trajectory) — 8–10 sentences\n"
-        "Step 2 (Env–Object Associations) — 4–6 sentences\n"
-        "Step 3 (Strategy × Question Type + Directional Priors) — 4–6 sentences\n"
-        "Step 4 (Anti-patterns) — 2–3 sentences\n"
-        "Abstraction: <20–24 sentence cohesive paragraph>\n"
-        "No extra lines, no additional headers, and do NOT reorder or omit any block. Do NOT mention 'BVF', 'CVF', 'view', 'snapshot', 'image', camera operations, or step IDs anywhere. Use only region/landmark/path terms and task-relevant cues. "
-        "In the Abstraction paragraph, always include concrete environment-task priors (e.g., 'recycling stations near utility/kitchen zones', 'signage near entrances/hubs'). If Task Outcome is FAIL, also include 2–4 explicit lessons phrased as do-not/avoid rules (e.g., 'avoid lingering in cluttered corners without new cues', 'do not switch directions without fresh evidence')."
+        "You are a self-reflective embodied exploration agent.\n"
+        "Your task is to produce a two-part analysis of a full exploration trajectory with a STRICT step-by-step Chain-of-Thought style in REFLECTION.\n\n"
+        "=== INPUT SCHEMA (provided separately) ===\n"
+        "<Target task>...</Target task>\n"
+        "<exploration trajectory>...</exploration trajectory>\n"
+        "<Final outcome>...</Final outcome>\n\n"
+        "=== OUTPUT FORMAT (must be exact; plain-text labels; no extra headers or sections) ===\n"
+        "REFLECTION:\n"
+        "task_understanding: ...\n"
+        "trajectory_reconstruction: ...\n"
+        "strategy_balance: ...\n"
+        "directional_shifts: ...\n"
+        "phase_timing: ...\n"
+        "style_assessment: ...\n"
+        "alternative_strategy: ...\n"
+        "outcome_synthesis: ...\n\n"
+        "ABSTRACTION:\n"
+        "Positive Lessons: ...\n"
+        "Negative Lessons: ...\n\n"
+        "=== REFLECTION (analysis requirements) ===\n"
+        "- task_understanding: Restate the exact guiding question verbatim (quote question_text) while outlining the overarching goal and success condition.\n"
+        "- trajectory_reconstruction: Reconstruct the overall route: which regions came first vs. later, transitions, and reasons for changes—all in service of answering question_text.\n"
+        "- strategy_balance: Judge if the trajectory prioritized broad coverage vs. immediate problem-solving; explain how that balance aligned with the question's requirements and affected efficiency/success.\n"
+        "- directional_shifts: Identify major directional/region shifts; which improved evidence gain, which caused stagnation, and why, citing how each shift related to question_text.\n"
+        "- phase_timing: Explain how early/mid/late sequencing and timing shaped the final outcome relative to the question's demands.\n"
+        "- style_assessment: Describe how local choices aggregated into an overall exploration style; name systemic strengths/weaknesses with respect to the question.\n"
+        "- alternative_strategy: Propose a better global strategy (if any), specifying how ordering, regions, or pivots would change and why it would likely improve performance for this question.\n"
+        "- outcome_synthesis: Tie the above analysis to the final outcome (SUCCESS/FAIL), explicitly link back to the guiding question's success criteria (include the question wording or its key nouns), and list 2–3 concrete improvements for a redo.\n"
+        "- Throughout REFLECTION, do not reference numeric step labels; instead, cite evidence or facets of question_text, weaving its targets, actions, and environments into every subsection.\n\n"
+        "=== ABSTRACTION (writing guidelines) ===\n"
+        "- The ABSTRACTION section must contain exactly TWO labeled parts in this order and format:\n"
+        "  Positive Lessons: <one paragraph with 5–6 sentences highlighting what to prioritize or repeat in future similar tasks. Begin with a single sentence that restates the guiding question and task goal, quoting question_text or a faithful paraphrase.>\n"
+        "  Negative Lessons: <one paragraph with 5–6 sentences identifying pitfalls or strategies to avoid next time. Begin with a single sentence that frames the key risks or failure modes for the same question, again citing question_text or its core terms.>\n"
+        "- Apply the General/Specific/Concise principles as writing constraints: every sentence must express a transferable rule, anchor it in concrete regions/landmarks/cues/timing markers, and stay compact and action-oriented.\n"
+        "- Ensure both paragraphs explicitly reference how the question framing or answer criteria shaped the recommended moves, without naming step numbers.\n"
+        "- After the opening sentence in each paragraph, every subsequent sentence must directly reuse concrete findings from REFLECTION (e.g., specific regions visited, directional pivots, timing judgments, style assessments, or outcome explanations) and explicitly mention a question-specific element (target object, required action, success cue).\n"
+        "- Keep the full ABSTRACTION section coherent and self-contained (10–12 sentences total, across both paragraphs).\n"
+        "- In 'Positive Lessons', write 2–4 if–then rules that each include: (i) a concrete region or landmark, (ii) a perceptual or functional cue, (iii) an action verb, and (iv) an expected effect tied to the REFLECTION analysis (refer to evidence or findings rather than step numbers).\n"
+        "- In 'Negative Lessons', write 2–4 anti-pattern rules that each include: (i) a trigger condition, (ii) a stop/pivot criterion with a small numeric threshold (e.g., 'within 1–2 transitions'), and (iii) a counterfactual fix linked to the REFLECTION analysis (cite observations instead of step numbers).\n"
+        "- Every sentence in both paragraphs must include at least one region/landmark term and one concrete action; avoid generic phrasing and keep measurements explicit (e.g., 'after scanning two non-informative rooms', 'within two doorway transitions').\n"
+
+        "=== CONSTRAINTS ===\n"
+        "- Use only regions/landmarks/paths and task-relevant cues. Do NOT mention cameras, images, BVF/CVF, or step IDs beyond the required labels.\n"
+        "- Keep every label EXACTLY as specified and in order. No extra sections, bullets, or markdown headers. "
+        "In ABSTRACTION, extend and consolidate the reasoning from REFLECTION, reusing its concrete insights and environment–task priors instead of introducing new umbrella themes. "
+        "Give special weight to summary_explain_outcome when writing ABSTRACTION, expanding its causal reasoning, question-specific implications, and directional lessons into a focused synthesis of about 10–12 sentences."
+        " Make sure every ABSTRACTION statement clearly signals which REFLECTION insight it extends or compresses (e.g., by mirroring its terminology or paraphrasing its causal link)."
+        " The ABSTRACTION section must be written as plain prose only—no additional sub-headings beyond the two required labels are allowed."
+        "It must comprehensively integrate the reasoning and conclusions from all REFLECTION steps—covering task understanding, trajectory logic, strategy balance, directional shifts, phase timing, exploration style, and alternative strategies—into one cohesive synthesis."
+
+
     )
+
+    # content: inject concrete inputs (HTML blocks) and supply minimal trigger instructions that enforce the required format
     content: List[Tuple[str, str]] = []
-    content.append((f"Question: {question_text or '(unknown)'}",))
-    if isinstance(task_outcome, str) and task_outcome.strip():
-        content.append((f"Task Outcome: {task_outcome.strip().upper()}",))
-    content.append(("Segments:",))
-    for i, seg in enumerate(segments, start=1):
-        if isinstance(seg, str) and seg.strip():
-            content.append((f"Segment {i}: {seg.strip()}",))
+
     content.append((
-        "Now print the following blocks in the exact order and with the exact labels (no extra content before/after). Constraints for ALL blocks: do NOT mention BVF/CVF/views/snapshots/images/camera; do NOT use step IDs; use only region/landmark/path words and task-relevant cues; keep prose, no bullets.\n\n"
-        "Step 0 (Task Understanding) — 2–3 sentences: Paraphrase succinctly what the question asks (e.g., find/verify/compare), and what constitutes success.\n\n"
-        "Step 1 (Trajectory) — 8–10 sentences: Summarize the overall trajectory across segments.\n"
-        "- Describe the entry points, major regions/rooms traversed (e.g., entrance, hallway, kitchen zone, utility area, living space), and key transitions between them.\n"
-        "- Indicate movement directionality (toward/away from salient regions or landmarks) and why the route changed (e.g., encountering new evidence or exhausting an area).\n"
-        "- Focus on path logic and coverage (what was visited first/next/last), not on per-image details.\n\n"
-        "Step 2 (Env–Object Associations) — 4–6 sentences: General priors linking categories to regions.\n"
-        "- Use generic categories and regions (e.g., signage near entrances/hubs; cookware in kitchen-like areas; cleaning supplies near sinks/utility corners; clothing/linens near bedroom/closet zones).\n"
-        "- Avoid scene-specific item names.\n\n"
-        "Step 3 (Strategy × Question Type + Directional Priors) — 4–6 sentences: Concrete guidance per question type with directional priors.\n"
-        "- Location: shortlist regions via priors, then confirm in the most indicative sub-areas.\n"
-        "- Attribute/State: prioritize proximity checks of the target category using functional/visual cues; verify state locally.\n"
-        "- Counting/Relationship: gain coverage to enumerate instances first, then verify local relations.\n"
-        "- Text-reading: seek text-bearing surfaces/signage/panels with high-contrast lettering near decision points (entrances, hubs, boards).\n"
-        "- Helpful: connectors (hallways/intersections), doorways, hubs; Harmful: blind dead-ends, purely cluttered corners without new cues.\n\n"
-        "Step 4 (Anti-patterns) — 2–3 sentences: Common failure modes to avoid.\n"
-        "- Make it concrete and environment-aware: specify where/when NOT to go. For example: following the perimeter of closed garage doors yields little new evidence when searching for containers; diving into deep storage alcoves is unhelpful for text-reading tasks; lingering in decor-heavy corners seldom helps container/appliance queries; circling vehicle bays rarely reveals recycling signage. Also state when to stop: avoid repeating passes along blank walls or returning to dead-end utility closets after container zones were already scanned; do not switch directions without fresh evidence; treat wrong or full-bin findings as negative evidence to pivot early.\n\n"
-        "**Abstraction**: <20–24 sentence cohesive paragraph integrating Steps 1–5 into actionable, transferable guidance for similar tasks. Do not introduce scope beyond Steps 1–5; do not mention BVF/CVF/views/images; do not use step IDs.>",
+        "<Target task>\n"
+        f"{question_text or '(unknown)'}\n"
+        "</Target task>",
     ))
+
+    if segments:
+        joined_segments = []
+        for i, seg in enumerate(segments, start=1):
+            if isinstance(seg, str) and seg.strip():
+                joined_segments.append(f"#chunk {i}: {seg.strip()}")
+        trajectory_text = "\n".join(joined_segments) if joined_segments else "(no segments)"
+    else:
+        trajectory_text = "(no segments)"
+
+    content.append((
+        "<exploration trajectory>\n"
+        f"{trajectory_text}\n"
+        "</exploration trajectory>",
+    ))
+
+    final_outcome_str = (task_outcome or "").strip() or "(unknown)"
+    content.append((
+        "<Final outcome>\n"
+        f"{final_outcome_str}\n"
+        "</Final outcome>",
+    ))
+
+    content.append((
+        "Now produce the output strictly in the required format with the exact labels and order:\n"
+        "REFLECTION:\n"
+        "step1_task_understanding: ...\n"
+        "step2_trajectory_reconstruction: ...\n"
+        "step3_strategy_balance: ...\n"
+        "step4_directional_shifts: ...\n"
+        "step5_phase_timing: ...\n"
+        "step6_style_analysis: ...\n"
+        "step7_alternative_global_strategy: ...\n"
+        "summary_explain_outcome: ...\n\n"
+        "ABSTRACTION:\n"
+        "Positive Lessons: ...\n"
+        "Negative Lessons: ...\n"
+        "\n"
+        "In ABSTRACTION, extend from REFLECTION by reusing its concrete insights and environment–task priors; do not introduce new umbrella themes.\n"
+        "Only include the two labeled parts above; each must be a single paragraph with 5–6 sentences.\n"
+        "Quote the literal question_text in the REFLECTION task_understanding subsection and in the opening sentences of both ABSTRACTION paragraphs.\n"
+        "Write every sentence as a transferable yet concrete rule anchored in regions/landmarks/cues/timing markers, using if–then or anti-pattern guidance with measurable thresholds, and explicitly connect recommendations back to the guiding question.\n"
+        "After the opening sentence, ensure every ABSTRACTION sentence references a question-specific element (target object, required action, or success cue) and mirrors a specific REFLECTION insight.\n"
+        "Keep the overall ABSTRACTION section within 10–12 sentences across the two paragraphs.\n"
+        "Each ABSTRACTION sentence must mirror or paraphrase a specific REFLECTION insight so the two sections stay tightly coupled.\n"
+        "Do not reference step numbers anywhere in the output; ground reasoning in the question, evidence, and environment cues instead.\n"
+    ))
+
     return sys_prompt, content
+
+
+
 
 
 
 
 def _split_thinking_and_abstraction(full_text: Optional[str]) -> Tuple[str, str]:
     """
-    Split model output into (thinking_process, abstraction_only).
-    - thinking_process: everything before the first line starting with 'Abstraction:' or '**Abstraction**:' (case-sensitive for double-asterisk; case-insensitive for the rest handled by explicit checks)
-    - abstraction_only: the content after the marker on that line (trimmed), plus any subsequent lines
-    If no marker is found, returns (full_text or '', '').
+    Split model output into (reflection, abstraction).
+    Supports the current plain-text label format and older HTML-like/tagged formats.
+    Falls back to legacy parsing (looking for 'Abstraction:' markers) when labels are missing.
     """
     if not isinstance(full_text, str) or not full_text.strip():
         return "", ""
+    
+    # Try the plain-text label format first (REFLECTION / ABSTRACTION)
+    reflection_plain = re.search(
+        r'REFLECTION:\s*(.*?)(?=\n\s*ABSTRACTION:)',
+        full_text,
+        re.DOTALL | re.IGNORECASE,
+    )
+    abstraction_plain = re.search(r'ABSTRACTION:\s*(.*)', full_text, re.DOTALL | re.IGNORECASE)
+    if reflection_plain and abstraction_plain:
+        reflection_content = reflection_plain.group(1).strip()
+        abstraction_content = abstraction_plain.group(1).strip()
+        return reflection_content, abstraction_content
+    
+    # Fallback: try HTML-like tag format
+    reflection_match = re.search(r'<reflection>(.*?)</reflection>', full_text, re.DOTALL | re.IGNORECASE)
+    abstraction_match = re.search(r'<abstraction>(.*?)</abstraction>', full_text, re.DOTALL | re.IGNORECASE)
+    
+    if reflection_match and abstraction_match:
+        reflection_content = reflection_match.group(1).strip()
+        abstraction_content = abstraction_match.group(1).strip()
+        return reflection_content, abstraction_content
+    
+    # Fallback to legacy parsing for backward compatibility
     lines = [ln.rstrip() for ln in full_text.splitlines()]
     abs_idx = -1
     # Preferred marker: **Abstraction**: (with colon)
@@ -164,6 +424,7 @@ def generate_traj_abstraction_from_chunk_caption(
         
     Returns a dict: {
       'question': str,
+      'reflection': str,
       'abstraction': str,
     }
     or None if the data is invalid.
@@ -187,11 +448,12 @@ def generate_traj_abstraction_from_chunk_caption(
     )
     final_out = call_openai_api(final_sys, final_cont, seed=seed)
     final_out = (final_out or "").strip()
-    _, abstraction_text = _split_thinking_and_abstraction(final_out)
-    logging.info(f"[Traj][Final] qid={question_id} final_abs_len={len(abstraction_text)}")
+    reflection_text, abstraction_text = _split_thinking_and_abstraction(final_out)    
+    logging.info(f"[Traj][Final] qid={question_id} reflection_len={len(reflection_text)} final_abs_len={len(abstraction_text)}")
 
     return {
         "question": question_text,
+        "reflection": reflection_text,
         "abstraction": abstraction_text,
     }
 
@@ -303,14 +565,14 @@ def main():
                 seed=args.seed,
             )
             if obj is None:
-                results[qid] = {"question": "", "abstraction": ""}
+                results[qid] = {"question": "", "reflection": "", "abstraction": ""}
             else:
                 results[qid] = obj
             # incremental write after each question
             _write_incremental_json(args.out, qid, results[qid])
         except Exception as e:
             logging.warning(f"abstraction generation failed for {qid}: {e}")
-            results[qid] = {"question": "", "abstraction": ""}
+            results[qid] = {"question": "", "reflection": "", "abstraction": ""}
             _write_incremental_json(args.out, qid, results[qid])
 
     # final write to ensure consistency

@@ -1409,15 +1409,15 @@ def format_explore_prompt_frontier(
     context_label = "TRAJECTORY ABSTRACTION" if bool(use_traj_abstraction) else "EXPERIENCE REPLAY"
     if bool(use_traj_abstraction):
         context_desc = (
-            "TRAJECTORY ABSTRACTION (if present): High-level, question-specific strategies distilled from past trajectories of similar tasks. "
-            "It provides concise guidance on which areas to prioritize or avoid for effective exploration, without low-level captions or critiques. "
-            "Each abstraction consists of two parts: (1) Environment Dynamics—describes the spatial layout, key regions, and physical structure of the environment; "
-            "(2) Decision-making Skills—provides actionable strategies and heuristics for navigating and making effective decisions in that specific environment type. "
-            "Use Environment Dynamics to understand the scene structure, and apply Decision-making Skills as guiding principles for frontier selection.\n\n"
+            "TRAJECTORY ABSTRACTION : A problem-specific reflection distilled from successful/failed trajectories answering the exact question at hand. "
+            "It is split into two labeled paragraphs: Positive Lessons (what to repeat) and Negative Lessons (what to avoid). "
+            "Each sentence is a concise if–then or anti-pattern rule grounded in concrete regions, landmarks, cues, and timing markers from prior runs. "
+            "The first sentence of each paragraph restates the question goal; following sentences reuse reflection insights to explain how to target the required object/action and when to pivot. "
+            "Use Positive Lessons to steer exploration toward high-value checks and Negative Lessons to recognize and exit low-yield behaviors.\n\n"
         )
     else:
         context_desc = (
-            "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, "
+            "EXPERIENCE REPLAY: A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, "
             "which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
         )
 

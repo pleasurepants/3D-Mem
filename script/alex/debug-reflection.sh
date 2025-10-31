@@ -1,15 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=chunk-to-caption
-#SBATCH --gres=gpu:a100:2
+#SBATCH --job-name=caption-reflection-abstraction-v1
+#SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=3:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/chunk-to-caption-%j.out
-#SBATCH --partition a100
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/caption-reflection-abstraction-v1-%j.out
+#SBATCH --partition a40
 
 
 
-# srun --nodes=1 --gres=gpu:a100:2 --ntasks=1 --cpus-per-task=16 --time=2:00:00 --partition a100 --pty bash
+# srun --nodes=1 --gres=gpu:a100:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a100 --pty bash
 # srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=2:00:00 --partition a40 --pty bash
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
@@ -74,10 +74,10 @@ source .env
 # export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 # -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
-CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client /home/hpc/v100dd/v100dd12/code/3D-Mem/captions_reflection_abstraction.py \
+CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/captions_reflection_abstraction.py \
   --chunk_caption /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/final_captions_from_chunck.json \
   --seed 32 \
-  --out /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/captions_reflection_abstraction.json
+  --out /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/captions_reflection_abstraction_v1.json
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
