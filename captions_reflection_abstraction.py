@@ -265,7 +265,7 @@ def format_final_trajectory_abstraction_prompt(
         joined_segments = []
         for i, seg in enumerate(segments, start=1):
             if isinstance(seg, str) and seg.strip():
-                joined_segments.append(f"#chunk {i}: {seg.strip()}")
+                joined_segments.append(f"#chunk {i}: {seg.strip()}")    # TODO: no chunk number for single segment?
         trajectory_text = "\n".join(joined_segments) if joined_segments else "(no segments)"
     else:
         trajectory_text = "(no segments)"

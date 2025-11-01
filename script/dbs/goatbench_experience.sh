@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=goatbench_train_captions_from_chunk
+#SBATCH --job-name=goatbench_train_captions_reflection_abstraction
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -49,8 +49,13 @@ export END_POINT="http://10.153.51.154:8006/v1"    # worker-5
 #   --seed 32 \
 #   --out /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/traj_abs_single.json
 
-python chunk_to_traj_caption.py \
-    --exp_tuple /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/exp_tuple_v0.json \
-    --max_steps 10 \
+# python chunk_to_traj_caption.py \
+#     --exp_tuple /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/exp_tuple_v0.json \
+#     --max_steps 10 \
+#     --seed 13 \
+#     --out /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/final_captions_from_chunk.json
+
+python captions_reflection_abstraction.py \
+    --chunk_caption /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/final_captions_from_chunk.json \
     --seed 13 \
-    --out /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/final_captions_from_chunk.json
+    --out /nfs/data8/jingpei/eqa/3D-Mem/results/goatbench/train_hierarchical-cot/seed13/captions_reflection_abstraction.json
