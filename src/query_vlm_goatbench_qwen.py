@@ -147,6 +147,7 @@ def query_vlm_for_response(
 
     # prepare other metadata
     step_dict["question"] = subtask_metadata["question"]
+    step_dict["question_id"] = subtask_metadata["question_id"]
     step_dict["task_type"] = subtask_metadata["task_type"]
     step_dict["class"] = subtask_metadata["class"]
     step_dict["image"] = subtask_metadata["image"]

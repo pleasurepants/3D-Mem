@@ -704,7 +704,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             step_idx=f"task-{subtask_idx}_step-{cnt_step}", # saving frontier
                             # question_id=question_id,
                             lifelong_json_path=lifelong_json_path,
-                            exp_tuple_path=(args.exp_tuple if isinstance(args.exp_tuple, str) and len(args.exp_tuple) > 0 else None),
+                            exp_tuple_path=(cfg.exp_tuple if isinstance(cfg.exp_tuple, str) and len(cfg.exp_tuple) > 0 else None),
                             inject_experience=(False if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.caption)),
                             inject_critique=(False if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.critique)),
                             inject_abstraction=(True if str(getattr(cfg, 'replay_mode', 'sim')).startswith('traj') else bool(args.abstraction)),
@@ -959,6 +959,8 @@ if __name__ == "__main__":
     if args.retrieve_root:
         cfg.retrieve_root = args.retrieve_root
 
+    cfg.exp_tuple = args.exp_tuple
+    
     # Episodic context toggle
     cfg.use_episodic_context = bool(args.use_episodic_context)
     # vLLM per-request seed (independent from cfg.seed)

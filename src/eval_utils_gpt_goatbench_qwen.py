@@ -161,7 +161,7 @@ def get_step_info(step, verbose=False):
     keep_index_snapshot = {
         rgb_id: list(range(len(snapshot_crops[rgb_id]))) for rgb_id in snapshot_crops
     }
-    if step.get("use_prefiltering") is True:    # seems not set by default
+    if step.get("use_prefiltering") is True:    # true by default
         use_full_obj_list = step["use_full_obj_list"]
         n_prev_snapshot = len(snapshot_full_imgs)
         snapshot_classes, keep_index, keep_index_snapshot = prefiltering(
@@ -235,14 +235,46 @@ def _load_frontier_index(cfg):
     
 _AEQA_QID2QUESTION = None
 
-def _load_questions_en() -> dict:
-    pass
+def _load_questions_en(questions_list_path: str) -> dict:
+    try:
+        with open(questions_list_path, 'r', encoding='utf-8') as f:
+            arr = json.load(f)
+        qmap = {}
+        if isinstance(arr, list):
+            for it in arr:
+                if not isinstance(it, dict):
+                    continue
+                qid = it.get('question_id')
+                qtext = it.get('question')
+                if isinstance(qid, str) and isinstance(qtext, str) and qid and qtext:
+                    qmap[qid] = qtext
+        return qmap
+    except Exception as e:
+        logging.warning(f"[SimpleRecall] load questions file failed: {e}")
+        return {}
 
 def _tokenize(text: str):
-    pass
+    if not isinstance(text, str):
+        return []
+    import re as _re
+    t = _re.sub(r"[^\w\s]", " ", text.lower())
+    return [w for w in t.split() if w]
 
 def _cosine_sim_tokens(a: str, b: str) -> float:
-    pass
+    ta = _tokenize(a)
+    tb = _tokenize(b)
+    if not ta or not tb:
+        return 0.0
+    from collections import Counter
+    ca, cb = Counter(ta), Counter(tb)
+    import math
+    keys = set(ca.keys()) | set(cb.keys())
+    dot = sum(ca[k] * cb[k] for k in keys)
+    na = math.sqrt(sum(v * v for v in ca.values()))
+    nb = math.sqrt(sum(v * v for v in cb.values()))
+    if na == 0 or nb == 0:
+        return 0.0
+    return float(dot / (na * nb))
 
 def _load_vector_store(cfg):
     """
@@ -310,12 +342,12 @@ def _rank_by_vectors_for_question(current_question: str, store: dict, top_k: int
 
 
 def simple_recall_and_aggregate(
-    frontier_imgs_b64, 
-    cfg, 
-    exclude_question_id=None, 
-    top_k=1, 
-    strategy: str = 'sim', 
-    current_question: str = None, 
+    frontier_imgs_b64,
+    cfg,
+    exclude_question_id=None,
+    top_k=1,
+    strategy: str = 'sim',
+    current_question: str = None,
     rrf_k: int = 60,
     exp_tuple_path: Optional[str] = None,
     inject_experience: bool = False,
@@ -413,7 +445,7 @@ def simple_recall_and_aggregate(
                 logging.info("[TrajSim] no merged candidates")
                 return None
             # 2) 文本相似（当前问题 -> 训练集问题文本）
-            qid2question = _load_questions_en()
+            qid2question = _load_questions_en(cfg.questions_list_path)
             for cand in merged_candidates:
                 qid = cand.get('question_id')
                 qtext = qid2question.get(qid, '')
@@ -483,7 +515,7 @@ def simple_recall_and_aggregate(
             try:
                 logging.info(f"[TrajSim] selected {len(selected)} question(s) (need {int(top_k)}):")
                 for i, (qid, cand) in enumerate(selected, 1):
-                    qtext = _load_questions_en().get(qid, (traj_data.get(qid) or {}).get('question', '')) if isinstance(traj_data, dict) else ''
+                    qtext = _load_questions_en(cfg.questions_list_path).get(qid, (traj_data.get(qid) or {}).get('question', '')) if isinstance(traj_data, dict) else ''
                     logging.info(
                         f"  #{i}: qid={qid} | clip_sim={float(cand.get('similarity', 0.0)):.4f} | qsim={float(cand.get('qsim', 0.0)):.4f} | rrf={float(cand.get('rrf_score', 0.0)):.6f} | question={_shorten(qtext, 180)}"
                     )
@@ -1202,22 +1234,22 @@ def format_explore_prompt_frontier(
 ):
     """
     Frontier-selection prompt with explicit Step 0/1/2/3 and FINAL:
-      - Clear semantics (Frontier / Episodic / Experience).
+      - Clear semantics (Frontier / Episodic / Experience or Trajectory Abstraction).
       - Optional blocks via has_episodic / has_experience.
       - Strict index-only discipline.
       - Reason first, answer last; FINAL line prints only: 'frontier i'.
     """
-    
+
     # --------- Presence flags ----------
     has_episodic = bool(episodic_con and isinstance(episodic_con, str) and episodic_con.strip())
     has_experience = bool(context and isinstance(context, str) and context.strip())
     has_ego = bool(egocentric_view and egocentric_imgs and len(egocentric_imgs) > 0)
-    
+
     # =========================
     # System role & definitions (based on user's template)
     # =========================
     label_word = "BVF" if str(frontier_type).upper() == "BVF" else "CVF"
-    
+
     # Context label & description switch
     context_label = "TRAJECTORY ABSTRACTION" if bool(use_traj_abstraction) else "EXPERIENCE REPLAY"
     if bool(use_traj_abstraction):
@@ -1233,28 +1265,26 @@ def format_explore_prompt_frontier(
             "EXPERIENCE REPLAY: A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, "
             "which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
         )
-    
-    
-    sys_prompt = ""
-    sys_prompt += (
+
+    sys_prompt = (
         "You are an embodied agent for exploration in an indoor environment to find the target object required in the question. "
-        + "At each step of exploration, you will be given frontier snapshots of your surrounding environment; your task is to pick EXACTLY ONE frontier to move to for further exploration or solving the question.\n\n"
-        + "FRONTIERs are candidate entry points toward yet-unseen or information-rich regions—typical visual patterns include doorways/thresholds, corridors/intersections, stairs, corners/turns, or vantage points that likely open new coverage.\n\n"
-        + "You will be given 2 types of frontiers: Broad-View Frontier (BVF) segments your 360° surrounding environment so that you can have an overview. "
-        + "Closer-View Frontier (CVF) gives narrowed perspectives of a specific BVF direction. "
-        + "You SHALL pick EXACTLY ONE BVF to look closer. With the selected BVF, you DO NOT move; you further break down that direction into Closer-View Frontiers (CVF), which give narrowed perspectives. "
-        + "You SHALL pick EXACTLY ONE CVF to move to in the next step.\n\n"
-        + "You will be given the following information as contexts:\n"
-        + "EGOCENTRIC VIEW (if shown): The agent's immediate forward-looking camera view; use it as local context only.\n"
-        + "EPISODIC CONTEXT (if present): A factual textual summary of the previous steps within THIS episode (visited path, observations, likely-unseen areas). "
-        + "Use this to avoid redundancy and prefer novel, informative directions. It is evidence, not a command.\n"
-        # + "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
-        + f"{context_desc}"
-        + "RULES:\n"
-        + "- You will only be given either BVFs or CVFs at a time (BVF for looking closer; CVF for moving next).\n"
-        + "- Your reasoning must be concrete and visual. Name specific objects, layouts, textures, lighting, text-bearing surfaces/symbols, and any cues directly relevant to the question.\n"
-        + "- You must select one of the provided candidates; do NOT output that none is suitable.\n"
-        + f"- Output the rationale first and the answer last. On the final line, print ONLY '{label_word} i' (the chosen index).\n"
+        "At each step of exploration, you will be given frontier snapshots of your surrounding environment; your task is to pick EXACTLY ONE frontier to move to for further exploration or solving the question.\n\n"
+        "FRONTIERs are candidate entry points toward yet-unseen or information-rich regions—typical visual patterns include doorways/thresholds, corridors/intersections, stairs, corners/turns, or vantage points that likely open new coverage.\n\n"
+        "You will be given 2 types of frontiers: Broad-View Frontier (BVF) segments your 360° surrounding environment so that you can have an overview. "
+        "Closer-View Frontier (CVF) gives narrowed perspectives of a specific BVF direction. "
+        "You SHALL pick EXACTLY ONE BVF to look closer. With the selected BVF, you DO NOT move; you further break down that direction into Closer-View Frontiers (CVF), which give narrowed perspectives. "
+        "You SHALL pick EXACTLY ONE CVF to move to in the next step.\n\n"
+        "You will also be given the following information as contexts:\n"
+        "EGOCENTRIC VIEW (if shown): The agent's immediate forward-looking camera view; use it as local context only.\n"
+        "EPISODIC CONTEXT (if present): A factual textual summary of the previous steps within THIS episode (visited path, observations, likely-unseen areas). "
+        "Use this to avoid redundancy and prefer novel, informative directions. It is evidence, not a command.\n"
+        # "EXPERIENCE REPLAY (if present): A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, which frontier was chosen, what actions followed, the outcome/reward, a brief critique, and an abstraction to reflect on.\n\n"
+        f"{context_desc}"
+        "RULES:\n"
+        "- You will only be given either BVFs or CVFs at a time (BVF for looking closer; CVF for moving next).\n"
+        "- Your reasoning must be concrete and visual. Name specific objects, layouts, textures, lighting, text-bearing surfaces/symbols, and any cues directly relevant to the question.\n"
+        "- You must select one of the provided candidates; do NOT output that none is suitable.\n"
+        f"- Output the rationale first and the answer last. On the final line, print ONLY '{label_word} i' (the chosen index).\n"
     )
     
     content = []
@@ -1295,7 +1325,7 @@ def format_explore_prompt_frontier(
         #     "what seems already covered vs. still unexplored). Use this to avoid redundancy and to prefer novel, decision-relevant directions:\n"
         #     + episodic_con.strip(),
         # ))
-        content.append((f"\nEPISODIC CONTEXT: ",))
+        content.append(("\nEPISODIC CONTEXT: ",))
         content.append((episodic_con.strip(),))
     
     # =========================
@@ -1717,10 +1747,10 @@ def frontier_context(
 
 
 def explore_step(
-    step, 
-    cfg, 
-    verbose=False, 
-    chosen_frontier_path=None, 
+    step,
+    cfg,
+    verbose=False,
+    chosen_frontier_path=None,
     step_idx=None,
     exp_tuple_path: Optional[str] = None,
     inject_experience: bool = False,
@@ -1960,7 +1990,7 @@ def explore_step(
         logging.info("[EpisodicCtx] Disabled by cfg.use_episodic_context=False")
     
     # 当 _replay_top=0 或禁用 layer0 注入时，不注入任何 experience（env recall）
-    layer0_con = step.get("replay_layer0_aggregated_context") if _replay_top > 0 else None
+    layer0_con = step.get("replay_layer0_aggregated_context") if (_replay_top > 0 and _inject_layer0) else None
     try:
         logging.info(f"[ReplayCtx] layer0 aggregated context len: {len(layer0_con) if isinstance(layer0_con, str) else 'None'}")
     except Exception:
@@ -2059,7 +2089,7 @@ def explore_step(
             )
         
         ## ==== (NEW) 对该方向的更近处子集做回忆与聚合 ====
-        if _replay_top > 0:
+        if _replay_top > 0 and _inject_layer1:
             # 根据选择的大簇子集做同样的最简实现
             subgroup_b64 = [frontier_imgs_1[i] for i in layer1_indices]
             layer1_context_text = simple_recall_and_aggregate(
