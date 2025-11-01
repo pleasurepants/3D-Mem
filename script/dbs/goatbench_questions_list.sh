@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=goatbench_question_list
+#SBATCH --job-name=goatbench_questions_list_train
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
@@ -24,5 +24,7 @@ cd /nfs/data8/jingpei/eqa/3D-Mem
 # export END_POINT="http://10.153.51.154:8009/v1"    # worker-5
 # export END_POINT="http://10.153.51.154:8006/v1"    # worker-5
 
-python generate_question_list.py -cf /nfs/data8/jingpei/eqa/3D-Mem/cfg/dbs_cfg/goatbench_qwen_rollout.yaml
+python generate_questions_list.py -cf /nfs/data8/jingpei/eqa/3D-Mem/cfg/dbs_cfg/goatbench_qwen_rollout.yaml
 # in train_hierarchical-cot_log
+# python generate_questions_list.py -cf /nfs/data8/jingpei/eqa/3D-Mem/cfg/dbs_cfg/goatbench_qwen_seed.yaml
+# # in hierarchical-cot_log

@@ -219,7 +219,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
     
     json.dump(
         question_list,
-        open(cfg.output_dir + "/question_list.json", "w"),
+        open(cfg.output_dir + "/questions_list.json", "w"),
         indent=4,
         default=_json_default,
     )
