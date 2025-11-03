@@ -1,7 +1,7 @@
 # General
 seed: 13
 exp_name: "random/top-1/ct-r-1-13"
-output_parent_dir: "/anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/trajectory_exp/traj_abs_format_po_nega"
+output_parent_dir: "/anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/trajectory_exp/traj_abs_format_lessons2"
 scene_dataset_config_path: "/home/hpc/v100dd/v100dd12/code/3D-Mem/data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/anvme/workspace/v100dd12-3dmem/hm3d/data/3dmem"
 questions_list_path: '/home/hpc/v100dd/v100dd12/code/3D-Mem/data/aeqa_questions-41.json'

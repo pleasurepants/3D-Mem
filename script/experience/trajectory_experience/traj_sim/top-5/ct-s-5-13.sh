@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=cra-s-5-13
+#SBATCH --job-name=traj-sim-t5-s13
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=12:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/traj_abs_format_po_nega/traj_sim/top-5/cra-s-5-13-%j.out
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/traj_abs_format_lessons2/traj_sim/top-5/traj-sim-t5-s13-%j.out
 #SBATCH --partition a40
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
