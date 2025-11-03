@@ -152,6 +152,8 @@ def tuple_step_save(
     # step_key = f"step_{cnt_step}"
     subtask_idx, local_idx = re.match(r"task-(\d+)_step-(\d+)", cnt_step).groups()
     step_key = f"step_{local_idx}"    # question_id include subtask_idx
+    # Initialize step data - allow updates if re-running the subtask
+    # This ensures step data reflects the current execution
     saved_result[ep_id][question_id]["steps"][step_key] = {}
 
     # --- dirs ---
@@ -235,6 +237,8 @@ def tuple_step_save(
     q_bucket = saved_result[ep_id][question_id]
     if "final_reward" not in q_bucket:
         q_bucket["final_reward"] = "fail"
+    # Update final_reward if explicitly provided (allow updates when re-running)
+    # Note: The final evaluation result (success_by_snapshot) is protected in log_subtask_result
     if final_reward is not None:
         q_bucket["final_reward"] = final_reward
 
@@ -407,7 +411,8 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                 for subtask_id in finished_subtask_ids
                 if subtask_id.startswith(f"{scene_id}_{episode_id}_")
             ]
-            if len(finished_episode_subtask) >= len(all_subtask_goals):
+            episode_is_complete = len(finished_episode_subtask) >= len(all_subtask_goals)
+            if episode_is_complete:
                 logging.info(f"Scene {scene_id} Episode {episode_id} already done!")
                 continue
 
@@ -446,8 +451,12 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                 save_visualization=cfg.save_visualization,
             )
 
+            # Clear existing frontier/snapshot directories when re-running incomplete episode
+            # This prevents conflicts when different runs generate different images with same filenames
+            clear_existing = not episode_is_complete and len(finished_episode_subtask) > 0
             episode_dir, eps_frontier_dir, eps_snapshot_dir = logger.init_episode(
-                episode_id=f"{scene_id}_ep_{episode_id}"
+                episode_id=f"{scene_id}_ep_{episode_id}",
+                clear_existing=clear_existing
             )   # diff w.r.t. aeqa: init_pts_voxel init in init_subtask(), no eps_chosen_snapshot_dir
 
             logging.info(f"\n\nScene {scene_id} initialization successful!")
@@ -1024,7 +1033,7 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(message)s",
         handlers=[
-            logging.FileHandler(logging_path, mode="w"),
+            logging.FileHandler(logging_path, mode="a"),  # Use append mode to preserve previous logs
             logging.StreamHandler(),
         ],
     )

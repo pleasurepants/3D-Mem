@@ -1,6 +1,7 @@
 import os
 import json
 import pickle
+import shutil
 from collections import defaultdict
 import logging
 import numpy as np
@@ -382,6 +383,22 @@ class Logger:
         n_total_snapshots,
         n_total_frames,
     ):
+        # For list-based results (success_by_task), need to handle overwriting
+        # If subtask_id already exists, save old values and remove from lists to avoid duplicates
+        old_success_value = None
+        old_spl_value = None
+        if subtask_id in self.success_by_snapshot:
+            # Get old values before updating dictionaries
+            old_success_value = self.success_by_distance.get(subtask_id, 0.0)
+            old_spl_value = self.spl_by_distance.get(subtask_id, 0.0)
+            
+            # Remove old entries from lists if they exist
+            if goal_type in self.success_by_task and old_success_value in self.success_by_task[goal_type]:
+                self.success_by_task[goal_type].remove(old_success_value)
+            if goal_type in self.spl_by_task and old_spl_value in self.spl_by_task[goal_type]:
+                self.spl_by_task[goal_type].remove(old_spl_value)
+
+        # Update dictionary-based results (these will overwrite old values)
         if success_by_snapshot:
             self.success_by_snapshot[subtask_id] = 1.0
         else:
@@ -403,6 +420,7 @@ class Logger:
             / max(gt_subtask_explore_dist, self.subtask_explore_dist)
         )
 
+        # Append new values (dictionaries already updated above)
         self.success_by_task[goal_type].append(self.success_by_distance[subtask_id])    # use _by_distance
         self.spl_by_task[goal_type].append(self.spl_by_distance[subtask_id])
 
@@ -452,12 +470,28 @@ class Logger:
     def init_episode(
         self,
         episode_id,
+        clear_existing: bool = False,
     ):
         self.episode_dir = os.path.join(self.output_dir, episode_id)
         eps_frontier_dir = os.path.join(self.episode_dir, "frontier")
         eps_snapshot_dir = os.path.join(self.episode_dir, "snapshot")
 
         os.makedirs(self.episode_dir, exist_ok=True)
+        
+        # Clear existing frontier, snapshot, and chosen_frontier directories if re-running episode
+        # This prevents conflicts when different runs generate different images with same filenames
+        if clear_existing:
+            if os.path.exists(eps_frontier_dir):
+                shutil.rmtree(eps_frontier_dir)
+                logging.info(f"Cleared existing frontier directory: {eps_frontier_dir}")
+            if os.path.exists(eps_snapshot_dir):
+                shutil.rmtree(eps_snapshot_dir)
+                logging.info(f"Cleared existing snapshot directory: {eps_snapshot_dir}")
+            chosen_frontier_dir = os.path.join(self.episode_dir, "chosen_frontier")
+            if os.path.exists(chosen_frontier_dir):
+                shutil.rmtree(chosen_frontier_dir)
+                logging.info(f"Cleared existing chosen_frontier directory: {chosen_frontier_dir}")
+        
         os.makedirs(eps_frontier_dir, exist_ok=True)
         os.makedirs(eps_snapshot_dir, exist_ok=True)
 
