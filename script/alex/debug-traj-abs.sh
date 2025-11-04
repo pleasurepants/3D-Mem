@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=3:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/trajectory-abs-32-%j.out
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/unformat-%j.out
 #SBATCH --partition a40
 
 
@@ -75,10 +75,10 @@ source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 # -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/generate_abstraction_from_captions.py \
-  --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/exp_tuple_v0.json \
+  --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json \
   --max_steps 10 \
   --seed 32 \
-  --out /anvme/workspace/v100dd12-3dmem/openeqa/ee_qwen/qwen-exp-168/traj_abs_single.json
+  --out /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/experience/unformat.json
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

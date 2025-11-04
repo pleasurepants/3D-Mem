@@ -77,7 +77,7 @@ export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/captions_reflection_abstraction.py \
   --chunk_caption /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/final_captions_from_chunck.json \
   --seed 32 \
-  --out /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/captions_reflection_abstraction_v1.json
+  --out /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/experience/lessons_v1.json
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."

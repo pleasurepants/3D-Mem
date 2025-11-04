@@ -76,18 +76,14 @@ source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 # -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/qwen_debug.yaml \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/eval_aeqa_debug.yaml \
     --replay_mode traj_sim \
+    --experience_training_status fail \
     --replay_top 3 \
     --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set \
-    --chat_seed 13 \
-    --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/traj_abs_format.json \
-    --caption true \
-    --critique true \
-    --abstraction true \
-    --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json \
-    --ppl_rank high \
-    --ppl_rank_file /home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json
+    --chat_seed 32 \
+    --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/experience-wrong_in_status/captions_reflection_abstraction_v1.json \
+    --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
