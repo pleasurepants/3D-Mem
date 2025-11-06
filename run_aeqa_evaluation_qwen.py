@@ -393,7 +393,7 @@ if __name__ == "__main__":
     parser.add_argument("--start_ratio", help="start ratio", default=0.0, type=float)
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
     parser.add_argument("--base_mode", help="base mode: 'hierarchy' or 'listwise'", default="hierarchy", type=str)
-    parser.add_argument("--kmeans", help="number of frontier snapshots to cluster using kmeans", default=12, type=int)
+    parser.add_argument("--kmeans", help="number of frontier snapshots to cluster using kmeans", default=9, type=int)
     parser.add_argument("--episodic_context", help="whether to use episodic context", action="store_true")
     parser.add_argument("--chat_seed", help="seed for chat API calls", default=None, type=int)
     args = parser.parse_args()

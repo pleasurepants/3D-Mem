@@ -68,7 +68,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
     logging.info(f"Load SAM model {cfg.sam_model_name} successful!")
 
     clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
-        "ViT-B-32", "laion2b_s34b_b79k"  # "ViT-H-14", "laion2b_s32b_b79k"
+        "ViT-H-14", pretrained="/anvme/workspace/v100dd12-3dmem/model/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin"  # "ViT-H-14", "laion2b_s32b_b79k"
     )
     clip_tokenizer = open_clip.get_tokenizer("ViT-B-32")
     logging.info(f"Load CLIP model successful!")
@@ -233,6 +233,9 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
             )
 
             # (3) Update the Frontier Snapshots
+            # Add base_mode and kmeans to planner cfg
+            cfg.planner.base_mode = cfg.base_mode
+            cfg.planner.kmeans = cfg.kmeans
             update_success = tsdf_planner.update_frontier_map(
                 pts=pts,
                 cfg=cfg.planner,
@@ -389,9 +392,19 @@ if __name__ == "__main__":
     parser.add_argument("-cf", "--cfg_file", help="cfg file path", default="", type=str)
     parser.add_argument("--start_ratio", help="start ratio", default=0.0, type=float)
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
+    parser.add_argument("--base_mode", help="base mode: 'hierarchy' or 'listwise'", default="hierarchy", type=str)
+    parser.add_argument("--kmeans", help="number of frontier snapshots to cluster using kmeans", default=9, type=int)
+    parser.add_argument("--episodic_context", help="whether to use episodic context", action="store_true")
+    parser.add_argument("--chat_seed", help="seed for chat API calls", default=None, type=int)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
+    
+    # Add command line arguments to config
+    cfg.base_mode = args.base_mode
+    cfg.kmeans = args.kmeans
+    cfg.episodic_context = args.episodic_context
+    cfg.chat_seed = args.chat_seed
 
     # Set up logging
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
@@ -432,4 +445,8 @@ if __name__ == "__main__":
 
     # run
     logging.info(f"***** Running {cfg.exp_name} *****")
+    logging.info(f"Base mode: {cfg.base_mode}")
+    logging.info(f"Kmeans clusters: {cfg.kmeans}")
+    logging.info(f"Episodic context: {cfg.episodic_context}")
+    logging.info(f"Chat seed: {cfg.chat_seed}")
     main(cfg, args.start_ratio, args.end_ratio)

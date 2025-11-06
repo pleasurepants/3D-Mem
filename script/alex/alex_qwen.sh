@@ -76,9 +76,8 @@ export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 CUDA_VISIBLE_DEVICES=1 python -m debugpy --listen 0.0.0.0:8798 --wait-for-client /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_qwen.py \
     -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/qwen-nocon.yaml \
     --base_mode hierarchy \
-    --kmeans 13 \
     --episodic_context \
-    --chat_seed 13
+    --chat_seed 568
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
