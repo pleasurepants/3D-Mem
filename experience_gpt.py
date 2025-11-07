@@ -6,8 +6,30 @@ import logging
 from typing import Dict, List, Optional, Tuple
 # Reuse the existing OpenAI chat wrapper
 from src.eval_utils_gpt_aeqa_qwen import call_openai_api
+import openai
+from openai import OpenAI
+import time
+from src.const_gpt import *
+client = OpenAI(
+    base_url=END_POINT,
+    api_key=OPENAI_KEY,
+)
 
-
+def format_content(contents):
+    formated_content = []
+    for c in contents:
+        formated_content.append({"type": "text", "text": c[0]})
+        if len(c) == 2:
+            formated_content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{c[1]}",
+                        "detail": "high",
+                    },
+                }
+            )
+    return formated_content
 
 
 def format_abstraction_prompt(*args, **kwargs):
@@ -20,7 +42,51 @@ def build_abstraction_for_question(*args, **kwargs):
     raise NotImplementedError("Deprecated in favor of two-stage pipeline (captions->critiques->abstraction).")
 
 
+def call_openai_api(sys_prompt, contents, seed: Optional[int] = None) -> Optional[str]:
+    max_tries = 5
+    retry_count = 0
+    formated_content = format_content(contents)
+    message_text = [
+        {"role": "system", "content": sys_prompt},
+        {"role": "user", "content": formated_content},
+    ]
+    while retry_count < max_tries:
+        try:
+            # 支持从参数或环境变量注入 seed（优先参数，其次 VLLM_SEED）
+            # 读取优先级：参数 seed > cfg.chat_seed（经外层传入）> 环境变量 VLLM_SEED
+            _seed_env = None
+            try:
+                _seed_env = int(os.getenv("VLLM_SEED")) if os.getenv("VLLM_SEED") is not None else None
+            except Exception:
+                _seed_env = None
+            _seed = seed if seed is not None else _seed_env
+            try:
+                logging.info(f"[ChatSeed] using seed={_seed}")
+            except Exception:
+                pass
+            completion = client.chat.completions.create(
+                model="gpt-4o",  # gpt-4o-internvl-minicpm-qwen
+                messages=message_text,
+                temperature=0.7,
+                max_tokens=4096, # 4096 for gpt-4o
+                top_p=0.95,
+                frequency_penalty=0,
+                presence_penalty=0,
+                **({"seed": int(_seed)} if _seed is not None else {}),
+            )
+            return completion.choices[0].message.content
+        except openai.RateLimitError as e:
+            print("Rate limit error, waiting for 60s")
+            time.sleep(30)
+            retry_count += 1
+            continue
+        except Exception as e:
+            print("Error: ", e)
+            time.sleep(60)
+            retry_count += 1
+            continue
 
+    return None
 
 
 

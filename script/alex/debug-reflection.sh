@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=caption-reflection-abstraction-v1
+#SBATCH --job-name=unformat-qwen
 #SBATCH --gres=gpu:a40:2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=3:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/caption-reflection-abstraction-v1-%j.out
+#SBATCH --time=8:00:00 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/unformat-qwen-traj_version-%j.out
 #SBATCH --partition a40
 
 
 
 # srun --nodes=1 --gres=gpu:a100:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a100 --pty bash
-# srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=2:00:00 --partition a40 --pty bash
+# srun --nodes=1 --gres=gpu:a40:2 --ntasks=1 --cpus-per-task=16 --time=4:00:00 --partition a40 --pty bash
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 
@@ -77,7 +77,8 @@ export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/captions_reflection_abstraction.py \
   --chunk_caption /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/final_captions_from_chunck.json \
   --seed 32 \
-  --out /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/experience/lessons_v1.json
+  --exp_mode unformat \
+  --out /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/experience/unformat-gpt.json
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
