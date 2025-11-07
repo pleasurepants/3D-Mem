@@ -1253,6 +1253,7 @@ def format_explore_prompt_frontier(
     # Context label & description switch
     context_label = "TRAJECTORY ABSTRACTION" if bool(use_traj_abstraction) else "EXPERIENCE REPLAY"
     if bool(use_traj_abstraction):
+        # lessons_v0
         context_desc = (
             "TRAJECTORY ABSTRACTION : A problem-specific reflection distilled from successful/failed trajectories answering the exact question at hand. "
             "It is split into two labeled paragraphs: Positive Lessons (what to repeat) and Negative Lessons (what to avoid). "
@@ -1260,6 +1261,17 @@ def format_explore_prompt_frontier(
             "The first sentence of each paragraph restates the question goal; following sentences reuse reflection insights to explain how to target the required object/action and when to pivot. "
             "Use Positive Lessons to steer exploration toward high-value checks and Negative Lessons to recognize and exit low-yield behaviors.\n\n"
         )
+        # lessons_v1
+        # context_desc = (
+        #     "TRAJECTORY ABSTRACTION : A problem-specific reflection distilled from successful/failed trajectories answering the exact question at hand. "
+        #     "It is split into two labeled paragraphs: Positive Lessons (what to repeat) and Negative Lessons (what to avoid). "
+        #     "Each sentence is a concise if–then or anti-pattern rule grounded in concrete regions, landmarks, cues, and timing markers from prior runs. "
+        #     # "The first sentence of each paragraph restates the question goal; following sentences reuse reflection insights to explain how to target the required object/action and when to pivot. "
+        #     "Before applying any lesson, pause to summarize the current question objective, egocentric observations, and the visual affordances of each frontier. "
+        #     "Explicitly match the present cues to Positive Lessons and describe how their guidance should be executed now. "
+        #     "Likewise, test the current situation against Negative Lessons and plan concrete pivots to avoid their failure modes. "
+        #     "Use Positive Lessons to steer exploration toward high-value checks and Negative Lessons to recognize and exit low-yield behaviors.\n\n"
+        # )
     else:
         context_desc = (
             "EXPERIENCE REPLAY: A textual experience of frontier selection to solve a similar question in a similar environment—how the decision was made, "
@@ -1348,6 +1360,7 @@ def format_explore_prompt_frontier(
     #     "Use the contexts (EPISODIC/EXPERIENCE) if present to avoid redundancy and transfer useful cues. "
     #     f"Output the rationale first and the answer last. On the final line, print ONLY '{label_word} i'."
     # )
+    # lessons_v0
     guidance = (
         f"Now reason in steps before making your choice. "
         "Step 0: restate the task in your own words and confirm you are choosing exactly one frontier of the given type. "
@@ -1360,6 +1373,19 @@ def format_explore_prompt_frontier(
         + "Step 3: compare the current frontiers one by one using visual cues, novelty, and alignment with these directive rules, then decide on the best option. "
         f"On the final line, print ONLY '{label_word} i'."
     )
+    # lessons_v1
+    # guidance = (
+    #     f"Now reason in steps before making your choice. "
+    #     "Step 0: restate the task in your own words and confirm you are choosing exactly one frontier of the given type. "
+    #     "Step 1: from EPISODIC CONTEXT (if present), briefly state which areas are already explored and which remain unseen. "
+    #     + (
+    #         "Step 2: when TRAJECTORY ABSTRACTION is present, restate the question goal and current visual cues (objects, layouts, lighting). For each Positive Lesson, check if the cues align, cite its label, and translate it into an immediate action plan. For each Negative Lesson, check for overlaps, cite its label, and describe the avoidance or contingency to apply now. Summarize these into 1–2 directive rules guiding this decision. "
+    #         if bool(use_traj_abstraction)
+    #         else "Step 2: analyze all EXPERIENCE REPLAY entries (if present). For each, note the chosen frontier, the outcome, and the critique. Then integrate them into 1-2 concise directive rules that give specific, problem-focused guidance for the current question. "
+    #     )
+    #     + "Step 3: evaluate each frontier sequentially, referencing the directive rules and naming which Positive Lessons support or which Negative Lessons warn against each option. Choose the frontier that maximizes alignment with Positive guidance while avoiding Negative triggers. "
+    #     f"On the final line, print ONLY '{label_word} i'."
+    # )
     content.append((guidance,))
 
     return sys_prompt, content
