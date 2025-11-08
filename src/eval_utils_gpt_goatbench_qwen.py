@@ -280,6 +280,10 @@ def _load_vector_store(cfg):
     """
     加载使用 build_retrieve_store 生成的向量仓库。
     期望结构：<root>/retrieve/png|question/{embeddings.npy, meta.json, encoders.json, index.faiss?}
+    或根据 experience_training_status 参数：
+        - None/不设置: <root>/retrieve/png|question/
+        - success: <root>/retrieve/png/success|question/
+        - fail: <root>/retrieve/png/fail|question/
     返回：{
         'png': {'emb': np.ndarray [N_img, D], 'meta': list[dict], 'enc': dict},
         'question': {'emb': np.ndarray [N_q, Dq], 'meta': list[dict], 'enc': dict},
@@ -288,18 +292,33 @@ def _load_vector_store(cfg):
     """
     root = getattr(cfg, "retrieve_root", None) or os.path.join(cfg.output_parent_dir, cfg.exp_name)
     retrieve_dir = os.path.join(root, "retrieve")
+    
+    # 根据 experience_training_status 参数决定 PNG 路径后缀
+    training_status = getattr(cfg, "experience_training_status", None)
+    if training_status is not None:
+        training_status = str(training_status).strip().lower()
+        if training_status == "success" or training_status == "fail":
+            png_subdir_suffix = training_status
+        else:
+            png_subdir_suffix = None
+    else:
+        png_subdir_suffix = None
+    
     try:
         import numpy as _np
         import json as _json
-        def _load_one(sub):
-            subdir = os.path.join(retrieve_dir, sub)
+        def _load_one(sub, status_suffix=None):
+            if sub == "png" and status_suffix is not None:
+                subdir = os.path.join(retrieve_dir, sub, status_suffix)
+            else:
+                subdir = os.path.join(retrieve_dir, sub)
             emb = _np.load(os.path.join(subdir, 'embeddings.npy'))
             with open(os.path.join(subdir, 'meta.json'), 'r', encoding='utf-8') as f:
                 meta = _json.load(f)
             with open(os.path.join(subdir, 'encoders.json'), 'r', encoding='utf-8') as f:
                 enc = _json.load(f)
             return {'emb': emb.astype(_np.float32), 'meta': meta, 'enc': enc}
-        png = _load_one('png')
+        png = _load_one('png', status_suffix=png_subdir_suffix)
         qst = _load_one('question')
         return {'png': png, 'question': qst, 'root': retrieve_dir}
     except Exception as e:

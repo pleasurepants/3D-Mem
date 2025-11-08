@@ -959,6 +959,7 @@ if __name__ == "__main__":
     # ppl_rank mode parameter
     parser.add_argument("--ppl_rank", help="perplexity rank category for filtering: 'low', 'medium', or 'high' (case-insensitive)", default="", type=str)
     parser.add_argument("--ppl_rank_file", help="path to ppl_rank json file", default="/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json", type=str)
+    parser.add_argument("--experience_training_status", help="filter vector store by training status: 'success' or 'fail' (default: None, uses default path)", default=None, type=str)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
@@ -983,6 +984,13 @@ if __name__ == "__main__":
     if args.ppl_rank:
         cfg.ppl_rank = str(args.ppl_rank).strip().lower()
         cfg.ppl_rank_file = args.ppl_rank_file
+    
+    # experience training status parameters (only set if provided via CLI, not in cfg file)
+    if args.experience_training_status is not None:
+        status = str(args.experience_training_status).strip().lower()
+        if status in ("success", "fail"):
+            cfg.experience_training_status = status
+        # if invalid value, don't set (let it use getattr default)
     
     # normalize inject_stage into cfg (empty -> None)
     # normalize stage flag (exp_at preferred)
