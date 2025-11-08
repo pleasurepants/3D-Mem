@@ -196,7 +196,53 @@ def format_final_trajectory_abstraction_prompt(
     question_text: str,
     segments: List[str],
     task_outcome: Optional[str] = None,
+    exp_mode: str = "lessons",
 ) -> Tuple[str, List[Tuple[str, str]]]:
+
+    if exp_mode == "unformat":
+        sys_prompt = (
+            "You are to synthesize a final trajectory-level abstraction for an embodied exploration agent. "
+            "INPUT: several trajectory paragraphs, each summarizing a short segment for the SAME question. "
+            "TASK: think step by step to integrate these segments, then output steps and a final Abstraction. "
+            "STRICT FORMAT: Your output MUST contain EXACTLY SIX blocks in this order and with these labels: \n"
+            "Step 0 (Task Understanding) — 2–3 sentences\n"
+            "Step 1 (Trajectory) — 8–10 sentences\n"
+            "Step 2 (Env–Object Associations) — 4–6 sentences\n"
+            "Step 3 (Strategy × Question Type + Directional Priors) — 4–6 sentences\n"
+            "Step 4 (Anti-patterns) — 2–3 sentences\n"
+            "Abstraction: <20–24 sentence cohesive paragraph>\n"
+            "No extra lines, no additional headers, and do NOT reorder or omit any block. Do NOT mention 'BVF', 'CVF', 'view', 'snapshot', 'image', camera operations, or step IDs anywhere. Use only region/landmark/path terms and task-relevant cues. "
+            "In the Abstraction paragraph, always include concrete environment-task priors (e.g., 'recycling stations near utility/kitchen zones', 'signage near entrances/hubs'). If Task Outcome is FAIL, also include 2–4 explicit lessons phrased as do-not/avoid rules (e.g., 'avoid lingering in cluttered corners without new cues', 'do not switch directions without fresh evidence')."
+        )
+        content: List[Tuple[str, str]] = []
+        content.append((f"Question: {question_text or '(unknown)'}",))
+        if isinstance(task_outcome, str) and task_outcome.strip():
+            content.append((f"Task Outcome: {task_outcome.strip().upper()}",))
+        content.append(("Segments:",))
+        for i, seg in enumerate(segments, start=1):
+            if isinstance(seg, str) and seg.strip():
+                content.append((f"Segment {i}: {seg.strip()}",))
+        content.append((
+            "Now print the following blocks in the exact order and with the exact labels (no extra content before/after). Constraints for ALL blocks: do NOT mention BVF/CVF/views/snapshots/images/camera; do NOT use step IDs; use only region/landmark/path words and task-relevant cues; keep prose, no bullets.\n\n"
+            "Step 0 (Task Understanding) — 2–3 sentences: Paraphrase succinctly what the question asks (e.g., find/verify/compare), and what constitutes success.\n\n"
+            "Step 1 (Trajectory) — 8–10 sentences: Summarize the overall trajectory across segments.\n"
+            "- Describe the entry points, major regions/rooms traversed (e.g., entrance, hallway, kitchen zone, utility area, living space), and key transitions between them.\n"
+            "- Indicate movement directionality (toward/away from salient regions or landmarks) and why the route changed (e.g., encountering new evidence or exhausting an area).\n"
+            "- Focus on path logic and coverage (what was visited first/next/last), not on per-image details.\n\n"
+            "Step 2 (Env–Object Associations) — 4–6 sentences: General priors linking categories to regions.\n"
+            "- Use generic categories and regions (e.g., signage near entrances/hubs; cookware in kitchen-like areas; cleaning supplies near sinks/utility corners; clothing/linens near bedroom/closet zones).\n"
+            "- Avoid scene-specific item names.\n\n"
+            "Step 3 (Strategy × Question Type + Directional Priors) — 4–6 sentences: Concrete guidance per question type with directional priors.\n"
+            "- Location: shortlist regions via priors, then confirm in the most indicative sub-areas.\n"
+            "- Attribute/State: prioritize proximity checks of the target category using functional/visual cues; verify state locally.\n"
+            "- Counting/Relationship: gain coverage to enumerate instances first, then verify local relations.\n"
+            "- Text-reading: seek text-bearing surfaces/signage/panels with high-contrast lettering near decision points (entrances, hubs, boards).\n"
+            "- Helpful: connectors (hallways/intersections), doorways, hubs; Harmful: blind dead-ends, purely cluttered corners without new cues.\n\n"
+            "Step 4 (Anti-patterns) — 2–3 sentences: Common failure modes to avoid.\n"
+            "- Make it concrete and environment-aware: specify where/when NOT to go. For example: following the perimeter of closed garage doors yields little new evidence when searching for containers; diving into deep storage alcoves is unhelpful for text-reading tasks; lingering in decor-heavy corners seldom helps container/appliance queries; circling vehicle bays rarely reveals recycling signage. Also state when to stop: avoid repeating passes along blank walls or returning to dead-end utility closets after container zones were already scanned; do not switch directions without fresh evidence; treat wrong or full-bin findings as negative evidence to pivot early.\n\n"
+            "**Abstraction**: <20–24 sentence cohesive paragraph integrating Steps 1–5 into actionable, transferable guidance for similar tasks. Do not introduce scope beyond Steps 1–5; do not mention BVF/CVF/views/images; do not use step IDs.>",
+        ))
+        return sys_prompt, content
 
     sys_prompt = (
         "You are a self-reflective embodied exploration agent.\n"
@@ -373,6 +419,15 @@ def _split_thinking_and_abstraction(full_text: Optional[str]) -> Tuple[str, str]
             if ln.strip().lower() == "abstraction":
                 abs_idx = i
                 break
+    # Accept heading formats with markdown prefixes (e.g., ### Abstraction)
+    if abs_idx == -1:
+        for i, ln in enumerate(lines):
+            normalized = re.sub(r'^[#*\s]+', '', ln.strip())
+            normalized = re.sub(r'\*\*', '', normalized)
+            lower_norm = normalized.lower()
+            if lower_norm in {"abstraction", "abstraction:"} or lower_norm.startswith("abstraction:"):
+                abs_idx = i
+                break
     # If still not found, treat entire text as abstraction
     if abs_idx == -1:
         return "", full_text.strip()
@@ -409,10 +464,26 @@ def _write_incremental_json(out_path: str, qid: str, obj: dict):
         logging.warning(f"[Write][incremental] failed for qid={qid} path={out_path}: {e}")
 
 
+def _empty_result_for_mode(mode: str) -> Dict[str, object]:
+    if mode == "unformat":
+        return {
+            "question": "",
+            "abstraction": "",
+            "thinking_process": "",
+            "captions_step": {},
+        }
+    return {
+        "question": "",
+        "reflection": "",
+        "abstraction": "",
+    }
+
+
 def generate_traj_abstraction_from_chunk_caption(
     chunk_caption_data: dict,
     question_id: str,
     seed: Optional[int] = None,
+    exp_mode: str = "lessons",
 ) -> Optional[dict]:
     """
     Generate abstraction directly from chunk caption data.
@@ -431,29 +502,63 @@ def generate_traj_abstraction_from_chunk_caption(
     """
     if not isinstance(chunk_caption_data, dict):
         return None
-        
-    question_text = chunk_caption_data.get("question_text", "")
-    caption = chunk_caption_data.get("caption", "")
-    status = chunk_caption_data.get("status", "")
+    
+    mode = (exp_mode or "lessons").lower()
+    if mode not in {"lessons", "unformat"}:
+        mode = "lessons"
+
+    question_text = (
+        chunk_caption_data.get("question_text")
+        or chunk_caption_data.get("question")
+        or ""
+    )
+    caption = (
+        chunk_caption_data.get("caption")
+        or chunk_caption_data.get("trajectory")
+        or chunk_caption_data.get("experience")
+        or chunk_caption_data.get("traj")
+        or ""
+    )
+    status = chunk_caption_data.get("status", "") or chunk_caption_data.get("final_reward", "")
     
     if not question_text or not caption:
         return None
 
-    # Use the caption directly as the trajectory description
-    # Generate final abstraction using the caption
+    # Use the caption (or provided trajectory) directly as the trajectory description
+    # Generate final abstraction using the selected prompt style
     final_sys, final_cont = format_final_trajectory_abstraction_prompt(
         question_text,
-        segments=[caption],  # Use the caption as a single segment
-        task_outcome=("PASS" if status.lower() == "pass" else ("FAIL" if status.lower() == "fail" else None))
+        segments=[caption],  # Treat the provided text as a single segment
+        task_outcome=("PASS" if status.lower() == "pass" else ("FAIL" if status.lower() == "fail" else None)),
+        exp_mode=mode,
     )
     final_out = call_openai_api(final_sys, final_cont, seed=seed)
     final_out = (final_out or "").strip()
-    reflection_text, abstraction_text = _split_thinking_and_abstraction(final_out)    
-    logging.info(f"[Traj][Final] qid={question_id} reflection_len={len(reflection_text)} final_abs_len={len(abstraction_text)}")
+    thinking_text, abstraction_text = _split_thinking_and_abstraction(final_out)
+
+    logging.info(
+        "[Traj][Final] qid=%s mode=%s thinking_len=%d abstraction_len=%d",
+        question_id,
+        mode,
+        len(thinking_text),
+        len(abstraction_text),
+    )
+
+    if mode == "unformat":
+        result: Dict[str, object] = {
+            "question": question_text,
+            "reflection": thinking_text,
+            "abstraction": abstraction_text,
+        }
+        if caption:
+            result["captions_step"] = {"segment_1": caption}
+        else:
+            result["captions_step"] = {}
+        return result
 
     return {
         "question": question_text,
-        "reflection": reflection_text,
+        "reflection": thinking_text,
         "abstraction": abstraction_text,
     }
 
@@ -492,6 +597,13 @@ def _parse_args():
         type=int,
         default=None,
         help="Optional cap when processing all questions.",
+    )
+    parser.add_argument(
+        "--exp_mode",
+        type=str,
+        choices=["lessons", "unformat"],
+        default="lessons",
+        help="Experience mode: 'lessons' keeps reflection/lessons format; 'unformat' outputs trajectory abstraction style.",
     )
     return parser.parse_args()
 
@@ -536,6 +648,7 @@ def main():
             chunk_caption_data=chunk_data[args.question_id],
             question_id=args.question_id,
             seed=args.seed,
+            exp_mode=args.exp_mode,
         )
         if result_obj is None:
             print("{}")
@@ -563,16 +676,17 @@ def main():
                 chunk_caption_data=chunk_data[qid],
                 question_id=qid,
                 seed=args.seed,
+                exp_mode=args.exp_mode,
             )
             if obj is None:
-                results[qid] = {"question": "", "reflection": "", "abstraction": ""}
+                results[qid] = _empty_result_for_mode(args.exp_mode)
             else:
                 results[qid] = obj
             # incremental write after each question
             _write_incremental_json(args.out, qid, results[qid])
         except Exception as e:
             logging.warning(f"abstraction generation failed for {qid}: {e}")
-            results[qid] = {"question": "", "reflection": "", "abstraction": ""}
+            results[qid] = _empty_result_for_mode(args.exp_mode)
             _write_incremental_json(args.out, qid, results[qid])
 
     # final write to ensure consistency
