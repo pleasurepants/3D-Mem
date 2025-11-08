@@ -15,7 +15,22 @@ def query_vlm_for_response(
     verbose: bool = False,
     chosen_frontier_path: str = None,
     step_idx: int = 0,
+    question_id: Optional[str] = None,
+    lifelong_json_path: Optional[str] = None,
+    exp_tuple_path: Optional[str] = None,
+    inject_experience: bool = False,
+    inject_critique: bool = False,
+    inject_abstraction: bool = False,
 ) -> Optional[Tuple[Union[SnapShot, Frontier], str, int]]:
+    # note: extra parameters are accepted for interface parity with qwen pipeline
+    _ = (
+        question_id,
+        lifelong_json_path,
+        exp_tuple_path,
+        inject_experience,
+        inject_critique,
+        inject_abstraction,
+    )
     # prepare input for vlm
     step_dict = {}
 
