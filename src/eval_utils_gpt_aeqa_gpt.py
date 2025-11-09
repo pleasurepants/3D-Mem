@@ -1427,13 +1427,22 @@ def format_explore_prompt_frontier(
     # Context label & description switch
     context_label = "TRAJECTORY ABSTRACTION" if bool(use_traj_abstraction) else "EXPERIENCE REPLAY"
     if bool(use_traj_abstraction):
-        # lessons_v0
+        # lessons_v0 (kept for reference)
+        # context_desc = (
+        #     "TRAJECTORY ABSTRACTION : A problem-specific reflection distilled from successful/failed trajectories answering the exact question at hand. "
+        #     "It is split into two labeled paragraphs: Positive Lessons (what to repeat) and Negative Lessons (what to avoid). "
+        #     "Each sentence is a concise if–then or anti-pattern rule grounded in concrete regions, landmarks, cues, and timing markers from prior runs. "
+        #     "The first sentence of each paragraph restates the question goal; following sentences reuse reflection insights to explain how to target the required object/action and when to pivot. "
+        #     "Use Positive Lessons to steer exploration toward high-value checks and Negative Lessons to recognize and exit low-yield behaviors.\n\n"
+        # )
+        # abstraction_v2: unformat
         context_desc = (
-            "TRAJECTORY ABSTRACTION : A problem-specific reflection distilled from successful/failed trajectories answering the exact question at hand. "
-            "It is split into two labeled paragraphs: Positive Lessons (what to repeat) and Negative Lessons (what to avoid). "
-            "Each sentence is a concise if–then or anti-pattern rule grounded in concrete regions, landmarks, cues, and timing markers from prior runs. "
-            "The first sentence of each paragraph restates the question goal; following sentences reuse reflection insights to explain how to target the required object/action and when to pivot. "
-            "Use Positive Lessons to steer exploration toward high-value checks and Negative Lessons to recognize and exit low-yield behaviors.\n\n"
+            "TRAJECTORY ABSTRACTION (if present): High-level strategies distilled from past trajectories of similar tasks/scenes. "
+            "It summarizes transferable regularities about information-bearing regions, typical progression of exploration, "
+            "diagnostic visual cues/affordances that indicate progress, and recurring pitfalls that waste steps. "
+            "It is descriptive rather than prescriptive: use it to form selection criteria and to rank candidate frontiers by alignment—"
+            "prefer choices that advance toward indicated regions or satisfy the cues, while avoiding behaviors flagged as low-yield. "
+            "When signals are weak or conflicting, treat the abstraction as a prior for tie-breaking and favor actions that increase coverage and future optionality.\n\n"
         )
         # lessons_v1
         # context_desc = (

@@ -25,7 +25,7 @@ export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/pyth
 
 echo "[INFO] Starting AEQA evaluation (gpt, OpenAI API)..."
 source /home/hpc/v100dd/v100dd12/anaconda3/bin/activate 3dmem
-source .env
+source /home/hpc/v100dd/v100dd12/code/3D-Mem/.env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_gpt.py \
