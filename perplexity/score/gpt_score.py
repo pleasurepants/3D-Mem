@@ -8,8 +8,11 @@ import openai
 from openai import OpenAI
 from typing import Optional
 
-# 添加父目录到路径以导入相关模块
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 添加工程根目录到路径以导入相关模块
+from pathlib import Path
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 from src.const_gpt import END_POINT, OPENAI_KEY
 
 # 初始化 OpenAI 客户端
@@ -60,7 +63,7 @@ def call_openai_api(sys_prompt, contents, seed: Optional[int] = None) -> Optiona
             except Exception:
                 pass
             completion = client.chat.completions.create(
-                model="qwen",  # gpt-4o-internvl-minicpm-qwen
+                model="gpt-4o",  # gpt-4o-internvl-minicpm-qwen
                 messages=message_text,
                 temperature=0.7,
                 max_tokens=4096, # 4096 for gpt-4o

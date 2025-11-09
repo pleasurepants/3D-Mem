@@ -75,8 +75,8 @@ source .env
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 # -m debugpy --listen 0.0.0.0:8798 --wait-for-client \
 CUDA_VISIBLE_DEVICES=1 python /home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/ppl_score.py \
-  --input_json /home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank_165.json \
-  --output_json /home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank_score.json
+  --input_json /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/experience/unformat-gpt.json \
+  --output_json /home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/score/unformat-gpt-llm_score.json
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
