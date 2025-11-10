@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=gpt-hiera-cot-19
+#SBATCH --job-name=gpt-hiera-cot-44
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a40:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=16:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/gpt/hiera-cot-19-%j.out 
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/gpt/hiera-cot-44-%j.out 
 #SBATCH --partition a40
 
 
@@ -36,9 +36,9 @@ MASTER_ADDR=localhost
 # export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_gpt.py \
-    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/gpt-hiera-cot-19.yaml \
+    -cf /home/hpc/v100dd/v100dd12/code/3D-Mem/cfg/alex_cfg/gpt-hiera-cot-44.yaml \
     --base_mode hierarchy \
-    --chat_seed 19
+    --chat_seed 44
 
 
 echo "[INFO] AEQA finished. Killing vLLM server (PID=$VLLM_PID)..."
