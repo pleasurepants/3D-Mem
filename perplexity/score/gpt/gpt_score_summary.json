@@ -1,0 +1,65 @@
+{
+  "source_file": "/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/score/unformat-gpt-llm_score.json",
+  "output_dir": "/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/score/gpt",
+  "total_results": 163,
+  "statistics": {
+    "generality": {
+      "count": 163,
+      "mean": 4.190184049079755,
+      "median": 4.0,
+      "std": 0.46407302206325013,
+      "min": 3.0,
+      "max": 5.0,
+      "q25": 4.0,
+      "q75": 4.0
+    },
+    "relevance": {
+      "count": 163,
+      "mean": 3.3987730061349692,
+      "median": 3.0,
+      "std": 1.2655893038016315,
+      "min": 1.0,
+      "max": 5.0,
+      "q25": 2.0,
+      "q75": 5.0
+    },
+    "conciseness": {
+      "count": 163,
+      "mean": 3.736196319018405,
+      "median": 4.0,
+      "std": 0.7974516225409533,
+      "min": 2.0,
+      "max": 5.0,
+      "q25": 3.0,
+      "q75": 4.0
+    },
+    "actionability": {
+      "count": 163,
+      "mean": 4.294478527607362,
+      "median": 4.0,
+      "std": 0.6822240365466493,
+      "min": 2.0,
+      "max": 5.0,
+      "q25": 4.0,
+      "q75": 5.0
+    },
+    "average": {
+      "count": 163,
+      "mean": 3.9049079754601226,
+      "median": 4.0,
+      "std": 0.4916547345796149,
+      "min": 2.5,
+      "max": 5.0,
+      "q25": 3.5,
+      "q75": 4.25
+    }
+  },
+  "average_interval_distribution": {
+    "0-1": 0,
+    "1-2": 0,
+    "2-3": 3,
+    "3-4": 74,
+    "4-5": 85,
+    ">=5": 1
+  }
+}

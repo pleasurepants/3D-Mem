@@ -1,0 +1,105 @@
+{
+  "source_file": "/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/score/unformat-gpt-llm_score.json",
+  "total_results": 163,
+  "methods": {
+    "strict": {
+      "split_indices": {
+        "low_mid": 55,
+        "mid_high": 109
+      },
+      "boundary_scores": {
+        "low_mid": 3.75,
+        "mid_high": 4.25
+      },
+      "balance_variance": 0.22222222222222224,
+      "separation": 1.0623737373737372,
+      "objective": -0.1631565656565656,
+      "groups": {
+        "low": {
+          "count": 55,
+          "mean": 3.368181818181818,
+          "min": 2.5,
+          "max": 3.75
+        },
+        "mid": {
+          "count": 54,
+          "mean": 3.925925925925926,
+          "min": 3.75,
+          "max": 4.25
+        },
+        "high": {
+          "count": 54,
+          "mean": 4.430555555555555,
+          "min": 4.25,
+          "max": 5.0
+        }
+      }
+    },
+    "quantile": {
+      "split_indices": {
+        "low_mid": 46,
+        "mid_high": 103
+      },
+      "boundary_scores": {
+        "low_mid": 3.5,
+        "mid_high": 4.0
+      },
+      "balance_variance": 36.22222222222222,
+      "separation": 1.1190217391304342,
+      "objective": 25.019849033816424,
+      "groups": {
+        "low": {
+          "count": 46,
+          "mean": 3.2934782608695654,
+          "min": 2.5,
+          "max": 3.5
+        },
+        "mid": {
+          "count": 57,
+          "mean": 3.8640350877192984,
+          "min": 3.75,
+          "max": 4.0
+        },
+        "high": {
+          "count": 60,
+          "mean": 4.4125,
+          "min": 4.25,
+          "max": 5.0
+        }
+      }
+    },
+    "balanced": {
+      "split_indices": {
+        "low_mid": 54,
+        "mid_high": 109
+      },
+      "boundary_scores": {
+        "low_mid": 3.75,
+        "mid_high": 4.25
+      },
+      "balance_variance": 0.22222222222222224,
+      "separation": 1.0694444444444442,
+      "objective": -0.1652777777777777,
+      "groups": {
+        "low": {
+          "count": 54,
+          "mean": 3.361111111111111,
+          "min": 2.5,
+          "max": 3.75
+        },
+        "mid": {
+          "count": 55,
+          "mean": 3.922727272727273,
+          "min": 3.75,
+          "max": 4.25
+        },
+        "high": {
+          "count": 54,
+          "mean": 4.430555555555555,
+          "min": 4.25,
+          "max": 5.0
+        }
+      }
+    }
+  }
+}

@@ -86,20 +86,23 @@ def main() -> None:
     parser.add_argument(
         "first_dir",
         type=str,
-        default="/anvme/.../unformat-all-sim-t5-s568",
+        nargs="?",
+        default="/anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/trajectory_exp/unformat/gpt/sim/top-5/unformat-all-sim-t5-s568",
         help="第一个根目录（例如：/anvme/.../unformat-all-sim-t5-s568）",
     )
     parser.add_argument(
         "second_dir",
         type=str,
-        default="/anvme/.../hiera-cot-seed568",
+        nargs="?",
+        default="/anvme/workspace/v100dd12-3dmem/openeqa/gpt_version/hiera-cot-seed44",
         help="第二个根目录（例如：/anvme/.../hiera-cot-seed568）",
     )
     parser.add_argument(
         "--out",
         type=str,
-        default="",
-        help="输出 JSON 路径（可选）。默认输出到 /home/hpc/v100dd/v100dd12/code/3D-Mem/teaser/compare_frontier_video_{ts}.json",
+        nargs="?",
+        default="/home/hpc/v100dd/v100dd12/code/3D-Mem/teaser/gpt-568-44.json",
+        help="输出 JSON 路径（可选）。默认输出到 /home/hpc/v100dd/v100dd12/code/3D-Mem/teaser/gpt-568-19.json",
     )
     args = parser.parse_args()
 
