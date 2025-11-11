@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=14:00:00 
-#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/format_unformat/unformat/gpt/random/top-5/unformat-all-random-t5-s568-%j.out
+#SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/experience/format_unformat/unformat/gpt_qwenabs/random/top-5/unformat-all-random-t5-s568-%j.out
 #SBATCH --partition a40
 
 export LD_LIBRARY_PATH=/home/hpc/v100dd/v100dd12/anaconda3/envs/iclblip/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
@@ -34,7 +34,7 @@ python /home/hpc/v100dd/v100dd12/code/3D-Mem/run_aeqa_evaluation_gpt.py \
     --replay_top 5 \
     --retrieve_root /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set \
     --chat_seed 568 \
-    --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/experience/unformat-gpt.json \
+    --traj_file /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/experience/unformat.json \
     --exp_tuple /anvme/workspace/v100dd12-3dmem/openeqa/pipeline_2/training_set/exp_tuple_v0.json
 
 echo "=== JOB END ==="
