@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=gpt-baseline
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a100:1
+#SBATCH --gres=gpu:a40:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=12:00:00 
+#SBATCH --time=16:00:00 
 #SBATCH --output=/home/hpc/v100dd/v100dd12/code/3D-Mem/slurm/gpt/baseline-%j.out 
-#SBATCH --partition a100
+#SBATCH --partition a40
 
 
 
