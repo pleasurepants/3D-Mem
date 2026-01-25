@@ -572,6 +572,15 @@ class Logger:
         plt.savefig(os.path.join(visualization_path, f"{global_step}_{subtask_id}.png"))
         plt.close()
 
+    def save_topdown_ft_map(self, global_step, subtask_id, ft_map):
+        if ft_map is None:
+            return
+        assert self.episode_dir is not None
+        topdown_path = os.path.join(self.episode_dir, "top_down")
+        os.makedirs(topdown_path, exist_ok=True)
+        filename = f"{global_step}_{subtask_id}.png"
+        plt.imsave(os.path.join(topdown_path, filename), ft_map)
+
     def save_frontier_visualization(
         self,
         global_step,

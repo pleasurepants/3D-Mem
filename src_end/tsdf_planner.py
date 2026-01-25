@@ -3,6 +3,7 @@ import os.path
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage import measure
+from skimage.draw import disk
 from sklearn.cluster import DBSCAN, KMeans
 from scipy import stats
 import torch
@@ -126,6 +127,9 @@ class TSDFPlanner(TSDFPlannerBase):
         self.island = None
         self.unexplored_neighbors = None
         self.occupied_map_camera = None
+
+        # cache for sharing the rendered top-down map with external loggers
+        self.latest_ft_map = None
 
     def update_frontier_map(
         self,
@@ -695,6 +699,7 @@ class TSDFPlanner(TSDFPlannerBase):
 
         # Plot
         fig = None
+        self.latest_ft_map = None
         if save_visualization:
             h, w = self._tsdf_vol_cpu.shape[:2]
             h = 8 * h / w
@@ -726,6 +731,12 @@ class TSDFPlanner(TSDFPlannerBase):
                 & (obstacle_map_convolved < kernel_size**2 / 2)
             ] = [100, 100, 100]
             ft_map[(obstacle_map_convolved >= kernel_size**2 / 2)] = [0, 0, 0]
+
+            self.latest_ft_map = ft_map.copy()
+            agent_row = int(np.clip(cur_point[0], 0, self.latest_ft_map.shape[0] - 1))
+            agent_col = int(np.clip(cur_point[1], 0, self.latest_ft_map.shape[1] - 1))
+            rr, cc = disk((agent_row, agent_col), radius=3, shape=self.latest_ft_map.shape[:2])
+            self.latest_ft_map[rr, cc] = np.array([23, 188, 243], dtype=np.uint8)
 
             ax1.imshow(ft_map)
             ax1.axis("off")

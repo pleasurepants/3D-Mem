@@ -379,6 +379,14 @@ class Logger:
         plt.savefig(os.path.join(visualization_path, "{}_map.png".format(cnt_step)))
         plt.close()
 
+    def save_topdown_ft_map(self, cnt_step, ft_map):
+        if ft_map is None:
+            return
+        assert self.episode_dir is not None
+        topdown_path = os.path.join(self.episode_dir, "top_down")
+        os.makedirs(topdown_path, exist_ok=True)
+        plt.imsave(os.path.join(topdown_path, f"{cnt_step}.png"), ft_map)
+
     def save_frontier_visualization(
         self,
         cnt_step,

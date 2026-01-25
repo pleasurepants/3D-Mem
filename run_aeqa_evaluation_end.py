@@ -334,6 +334,10 @@ def main(vlm_pred, cfg, start_ratio=0.0, end_ratio=1.0):
                     cnt_step=cnt_step,
                     fig=fig,
                 )
+                logger.save_topdown_ft_map(
+                    cnt_step=cnt_step,
+                    ft_map=tsdf_planner.latest_ft_map,
+                )
                 # save the visualization of vlm's choice at each step
                 logger.save_frontier_visualization(
                     cnt_step=cnt_step,

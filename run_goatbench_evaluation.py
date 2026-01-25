@@ -432,6 +432,11 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0, split=1):
                             goal_obj_ids_mapping=goal_obj_ids_mapping,
                             fig=fig,
                         )
+                        logger.save_topdown_ft_map(
+                            global_step=global_step,
+                            subtask_id=subtask_id,
+                            ft_map=tsdf_planner.latest_ft_map,
+                        )
                         # save the visualization of vlm's choice at each step
                         logger.save_frontier_visualization(
                             global_step=global_step,
