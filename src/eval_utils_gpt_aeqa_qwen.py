@@ -1190,6 +1190,301 @@ def simple_recall_and_aggregate(
             except Exception as e:
                 logging.warning(f"[VecRetrieve] sim(vecimg) branch failed: {e}")
 
+    # txt：只使用问题文本相似度，不使用图像相似度和RRF融合
+    if (strategy or 'sim') == 'txt':
+        store = _load_vector_store(cfg)
+        if not store or not frontier_imgs_b64:
+            logging.info("[VecRetrieve][txt] vector store not available or no frontiers")
+        else:
+            try:
+                logging.info(
+                    f"[VecRetrieve][txt] question={_shorten(current_question or '', 160)} | num_frontiers={len(frontier_imgs_b64)}"
+                )
+                import numpy as _np
+                # 只使用问题文本相似度
+                qid2question = _load_questions_en()
+                # 收集所有 (qid, step_key) 组合及其问题文本相似度
+                meta = store['png']['meta'] or []
+                seen = set()
+                candidates = []
+                for m in meta:
+                    qid = m.get('question_id')
+                    sk = m.get('step_key')
+                    if not qid or not sk:
+                        continue
+                    if exclude_question_id and qid == exclude_question_id:
+                        continue
+                    key = (qid, sk)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    qtext = qid2question.get(qid, '')
+                    qsim = _cosine_sim_tokens(current_question or '', qtext) if isinstance(current_question, str) and current_question.strip() else 0.0
+                    candidates.append({
+                        'question_id': qid,
+                        'step_key': sk,
+                        'level': m.get('level'),
+                        'filename_rel': m.get('src_rel_path'),
+                        'qsim': qsim,
+                    })
+                if candidates:
+                    # 按问题文本相似度排序
+                    final_sorted = sorted(candidates, key=lambda x: x.get('qsim', 0.0), reverse=True)
+                    # 日志：展示 text-only 排名
+                    try:
+                        log_n = min(max(1, top_k), len(final_sorted))
+                        if log_n > 0:
+                            logging.info(f"[VecRetrieve][txt] text-only top {log_n}:")
+                        for rank, cand in enumerate(final_sorted[:log_n], 1):
+                            logging.info(
+                                f"  #{rank}: qsim={cand.get('qsim', 0.0):.4f} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')}"
+                            )
+                    except Exception:
+                        pass
+                    # 选取 top_k 并回取 tuple 经验
+                    final_selected = final_sorted[: max(1, top_k)]
+                    texts = []
+                    try:
+                        if isinstance(exp_tuple_path, str) and len(exp_tuple_path) > 0 and os.path.exists(exp_tuple_path):
+                            with open(exp_tuple_path, 'r', encoding='utf-8') as _f:
+                                tuple_data = json.load(_f)
+                        else:
+                            tuple_data = None
+                    except Exception:
+                        tuple_data = None
+
+                    def _fetch_tuple_step(_data, _qid, _step_key):
+                        if not isinstance(_data, dict):
+                            return None
+                        if _qid in _data and isinstance(_data[_qid], dict):
+                            qnode = _data[_qid]
+                        else:
+                            qnode = None
+                            for _, bucket in _data.items():
+                                if isinstance(bucket, dict) and _qid in bucket:
+                                    qnode = bucket.get(_qid)
+                                    break
+                        if not isinstance(qnode, dict):
+                            return None
+                        q_text = qnode.get('question', '')
+                        steps = qnode.get('steps') if isinstance(qnode.get('steps'), dict) else qnode
+                        step_entry = None
+                        if isinstance(steps, dict):
+                            step_entry = steps.get(_step_key)
+                        if not isinstance(step_entry, dict):
+                            return None
+                        return q_text, step_entry
+
+                    for j, cand in enumerate(final_selected):
+                        qid = cand.get('question_id')
+                        sk = cand.get('step_key')
+                        if tuple_data is None:
+                            continue
+                        fetched = _fetch_tuple_step(tuple_data, qid, sk)
+                        if not fetched:
+                            continue
+                        q_text, step_entry = fetched
+                        cur = step_entry.get('current_step')
+                        tot = step_entry.get('total_step')
+                        caption = step_entry.get('Caption') or step_entry.get('caption') or ''
+                        critique = step_entry.get('Critique') or step_entry.get('critique')
+                        abstraction = step_entry.get('Abstraction') or step_entry.get('abstraction')
+                        bvf = step_entry.get('chosen_BVF')
+                        cvf = step_entry.get('chosen_CVF')
+                        outcome = step_entry.get('final_reward')
+
+                        blocks = []
+                        exp_id = j + 1
+                        if inject_experience:
+                            sentence = f"Experience {exp_id}:\n At step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                            if caption:
+                                sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                            if (bvf is not None and cvf is not None):
+                                sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                            elif (bvf is not None):
+                                sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                            elif (cvf is not None):
+                                sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                            if outcome is not None:
+                                sentence += f"and the outcome of that trial was {outcome}."
+                            blocks.append(sentence.strip())
+                        else:
+                            blocks.append(f"Experience {exp_id}:")
+
+                        if inject_critique and isinstance(critique, str) and critique.strip():
+                            blocks.append("")
+                            blocks.append(f"Critique: {critique}")
+                        if inject_abstraction and isinstance(abstraction, str) and abstraction.strip():
+                            blocks.append("")
+                            blocks.append(f"Abstraction: {abstraction}")
+                        texts.append("\n".join(blocks))
+                    return "\n\n".join(texts) if texts else None
+            except Exception as e:
+                logging.warning(f"[VecRetrieve][txt] failed: {e}")
+
+    # img：只使用图像相似度，不使用问题文本相似度和RRF融合
+    if (strategy or 'sim') == 'img':
+        store = _load_vector_store(cfg)
+        if not store or not frontier_imgs_b64:
+            logging.info("[VecRetrieve][img] vector store not available or no frontiers")
+        else:
+            try:
+                logging.info(
+                    f"[VecRetrieve][img] question={_shorten(current_question or '', 160)} | num_frontiers={len(frontier_imgs_b64)}"
+                )
+                dev = _device_auto()
+                from PIL import Image as _Image
+                from io import BytesIO as _BytesIO
+                pil_list = []
+                for b64 in frontier_imgs_b64:
+                    try:
+                        img_bytes = base64.b64decode(b64)
+                        pil_list.append(_Image.open(_BytesIO(img_bytes)).convert('RGB'))
+                    except Exception:
+                        pil_list.append(_Image.new('RGB', (224, 224), color=(0, 0, 0)))
+                enc = store['png']['enc'] or {}
+                clip_model = str(enc.get('clip_model', 'ViT-B-32'))
+                pretrained = enc.get('open_clip_pretrained') or None
+                t_emb = _embed_images_with_clip(pil_list, model_name=clip_model, pretrained=pretrained, device=dev)
+                if t_emb is None:
+                    logging.info("[VecRetrieve][img] image embedding failed")
+                else:
+                    import numpy as _np
+                    corpus = store['png']['emb']  # [N, D], 已归一化
+                    merged_candidates = []
+                    for i in range(t_emb.shape[0]):
+                        v = t_emb[i]
+                        sims = corpus @ v.astype(_np.float32)
+                        top_idx = _np.argsort(-sims)[: min(2000, max(50, top_k * 50))]
+                        per_scores = []
+                        for idx in top_idx:
+                            meta = store['png']['meta'][int(idx)]
+                            qid = meta.get('question_id')
+                            if exclude_question_id and qid == exclude_question_id:
+                                continue
+                            per_scores.append({
+                                'similarity': float(sims[int(idx)]),
+                                'question_id': qid,
+                                'step_key': meta.get('step_key'),
+                                'level': meta.get('level'),
+                                'filename_rel': meta.get('src_rel_path'),
+                                'source_frontier_index': i,
+                            })
+                        # 去重 top-5（按 (qid, step_key)）
+                        seen = set()
+                        kept = []
+                        for cand in per_scores:
+                            key = (cand['question_id'], cand['step_key'])
+                            if key in seen:
+                                continue
+                            seen.add(key)
+                            kept.append(cand)
+                            if len(kept) >= 5:
+                                break
+                        merged_candidates.extend(kept)
+                    if merged_candidates:
+                        # 全局去重
+                        best_by_key = {}
+                        for cand in merged_candidates:
+                            key = (cand['question_id'], cand['step_key'])
+                            prev = best_by_key.get(key)
+                            if prev is None or float(cand['similarity']) > float(prev['similarity']):
+                                best_by_key[key] = cand
+                        merged_unique = list(best_by_key.values())
+                        # 只按图像相似度排序，不做RRF融合
+                        final_sorted = sorted(merged_unique, key=lambda x: x['similarity'], reverse=True)
+                        # 日志：展示 image-only 排名
+                        try:
+                            log_n = min(max(1, top_k), len(final_sorted))
+                            if log_n > 0:
+                                logging.info(f"[VecRetrieve][img] image-only top {log_n}:")
+                            for rank, cand in enumerate(final_sorted[:log_n], 1):
+                                logging.info(
+                                    f"  #{rank}: clip_sim={cand.get('similarity', 0.0):.4f} | src_idx={cand.get('source_frontier_index')} | qid={cand.get('question_id')} | step={cand.get('step_key')} | lvl={cand.get('level')}"
+                                )
+                        except Exception:
+                            pass
+                        # 选取 top_k 并回取 tuple 经验
+                        final_selected = final_sorted[: max(1, top_k)]
+                        texts = []
+                        try:
+                            if isinstance(exp_tuple_path, str) and len(exp_tuple_path) > 0 and os.path.exists(exp_tuple_path):
+                                with open(exp_tuple_path, 'r', encoding='utf-8') as _f:
+                                    tuple_data = json.load(_f)
+                            else:
+                                tuple_data = None
+                        except Exception:
+                            tuple_data = None
+
+                        def _fetch_tuple_step(_data, _qid, _step_key):
+                            if not isinstance(_data, dict):
+                                return None
+                            if _qid in _data and isinstance(_data[_qid], dict):
+                                qnode = _data[_qid]
+                            else:
+                                qnode = None
+                                for _, bucket in _data.items():
+                                    if isinstance(bucket, dict) and _qid in bucket:
+                                        qnode = bucket.get(_qid)
+                                        break
+                            if not isinstance(qnode, dict):
+                                return None
+                            q_text = qnode.get('question', '')
+                            steps = qnode.get('steps') if isinstance(qnode.get('steps'), dict) else qnode
+                            step_entry = None
+                            if isinstance(steps, dict):
+                                step_entry = steps.get(_step_key)
+                            if not isinstance(step_entry, dict):
+                                return None
+                            return q_text, step_entry
+
+                        for j, cand in enumerate(final_selected):
+                            qid = cand.get('question_id')
+                            sk = cand.get('step_key')
+                            if tuple_data is None:
+                                continue
+                            fetched = _fetch_tuple_step(tuple_data, qid, sk)
+                            if not fetched:
+                                continue
+                            q_text, step_entry = fetched
+                            cur = step_entry.get('current_step')
+                            tot = step_entry.get('total_step')
+                            caption = step_entry.get('Caption') or step_entry.get('caption') or ''
+                            critique = step_entry.get('Critique') or step_entry.get('critique')
+                            abstraction = step_entry.get('Abstraction') or step_entry.get('abstraction')
+                            bvf = step_entry.get('chosen_BVF')
+                            cvf = step_entry.get('chosen_CVF')
+                            outcome = step_entry.get('final_reward')
+
+                            blocks = []
+                            exp_id = j + 1
+                            if inject_experience:
+                                sentence = f"Experience {exp_id}:\n At step {cur if cur is not None else '?'} of {tot if tot is not None else '?'}, you were asked to answer the question: {q_text}. "
+                                if caption:
+                                    sentence += f"In that moment, the visible frontier looked like this: {caption} "
+                                if (bvf is not None and cvf is not None):
+                                    sentence += f"You first selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, and then chose the Closer-View Frontier (CVF {cvf}) within that direction to proceed, "
+                                elif (bvf is not None):
+                                    sentence += f"You selected the Broad-View Frontier (BVF {bvf}) to set the overall direction, "
+                                elif (cvf is not None):
+                                    sentence += f"You chose the Closer-View Frontier (CVF {cvf}) to move forward, "
+                                if outcome is not None:
+                                    sentence += f"and the outcome of that trial was {outcome}."
+                                blocks.append(sentence.strip())
+                            else:
+                                blocks.append(f"Experience {exp_id}:")
+
+                            if inject_critique and isinstance(critique, str) and critique.strip():
+                                blocks.append("")
+                                blocks.append(f"Critique: {critique}")
+                            if inject_abstraction and isinstance(abstraction, str) and abstraction.strip():
+                                blocks.append("")
+                                blocks.append(f"Abstraction: {abstraction}")
+                            texts.append("\n".join(blocks))
+                        return "\n\n".join(texts) if texts else None
+            except Exception as e:
+                logging.warning(f"[VecRetrieve][img] failed: {e}")
+
     # random：从向量库 PNG 通道随机抽取，映射到 (qid, step_key) 后回取 experience
     if (strategy or 'sim') == 'random':
         store = _load_vector_store(cfg)

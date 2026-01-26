@@ -1008,7 +1008,7 @@ if __name__ == "__main__":
     parser.add_argument("-cf", "--cfg_file", help="cfg file path", default="", type=str)
     parser.add_argument("--start_ratio", help="start ratio", default=0.0, type=float)
     parser.add_argument("--end_ratio", help="end ratio", default=1.0, type=float)
-    parser.add_argument("--replay_mode", help="replay selection mode: sim or random or traj_sim or traj_random", default="sim", type=str)
+    parser.add_argument("--replay_mode", help="replay selection mode: sim or random or traj_sim or traj_random or txt or img (txt=text-only, img=image-only, no RRF)", default="sim", type=str)
     parser.add_argument("--replay_top", help="top-k for replay candidates", default=1, type=int)
     parser.add_argument("--retrieve_root", help="external retrieve root; expects replay_step_info.json & experience_output.json inside", default="", type=str)
     parser.add_argument("--use_episodic_context", help="whether to enable episodic context (0/1)", default=1, type=int)
