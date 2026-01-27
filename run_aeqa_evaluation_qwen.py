@@ -193,7 +193,7 @@ def check_lifelong_memory(lifelong_json_path, lifelong_memory, cfg, question):
         question,
         top_k=3,
         max_objects=8,
-        model_name='/anvme/workspace/v100dd12-3dmem/model/clip-ViT-B-32'
+        model_name='/anvme/workspace/v100dd12-3dmem_rebuttal/v100dd12-3dmem-1769055061/model/clip-ViT-B-32'
     ):
 
         def obj_list_to_caption(obj_list):
@@ -575,7 +575,7 @@ def main(cfg, start_ratio=0.0, end_ratio=1.0):
 
     logging.info("[DEBUG] Loading CLIP model...")
     clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
-        "ViT-H-14", pretrained="/anvme/workspace/v100dd12-3dmem/model/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin"  # "ViT-H-14", "laion2b_s32b_b79k"
+        "ViT-H-14", pretrained="/anvme/workspace/v100dd12-3dmem_rebuttal/v100dd12-3dmem-1769055061/model/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin"  # "ViT-H-14", "laion2b_s32b_b79k"
     )
     clip_tokenizer = open_clip.get_tokenizer("ViT-B-32")
     logging.info(f"Load CLIP model successful!")
