@@ -1,4 +1,4 @@
-# ReExplore: Learning from Past Explorations for Embodied Question Answering
+# ReEXplore: Retrospective Experience Replay for MLLM-Based Embodied Exploration
 
 This repository contains the code for **ReExplore**, a framework that enables embodied agents to learn from past exploration experiences to improve future embodied question answering (EQA) performance.
 
