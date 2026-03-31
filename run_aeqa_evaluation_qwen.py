@@ -1027,6 +1027,7 @@ if __name__ == "__main__":
     parser.add_argument("--ppl_rank", help="perplexity rank category for filtering: 'low', 'medium', or 'high' (case-insensitive)", default="", type=str)
     parser.add_argument("--ppl_rank_file", help="path to ppl_rank json file", default="/home/hpc/v100dd/v100dd12/code/3D-Mem/perplexity/traj_abs_format_ppl_rank.json", type=str)
     parser.add_argument("--experience_training_status", help="filter vector store by training status: 'success' or 'fail' (default: None, uses default path)", default=None, type=str)
+    parser.add_argument("--k_num", help="rrf_k parameter for traj_sim mode (default: 60)", default=60, type=int)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
@@ -1055,6 +1056,9 @@ if __name__ == "__main__":
         if status in ("success", "fail"):
             cfg.experience_training_status = status
         # if invalid value, don't set (let it use getattr default)
+    
+    # k_num parameter for rrf_k in traj_sim mode (default: 60)
+    cfg.rrf_k = int(args.k_num)
 
     # normalize inject_stage into cfg (empty -> None)
     # normalize stage flag (exp_at preferred)

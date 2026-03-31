@@ -2430,6 +2430,7 @@ def explore_step(
                 )
             ),
             current_question=question,
+            rrf_k=int(getattr(cfg, "rrf_k", 60)),
             exp_tuple_path=exp_tuple_path,
             inject_experience=bool(inject_experience),
             inject_critique=bool(inject_critique),
@@ -2585,6 +2586,7 @@ def explore_step(
                     )
                 ),
                 current_question=question,
+                rrf_k=int(getattr(cfg, "rrf_k", 60)),
                 exp_tuple_path=exp_tuple_path,
                 inject_experience=bool(inject_experience),
                 inject_critique=bool(inject_critique),
