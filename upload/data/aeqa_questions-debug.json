@@ -1,0 +1,40 @@
+[{
+    "question": "Where can I get recipes for what to cook?",
+    "answer": "The open cookbook on the kitchen counter top",
+    "category": "functional reasoning",
+    "question_id": "ae19adeb-498a-4814-b955-e0af05623f9b",
+    "episode_history": "00824-Dd4bFSTQ8gi",
+    "position": [
+        6.892691135406494,
+        0.06882420182228088,
+        1.4872137308120728
+    ],
+    "rotation": [
+        0.37141478061676025,
+        0.0,
+        0.9284670948982239,
+        0.0
+    ],
+    "object_id": null,
+    "class": null
+},
+{
+    "question": "What is hanging from the oven handle?",
+    "answer": "A towel",
+    "category": "spatial understanding",
+    "question_id": "00c2be2a-1377-4fae-a889-30936b7890c3",
+    "episode_history": "00824-Dd4bFSTQ8gi",
+    "position": [
+        6.892691135406494,
+        0.06882420182228088,
+        1.4872137308120728
+    ],
+    "rotation": [
+        0.37141478061676025,
+        0.0,
+        0.9284670948982239,
+        0.0
+    ],
+    "object_id": null,
+    "class": null
+}]
